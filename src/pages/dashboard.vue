@@ -94,9 +94,6 @@
             <el-tab-pane label="自动回复" name="auto-reply">
               <AutoReply :account="authStore.currentAccount" />
             </el-tab-pane>
-            <el-tab-pane label="代理设置" name="proxy">
-              <ProxySettings />
-            </el-tab-pane>
           </el-tabs>
         </div>
       </el-main>
@@ -135,7 +132,6 @@ import GroupManagement from '@/components/GroupManagement.vue'
 import AutoReply from '@/components/AutoReply.vue'
 import AccountManager from '@/components/AccountManager.vue'
 import AccountManagementModal from '@/components/AccountManagementModal.vue'
-import ProxySettings from '@/components/ProxySettings.vue'
 
 // Store
 const authStore = useAuthStore()
@@ -453,7 +449,7 @@ onMounted(async () => {
 
 .account-tabs {
   height: 100%;
-  padding-left: var(--spacing-xl);
+  padding: 0 var(--spacing-xl);
 
   :deep(.el-tabs__header) {
     margin: 0;
@@ -503,7 +499,7 @@ onMounted(async () => {
   :deep(.el-tab-pane) {
     height: 100%;
     overflow-y: auto;
-    padding: var(--spacing-xl);
+    padding: var(--spacing-xl) 0;
     background: var(--bg-primary);
   }
 }

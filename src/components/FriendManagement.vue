@@ -42,7 +42,7 @@
             <div class="region" v-if="searchResult.region">地区：{{ searchResult.region }}</div>
           </div>
           <div class="actions">
-            <el-button type="primary" :loading="addFriendLoading" @click="addFriend">
+            <el-button type="primary" :loading="addFriendLoading" @click="openAddFriendDialog">
               <el-icon><UserFilled /></el-icon>
               添加好友
             </el-button>
@@ -79,8 +79,19 @@
         </div>
         
         <div v-else-if="filteredFriends.length === 0" class="empty-friends">
-          <el-empty description="暂无好友">
-            <el-button type="primary" @click="refreshFriends">刷新好友列表</el-button>
+          <el-empty description="暂无好友数据">
+            <template #description>
+              <p>可能的原因：</p>
+              <ul style="text-align: left; margin: 10px 0;">
+                <li>当前账号还没有好友</li>
+                <li>需要刷新通讯录数据</li>
+                <li>网络连接问题</li>
+              </ul>
+            </template>
+            <el-button type="primary" @click="refreshFriends" :loading="friendsLoading">
+              <el-icon><Refresh /></el-icon>
+              刷新通讯录
+            </el-button>
           </el-empty>
         </div>
         
@@ -122,6 +133,50 @@
       </div>
     </el-card>
 
+    <!-- 添加好友对话框 -->
+    <el-dialog v-model="showAddFriendDialog" title="添加好友" width="500px">
+      <div class="add-friend-content" v-if="searchResult">
+        <div class="friend-info">
+          <el-avatar :src="searchResult.avatar" :size="60">
+            <el-icon><UserFilled /></el-icon>
+          </el-avatar>
+          <div class="info">
+            <div class="nickname">{{ searchResult.nickname }}</div>
+            <div class="wxid">微信号：{{ searchResult.wxid }}</div>
+            <div class="signature" v-if="searchResult.signature">{{ searchResult.signature }}</div>
+          </div>
+        </div>
+
+        <el-form :model="addFriendForm" label-width="100px" class="add-friend-form">
+          <el-form-item label="打招呼内容" required>
+            <el-input
+              v-model="addFriendForm.verifyContent"
+              type="textarea"
+              :rows="4"
+              placeholder="请输入打招呼内容..."
+              maxlength="200"
+              show-word-limit
+            />
+          </el-form-item>
+          <el-form-item label="验证来源">
+            <el-select v-model="addFriendForm.scene" placeholder="选择验证来源">
+              <el-option label="通过搜索添加" :value="1" />
+              <el-option label="通过群聊添加" :value="2" />
+              <el-option label="通过名片添加" :value="3" />
+            </el-select>
+          </el-form-item>
+        </el-form>
+      </div>
+
+      <template #footer>
+        <el-button @click="showAddFriendDialog = false">取消</el-button>
+        <el-button type="primary" :loading="addFriendLoading" @click="confirmAddFriend">
+          <el-icon><UserFilled /></el-icon>
+          发送好友请求
+        </el-button>
+      </template>
+    </el-dialog>
+
     <!-- 修改备注对话框 -->
     <el-dialog v-model="showRemarkDialog" title="修改备注" width="400px">
       <el-form :model="remarkForm" label-width="80px">
@@ -147,6 +202,29 @@ import { Search, UserFilled, Refresh, MoreFilled, ChatDotRound, Edit, Delete } f
 import { friendApi } from '@/api/friend'
 import type { SearchContactRequest, SendFriendRequestRequest } from '@/types/friend'
 
+// 定义好友类型
+interface Friend {
+  wxid: string
+  nickname: string
+  avatar: string
+  remark: string
+  signature: string
+  sex: number
+  isOnline: boolean
+}
+
+// 定义搜索结果类型
+interface SearchResult {
+  wxid: string
+  nickname: string
+  avatar: string
+  region: string
+  signature: string
+  v1?: string
+  v2?: string
+  antispamTicket?: string
+}
+
 // Props
 const props = defineProps<{
   account: any
@@ -158,20 +236,27 @@ const searchForm = ref({
   keyword: ''
 })
 
-const searchResult = ref(null)
+const searchResult = ref<SearchResult | null>(null)
 const searchLoading = ref(false)
 const addFriendLoading = ref(false)
 const friendsLoading = ref(false)
 const friendFilter = ref('')
 const forceRefreshCache = ref(false)
 const showRemarkDialog = ref(false)
-const currentFriend = ref(null)
+const showAddFriendDialog = ref(false)
+const currentFriend = ref<Friend | null>(null)
 const remarkForm = ref({
   remark: ''
 })
 
+// 添加好友表单数据
+const addFriendForm = ref({
+  verifyContent: '你好，我想加你为好友',
+  scene: 1
+})
+
 // 好友数据
-const friends = ref([])
+const friends = ref<Friend[]>([])
 
 // 计算属性
 const filteredFriends = computed(() => {
@@ -233,8 +318,23 @@ const searchUser = async () => {
   }
 }
 
-const addFriend = async () => {
+// 显示添加好友对话框
+const openAddFriendDialog = () => {
+  if (!searchResult.value) {
+    ElMessage.warning('请先搜索用户')
+    return
+  }
+  showAddFriendDialog.value = true
+}
+
+// 确认添加好友
+const confirmAddFriend = async () => {
   if (!searchResult.value || !props.account?.wxid) return
+
+  if (!addFriendForm.value.verifyContent.trim()) {
+    ElMessage.warning('请输入打招呼内容')
+    return
+  }
 
   addFriendLoading.value = true
   try {
@@ -243,16 +343,20 @@ const addFriend = async () => {
       V1: searchResult.value.v1 || '',
       V2: searchResult.value.v2 || '',
       Opcode: 1,
-      Scene: 1,
-      VerifyContent: '你好，我想加你为好友'
+      Scene: addFriendForm.value.scene,
+      VerifyContent: addFriendForm.value.verifyContent
     }
 
     const response = await friendApi.sendFriendRequest(params)
 
     if (response.Success) {
       ElMessage.success('好友请求已发送')
+      showAddFriendDialog.value = false
       searchResult.value = null
       searchForm.value.keyword = ''
+      // 重置表单
+      addFriendForm.value.verifyContent = '你好，我想加你为好友'
+      addFriendForm.value.scene = 1
       // 刷新好友列表
       await refreshFriends()
     } else {
@@ -282,17 +386,40 @@ const refreshFriends = async () => {
     }
 
     console.log('刷新通讯录参数:', params)
-    const response = await friendApi.getSimplifiedContactList(params)
+
+    // 尝试使用简化接口，如果失败则使用完整接口
+    let response
+    try {
+      response = await friendApi.getSimplifiedContactList(params)
+    } catch (error) {
+      console.log('简化接口失败，尝试使用完整接口:', error)
+      response = await friendApi.getTotalContactList(params)
+    }
+
+    console.log('通讯录响应:', response)
 
     if (response.Success) {
+      // 处理不同的响应格式
+      let contactList = []
+
       if (response.Data?.ContactList) {
-        friends.value = response.Data.ContactList.map((contact: any) => ({
-          wxid: contact.UserName,
-          nickname: contact.NickName || contact.UserName,
-          avatar: contact.BigHeadImgUrl || '',
-          remark: contact.Remark || '',
-          signature: contact.Signature || '',
-          sex: contact.Sex || 0,
+        contactList = response.Data.ContactList
+      } else if (response.Data?.MemberList) {
+        contactList = response.Data.MemberList
+      } else if (Array.isArray(response.Data)) {
+        contactList = response.Data
+      } else {
+        console.log('未知的响应格式:', response.Data)
+      }
+
+      if (contactList && contactList.length > 0) {
+        friends.value = contactList.map((contact: any) => ({
+          wxid: contact.UserName || contact.Wxid || contact.wxid,
+          nickname: contact.NickName || contact.Nickname || contact.nickname || contact.UserName || '未知用户',
+          avatar: contact.BigHeadImgUrl || contact.HeadImgUrl || contact.avatar || '',
+          remark: contact.Remark || contact.remark || '',
+          signature: contact.Signature || contact.signature || '',
+          sex: contact.Sex || contact.sex || 0,
           isOnline: false
         }))
 
@@ -306,14 +433,15 @@ const refreshFriends = async () => {
         ElMessage.success(message)
       } else {
         friends.value = []
-        ElMessage.info('通讯录为空')
+        ElMessage.info('通讯录为空或暂无好友')
       }
     } else {
       throw new Error(response.Message || '获取好友列表失败')
     }
   } catch (error: any) {
-    ElMessage.error(error.message || '刷新失败')
     console.error('刷新好友列表失败:', error)
+    ElMessage.error(`刷新失败: ${error.message || '网络错误'}`)
+    friends.value = []
   } finally {
     friendsLoading.value = false
   }
@@ -322,7 +450,12 @@ const refreshFriends = async () => {
 const handleFriendAction = async (command: string) => {
   const [action, wxid] = command.split('-')
   const friend = friends.value.find(f => f.wxid === wxid)
-  
+
+  if (!friend) {
+    ElMessage.error('未找到该好友')
+    return
+  }
+
   if (action === 'chat') {
     ElMessage.info(`准备与 ${friend.nickname} 聊天`)
     // 这里可以切换到聊天界面
@@ -497,6 +630,61 @@ onMounted(() => {
   
   .friend-actions {
     flex-shrink: 0;
+  }
+}
+
+// 添加好友对话框样式
+.add-friend-content {
+  .friend-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-medium);
+    margin-bottom: var(--spacing-lg);
+
+    .info {
+      flex: 1;
+
+      .nickname {
+        font-size: var(--font-size-lg);
+        font-weight: 500;
+        color: var(--text-primary);
+        margin-bottom: var(--spacing-xs);
+      }
+
+      .wxid {
+        font-size: var(--font-size-sm);
+        color: var(--text-secondary);
+        margin-bottom: var(--spacing-xs);
+      }
+
+      .signature {
+        font-size: var(--font-size-sm);
+        color: var(--text-tertiary);
+        font-style: italic;
+      }
+    }
+  }
+
+  .add-friend-form {
+    .el-form-item {
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .el-textarea {
+      :deep(.el-textarea__inner) {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: var(--radius-small);
+
+        &:focus {
+          border-color: var(--primary-color);
+          box-shadow: 0 0 0 2px var(--primary-light);
+        }
+      }
+    }
   }
 }
 </style>
