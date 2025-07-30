@@ -1,0 +1,547 @@
+// Element Plus 强制样式覆盖
+// 确保完全移除绿色主题，使用蓝色透明质感设计
+// 强制禁用夜间模式，始终使用浅色透明质感主题
+
+// 强制覆盖夜间模式
+html,
+body,
+#app,
+.app-container {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%) !important;
+  color: #262626 !important;
+}
+
+// 禁用所有暗色主题样式
+html.dark,
+body.dark,
+.dark,
+[data-theme="dark"],
+[class*="dark"] {
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%) !important;
+  color: #262626 !important;
+
+  * {
+    background-color: transparent !important;
+    color: inherit !important;
+  }
+}
+
+// 强制覆盖Element Plus暗色主题
+.ep-config-provider,
+.el-config-provider {
+  --ep-bg-color: transparent !important;
+  --ep-text-color-primary: #262626 !important;
+  --ep-text-color-regular: #595959 !important;
+  --ep-text-color-secondary: #8c8c8c !important;
+  --ep-text-color-placeholder: #bfbfbf !important;
+  --ep-border-color: rgba(0, 0, 0, 0.06) !important;
+  --ep-border-color-light: rgba(0, 0, 0, 0.06) !important;
+  --ep-border-color-lighter: rgba(0, 0, 0, 0.06) !important;
+  --ep-border-color-extra-light: rgba(0, 0, 0, 0.06) !important;
+  --ep-fill-color: rgba(255, 255, 255, 0.7) !important;
+  --ep-fill-color-light: rgba(255, 255, 255, 0.8) !important;
+  --ep-fill-color-lighter: rgba(255, 255, 255, 0.9) !important;
+  --ep-fill-color-extra-light: rgba(255, 255, 255, 0.95) !important;
+  --ep-fill-color-blank: transparent !important;
+}
+
+// 强制覆盖所有按钮样式
+.el-button,
+.ep-button,
+[class*="el-button"],
+[class*="ep-button"] {
+  --el-button-bg-color: transparent !important;
+  --el-button-border-color: rgba(0, 0, 0, 0.15) !important;
+  --el-button-text-color: #595959 !important;
+  --el-button-hover-bg-color: rgba(0, 0, 0, 0.02) !important;
+  --el-button-hover-border-color: rgba(24, 144, 255, 0.3) !important;
+  --el-button-hover-text-color: #1890ff !important;
+  
+  background: transparent !important;
+  backdrop-filter: blur(10px) !important;
+  border-radius: 6px !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  
+  &.el-button--primary,
+  &.ep-button--primary {
+    --el-button-bg-color: transparent !important;
+    --el-button-border-color: #1890ff !important;
+    --el-button-text-color: #1890ff !important;
+    --el-button-hover-bg-color: rgba(24, 144, 255, 0.05) !important;
+    --el-button-hover-border-color: #40a9ff !important;
+    --el-button-hover-text-color: #40a9ff !important;
+    
+    background: transparent !important;
+    border-color: #1890ff !important;
+    color: #1890ff !important;
+    
+    &:hover,
+    &:focus {
+      background: rgba(24, 144, 255, 0.05) !important;
+      border-color: #40a9ff !important;
+      color: #40a9ff !important;
+      transform: translateY(-1px) !important;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+    }
+  }
+}
+
+// 强制覆盖开关组件
+.el-switch,
+.ep-switch,
+[class*="el-switch"],
+[class*="ep-switch"] {
+  --el-switch-on-color: #1890ff !important;
+  --el-switch-off-color: rgba(0, 0, 0, 0.15) !important;
+  --el-switch-border-color: rgba(0, 0, 0, 0.15) !important;
+
+  .el-switch__core,
+  .ep-switch__core {
+    background-color: rgba(255, 255, 255, 0.7) !important;
+    backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(0, 0, 0, 0.15) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+
+    &.is-checked {
+      background-color: #1890ff !important;
+      border-color: #1890ff !important;
+    }
+  }
+
+  .el-switch__action,
+  .ep-switch__action {
+    background: #ffffff !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+    border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  }
+
+  &.is-checked {
+    .el-switch__core,
+    .ep-switch__core {
+      background-color: #1890ff !important;
+      border-color: #1890ff !important;
+    }
+  }
+}
+
+// 额外的开关强制覆盖
+.el-switch.is-checked .el-switch__core {
+  background-color: #1890ff !important;
+  border-color: #1890ff !important;
+}
+
+.ep-switch.is-checked .ep-switch__core {
+  background-color: #1890ff !important;
+  border-color: #1890ff !important;
+}
+
+// 强制覆盖标签组件
+.el-tag,
+.ep-tag,
+[class*="el-tag"],
+[class*="ep-tag"] {
+  border-radius: 4px !important;
+  backdrop-filter: blur(10px) !important;
+
+  &.el-tag--success,
+  &.ep-tag--success {
+    --el-tag-bg-color: rgba(24, 144, 255, 0.05) !important;
+    --el-tag-border-color: rgba(24, 144, 255, 0.3) !important;
+    --el-tag-text-color: #1890ff !important;
+
+    background-color: rgba(24, 144, 255, 0.05) !important;
+    border-color: rgba(24, 144, 255, 0.3) !important;
+    color: #1890ff !important;
+  }
+
+  &.el-tag--primary,
+  &.ep-tag--primary {
+    --el-tag-bg-color: rgba(24, 144, 255, 0.05) !important;
+    --el-tag-border-color: rgba(24, 144, 255, 0.3) !important;
+    --el-tag-text-color: #1890ff !important;
+
+    background-color: rgba(24, 144, 255, 0.05) !important;
+    border-color: rgba(24, 144, 255, 0.3) !important;
+    color: #1890ff !important;
+  }
+
+  &.el-tag--danger,
+  &.ep-tag--danger {
+    --el-tag-bg-color: rgba(255, 77, 79, 0.05) !important;
+    --el-tag-border-color: rgba(255, 77, 79, 0.3) !important;
+    --el-tag-text-color: #ff4d4f !important;
+
+    background-color: rgba(255, 77, 79, 0.05) !important;
+    border-color: rgba(255, 77, 79, 0.3) !important;
+    color: #ff4d4f !important;
+  }
+
+  &.el-tag--warning,
+  &.ep-tag--warning {
+    --el-tag-bg-color: rgba(250, 173, 20, 0.05) !important;
+    --el-tag-border-color: rgba(250, 173, 20, 0.3) !important;
+    --el-tag-text-color: #faad14 !important;
+
+    background-color: rgba(250, 173, 20, 0.05) !important;
+    border-color: rgba(250, 173, 20, 0.3) !important;
+    color: #faad14 !important;
+  }
+}
+
+// 强制覆盖输入框
+.el-input,
+.ep-input,
+[class*="el-input"],
+[class*="ep-input"] {
+  .el-input__wrapper,
+  .ep-input__wrapper {
+    --el-input-border-color: rgba(0, 0, 0, 0.06) !important;
+    --el-input-hover-border-color: rgba(0, 0, 0, 0.1) !important;
+    --el-input-focus-border-color: #1890ff !important;
+    
+    background: rgba(255, 255, 255, 0.7) !important;
+    backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(0, 0, 0, 0.06) !important;
+    border-radius: 6px !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    
+    &:hover {
+      border-color: rgba(0, 0, 0, 0.1) !important;
+      background: rgba(255, 255, 255, 0.95) !important;
+    }
+    
+    &.is-focus {
+      border-color: #1890ff !important;
+      background: rgba(255, 255, 255, 0.95) !important;
+      box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1) !important;
+    }
+  }
+}
+
+// 强制覆盖选择器
+.el-select,
+.ep-select,
+[class*="el-select"],
+[class*="ep-select"] {
+  .el-input__wrapper,
+  .ep-input__wrapper {
+    background: rgba(255, 255, 255, 0.7) !important;
+    backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(0, 0, 0, 0.06) !important;
+    
+    &:hover {
+      border-color: rgba(0, 0, 0, 0.1) !important;
+      background: rgba(255, 255, 255, 0.95) !important;
+    }
+    
+    &.is-focus {
+      border-color: #1890ff !important;
+      background: rgba(255, 255, 255, 0.95) !important;
+      box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1) !important;
+    }
+  }
+}
+
+// 强制覆盖数字输入框
+.el-input-number,
+.ep-input-number,
+[class*="el-input-number"],
+[class*="ep-input-number"] {
+  .el-input__wrapper,
+  .ep-input__wrapper {
+    background: rgba(255, 255, 255, 0.7) !important;
+    backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(0, 0, 0, 0.06) !important;
+    
+    &:hover {
+      border-color: rgba(0, 0, 0, 0.1) !important;
+      background: rgba(255, 255, 255, 0.95) !important;
+    }
+    
+    &.is-focus {
+      border-color: #1890ff !important;
+      background: rgba(255, 255, 255, 0.95) !important;
+      box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1) !important;
+    }
+  }
+}
+
+// 移除任何可能的绿色样式
+* {
+  &[style*="green"],
+  &[style*="#00b96b"],
+  &[style*="#07c160"],
+  &[style*="#21ba45"] {
+    color: #1890ff !important;
+    background-color: transparent !important;
+    border-color: #1890ff !important;
+  }
+}
+
+// 确保CSS变量完全覆盖
+html,
+body,
+:root,
+* {
+  --el-color-primary: #1890ff !important;
+  --el-color-primary-light-1: #40a9ff !important;
+  --el-color-primary-light-2: #69c0ff !important;
+  --el-color-primary-light-3: #91d5ff !important;
+  --el-color-primary-light-4: #b7e7ff !important;
+  --el-color-primary-light-5: #d6f7ff !important;
+  --el-color-primary-light-6: #e6f7ff !important;
+  --el-color-primary-light-7: #f0f9ff !important;
+  --el-color-primary-light-8: #f7fcff !important;
+  --el-color-primary-light-9: #fafcff !important;
+  --el-color-primary-dark-1: #1677cc !important;
+  --el-color-primary-dark-2: #135aa3 !important;
+}
+
+// 最强制的覆盖规则
+.el-button--primary,
+.ep-button--primary,
+button[class*="primary"],
+[class*="el-button"][class*="primary"],
+[class*="ep-button"][class*="primary"] {
+  background-color: transparent !important;
+  background: transparent !important;
+  border-color: #1890ff !important;
+  color: #1890ff !important;
+
+  &:hover,
+  &:focus,
+  &:active {
+    background-color: rgba(24, 144, 255, 0.05) !important;
+    background: rgba(24, 144, 255, 0.05) !important;
+    border-color: #40a9ff !important;
+    color: #40a9ff !important;
+  }
+}
+
+.el-switch.is-checked .el-switch__core,
+.ep-switch.is-checked .ep-switch__core,
+[class*="el-switch"].is-checked [class*="core"],
+[class*="ep-switch"].is-checked [class*="core"] {
+  background-color: rgba(24, 144, 255, 0.05) !important;
+  background: rgba(24, 144, 255, 0.05) !important;
+  border-color: #1890ff !important;
+}
+
+// 强制移除所有绿色
+*[style*="background-color: green"],
+*[style*="background-color: #00b96b"],
+*[style*="background-color: #07c160"],
+*[style*="background-color: #21ba45"],
+*[style*="background-color: #67c23a"],
+*[style*="background: green"],
+*[style*="background: #00b96b"],
+*[style*="background: #07c160"],
+*[style*="background: #21ba45"],
+*[style*="background: #67c23a"],
+*[class*="green"] {
+  background-color: #1890ff !important;
+  background: #1890ff !important;
+  border-color: #1890ff !important;
+  color: #ffffff !important;
+}
+
+// 强制覆盖Element Plus的成功状态颜色
+.el-tag--success,
+.ep-tag--success,
+.el-button--success,
+.ep-button--success,
+.el-switch.is-checked,
+.ep-switch.is-checked {
+  --el-color-success: #1890ff !important;
+  --el-color-success-light-3: rgba(24, 144, 255, 0.3) !important;
+  --el-color-success-light-5: rgba(24, 144, 255, 0.5) !important;
+  --el-color-success-light-7: rgba(24, 144, 255, 0.7) !important;
+  --el-color-success-light-8: rgba(24, 144, 255, 0.8) !important;
+  --el-color-success-light-9: rgba(24, 144, 255, 0.9) !important;
+}
+
+// 最终的绿色清除规则
+* {
+  &[style*="#67c23a"],
+  &[style*="#85ce61"],
+  &[style*="#95d475"],
+  &[style*="#b3e19d"],
+  &[style*="#d1edc4"] {
+    background-color: #1890ff !important;
+    border-color: #1890ff !important;
+    color: #ffffff !important;
+  }
+}
+
+// 专门针对在线状态标签的强制覆盖
+.el-tag.el-tag--success,
+.ep-tag.ep-tag--success,
+.el-tag[class*="success"],
+.ep-tag[class*="success"] {
+  background-color: rgba(24, 144, 255, 0.1) !important;
+  border-color: #1890ff !important;
+  color: #1890ff !important;
+
+  &.el-tag--light,
+  &.ep-tag--light {
+    background-color: rgba(24, 144, 255, 0.05) !important;
+    border-color: rgba(24, 144, 255, 0.3) !important;
+    color: #1890ff !important;
+  }
+}
+
+// 强制覆盖所有可能的绿色CSS变量
+:root,
+html,
+body {
+  --el-color-success: #1890ff !important;
+  --el-color-success-rgb: 24, 144, 255 !important;
+  --el-color-success-light-1: #40a9ff !important;
+  --el-color-success-light-2: #69c0ff !important;
+  --el-color-success-light-3: #91d5ff !important;
+  --el-color-success-light-4: #b7e7ff !important;
+  --el-color-success-light-5: #d6f7ff !important;
+  --el-color-success-light-6: #e6f7ff !important;
+  --el-color-success-light-7: #f0f9ff !important;
+  --el-color-success-light-8: #f7fcff !important;
+  --el-color-success-light-9: #fafcff !important;
+  --el-color-success-dark-1: #1677cc !important;
+  --el-color-success-dark-2: #135aa3 !important;
+}
+
+// 强制覆盖所有可能的暗色背景
+*,
+*::before,
+*::after {
+  &[style*="background-color: #"],
+  &[style*="background: #"],
+  &[class*="dark"],
+  &[data-theme="dark"] {
+    background-color: transparent !important;
+    background: transparent !important;
+  }
+}
+
+// 强制覆盖Element Plus组件的暗色样式
+.ep-card,
+.el-card,
+.ep-dialog,
+.el-dialog,
+.ep-drawer,
+.el-drawer,
+.ep-popover,
+.el-popover,
+.ep-tooltip,
+.el-tooltip,
+.ep-dropdown,
+.el-dropdown {
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  color: #262626 !important;
+
+  .ep-card__body,
+  .el-card__body,
+  .ep-dialog__body,
+  .el-dialog__body {
+    background: transparent !important;
+    color: #262626 !important;
+  }
+}
+
+// 强制覆盖表单组件的暗色样式
+.ep-form,
+.el-form,
+.ep-form-item,
+.el-form-item,
+.ep-input,
+.el-input,
+.ep-select,
+.el-select,
+.ep-textarea,
+.el-textarea {
+  background: transparent !important;
+  color: #262626 !important;
+
+  .ep-input__wrapper,
+  .el-input__wrapper,
+  .ep-textarea__inner,
+  .el-textarea__inner {
+    background: rgba(255, 255, 255, 0.7) !important;
+    backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(0, 0, 0, 0.06) !important;
+    color: #262626 !important;
+  }
+}
+
+// 强制覆盖导航和布局组件
+.ep-header,
+.el-header,
+.ep-aside,
+.el-aside,
+.ep-main,
+.el-main,
+.ep-footer,
+.el-footer {
+  background: transparent !important;
+  color: #262626 !important;
+}
+
+// 强制覆盖所有文本颜色
+* {
+  color: #262626 !important;
+
+  &::placeholder {
+    color: #bfbfbf !important;
+  }
+}
+
+// 最终的强制浅色模式规则
+html,
+body,
+#app,
+.app-container,
+* {
+  &.dark,
+  &[data-theme="dark"],
+  &[class*="dark"] {
+    background: transparent !important;
+    color: #262626 !important;
+  }
+}
+
+// 强制覆盖所有可能的暗色背景
+*[style*="background-color: rgb("],
+*[style*="background-color: rgba("],
+*[style*="background: rgb("],
+*[style*="background: rgba("] {
+  background: transparent !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+// 强制覆盖Element Plus的暗色CSS变量
+html,
+body,
+:root {
+  --ep-bg-color: transparent !important;
+  --ep-bg-color-page: transparent !important;
+  --ep-bg-color-overlay: rgba(255, 255, 255, 0.95) !important;
+  --ep-text-color-primary: #262626 !important;
+  --ep-text-color-regular: #595959 !important;
+  --ep-text-color-secondary: #8c8c8c !important;
+  --ep-text-color-placeholder: #bfbfbf !important;
+  --ep-text-color-disabled: #bfbfbf !important;
+  --ep-border-color: rgba(0, 0, 0, 0.06) !important;
+  --ep-border-color-light: rgba(0, 0, 0, 0.06) !important;
+  --ep-border-color-lighter: rgba(0, 0, 0, 0.06) !important;
+  --ep-border-color-extra-light: rgba(0, 0, 0, 0.06) !important;
+  --ep-border-color-dark: rgba(0, 0, 0, 0.1) !important;
+  --ep-border-color-darker: rgba(0, 0, 0, 0.15) !important;
+  --ep-fill-color: rgba(255, 255, 255, 0.7) !important;
+  --ep-fill-color-light: rgba(255, 255, 255, 0.8) !important;
+  --ep-fill-color-lighter: rgba(255, 255, 255, 0.9) !important;
+  --ep-fill-color-extra-light: rgba(255, 255, 255, 0.95) !important;
+  --ep-fill-color-dark: rgba(255, 255, 255, 0.6) !important;
+  --ep-fill-color-darker: rgba(255, 255, 255, 0.5) !important;
+  --ep-fill-color-blank: transparent !important;
+}

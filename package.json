@@ -20,7 +20,10 @@
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",
     "@vueuse/core": "^12.0.0",
+    "axios": "^1.6.0",
     "element-plus": "^2.9.0",
+    "pinia": "^2.1.7",
+    "qrcode": "^1.5.3",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0"
   },
@@ -29,6 +32,7 @@
     "@iconify-json/ep": "^1.2.1",
     "@iconify-json/ri": "^1.2.3",
     "@types/node": "^20.17.10",
+    "@types/qrcode": "^1.5.5",
     "@unocss/eslint-plugin": "^0.65.1",
     "@vitejs/plugin-vue": "^5.2.1",
     "eslint": "^9.16.0",
