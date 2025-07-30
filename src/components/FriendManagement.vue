@@ -34,7 +34,7 @@
         <el-divider content-position="left">搜索结果</el-divider>
         <div class="user-card">
           <el-avatar :src="searchResult.avatar" :size="50">
-            {{ searchResult.nickname.charAt(0) }}
+            {{ (searchResult.nickname || '').toString().charAt(0) || '?' }}
           </el-avatar>
           <div class="user-info">
             <div class="nickname">{{ searchResult.nickname }}</div>
@@ -55,7 +55,7 @@
     <el-card class="friends-card" shadow="never">
       <template #header>
         <div class="card-header">
-          <span>好友列表 ({{ filteredFriends.length }})</span>
+          <span>好友列表 ({{ filteredFriends.length }}{{ filteredFriends.length !== friends.length ? ` / ${friends.length}` : '' }})</span>
           <div class="header-actions">
             <el-input v-model="friendFilter" placeholder="搜索好友" size="small" style="width: 200px">
               <template #prefix>
@@ -94,39 +94,62 @@
             </el-button>
           </el-empty>
         </div>
-        
-        <div v-else class="friends-grid">
-          <div v-for="friend in filteredFriends" :key="friend.wxid" class="friend-item">
-            <el-avatar :src="friend.avatar" :size="40">
-              {{ friend.nickname.charAt(0) }}
-            </el-avatar>
-            <div class="friend-info">
-              <div class="nickname" :title="friend.nickname">{{ friend.nickname }}</div>
-              <div class="wxid">{{ friend.wxid }}</div>
-              <div class="remark" v-if="friend.remark">备注：{{ friend.remark }}</div>
-            </div>
-            <div class="friend-actions">
-              <el-dropdown @command="handleFriendAction">
-                <el-button link size="small">
-                  <el-icon><MoreFilled /></el-icon>
-                </el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item :command="`chat-${friend.wxid}`">
-                      <el-icon><ChatDotRound /></el-icon>
-                      发送消息
-                    </el-dropdown-item>
-                    <el-dropdown-item :command="`remark-${friend.wxid}`">
-                      <el-icon><Edit /></el-icon>
-                      修改备注
-                    </el-dropdown-item>
-                    <el-dropdown-item :command="`delete-${friend.wxid}`" divided>
-                      <el-icon><Delete /></el-icon>
-                      删除好友
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+
+        <div v-else class="friends-container">
+          <div
+            ref="scrollContainer"
+            class="friends-scroll-container"
+            @scroll="handleScroll"
+          >
+            <div
+              class="friends-virtual-list"
+              :style="{ height: `${totalHeight}px` }"
+            >
+              <div
+                class="friends-visible-area"
+                :style="{ transform: `translateY(${offsetY}px)` }"
+              >
+                <div
+                  v-for="friend in visibleFriends"
+                  :key="friend.wxid"
+                  class="friend-item"
+                  :style="{ height: `${itemHeight}px` }"
+                >
+                  <el-avatar :src="friend.avatar" :size="40" lazy>
+                    {{ (friend.nickname || '').toString().charAt(0) || '?' }}
+                  </el-avatar>
+                  <div class="friend-info">
+                    <div class="nickname" :title="friend.nickname">
+                      {{ friend.nickname }}
+                      <span v-if="friend.remark && String(friend.remark).trim()" class="remark-inline">({{ friend.remark }})</span>
+                    </div>
+                    <div class="wxid">{{ friend.wxid }}</div>
+                  </div>
+                  <div class="friend-actions">
+                    <el-dropdown @command="handleFriendAction">
+                      <el-button link size="small">
+                        <el-icon><MoreFilled /></el-icon>
+                      </el-button>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item :command="`chat-${friend.wxid}`">
+                            <el-icon><ChatDotRound /></el-icon>
+                            发送消息
+                          </el-dropdown-item>
+                          <el-dropdown-item :command="`remark-${friend.wxid}`">
+                            <el-icon><Edit /></el-icon>
+                            修改备注
+                          </el-dropdown-item>
+                          <el-dropdown-item :command="`delete-${friend.wxid}`" divided>
+                            <el-icon><Delete /></el-icon>
+                            删除好友
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -196,7 +219,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, UserFilled, Refresh, MoreFilled, ChatDotRound, Edit, Delete } from '@element-plus/icons-vue'
 import { friendApi } from '@/api/friend'
@@ -258,16 +281,64 @@ const addFriendForm = ref({
 // 好友数据
 const friends = ref<Friend[]>([])
 
+// 虚拟滚动相关
+const scrollContainer = ref<HTMLElement>()
+const itemHeight = 80 // 每个好友项的高度
+const containerHeight = 400 // 容器高度
+const visibleCount = Math.ceil(containerHeight / itemHeight) + 2 // 可见项数量 + 缓冲
+const scrollTop = ref(0)
+
 // 计算属性
 const filteredFriends = computed(() => {
   if (!friendFilter.value) return friends.value
-  
+
   const keyword = friendFilter.value.toLowerCase()
-  return friends.value.filter(friend => 
-    friend.nickname.toLowerCase().includes(keyword) ||
-    friend.wxid.toLowerCase().includes(keyword) ||
-    (friend.remark && friend.remark.toLowerCase().includes(keyword))
-  )
+  return friends.value.filter(friend => {
+    const nickname = (friend.nickname || '').toString().toLowerCase()
+    const wxid = (friend.wxid || '').toString().toLowerCase()
+    const remark = (friend.remark || '').toString().toLowerCase()
+    
+    return nickname.includes(keyword) ||
+           wxid.includes(keyword) ||
+           remark.includes(keyword)
+  })
+})
+
+// 虚拟滚动计算
+const startIndex = computed(() => {
+  return Math.floor(scrollTop.value / itemHeight)
+})
+
+const endIndex = computed(() => {
+  return Math.min(startIndex.value + visibleCount, filteredFriends.value.length)
+})
+
+const visibleFriends = computed(() => {
+  return filteredFriends.value.slice(startIndex.value, endIndex.value)
+})
+
+const totalHeight = computed(() => {
+  return filteredFriends.value.length * itemHeight
+})
+
+const offsetY = computed(() => {
+  return startIndex.value * itemHeight
+})
+
+// 滚动处理
+const handleScroll = (event: Event) => {
+  const target = event.target as HTMLElement
+  if (target && typeof target.scrollTop === 'number') {
+    scrollTop.value = target.scrollTop
+  }
+}
+
+// 监听搜索条件变化，重置滚动位置
+watch(friendFilter, () => {
+  scrollTop.value = 0
+  if (scrollContainer.value) {
+    scrollContainer.value.scrollTop = 0
+  }
 })
 
 // 方法
@@ -387,14 +458,8 @@ const refreshFriends = async () => {
 
     console.log('刷新通讯录参数:', params)
 
-    // 尝试使用简化接口，如果失败则使用完整接口
-    let response
-    try {
-      response = await friendApi.getSimplifiedContactList(params)
-    } catch (error) {
-      console.log('简化接口失败，尝试使用完整接口:', error)
-      response = await friendApi.getTotalContactList(params)
-    }
+    // 使用完整接口
+    const response = await friendApi.getTotalContactList(params)
 
     console.log('通讯录响应:', response)
 
@@ -406,6 +471,18 @@ const refreshFriends = async () => {
         contactList = response.Data.ContactList
       } else if (response.Data?.MemberList) {
         contactList = response.Data.MemberList
+      } else if (response.Data?.list) {
+        // 处理新的响应格式: {wxid: 'xxx', total: 1749, list: Array(1749)}
+        contactList = response.Data.list
+      } else if (response.Data?.details) {
+        // 处理包含details数组的格式: {wxid: 'xxx', usernames: Array, details: Array, cache_time: 'xxx', total_count: 46}
+        // details数组中每个元素都包含ContactList数组，需要合并所有ContactList
+        contactList = []
+        response.Data.details.forEach((detail: any) => {
+          if (detail.ContactList && Array.isArray(detail.ContactList)) {
+            contactList.push(...detail.ContactList)
+          }
+        })
       } else if (Array.isArray(response.Data)) {
         contactList = response.Data
       } else {
@@ -413,18 +490,53 @@ const refreshFriends = async () => {
       }
 
       if (contactList && contactList.length > 0) {
-        friends.value = contactList.map((contact: any) => ({
-          wxid: contact.UserName || contact.Wxid || contact.wxid,
-          nickname: contact.NickName || contact.Nickname || contact.nickname || contact.UserName || '未知用户',
-          avatar: contact.BigHeadImgUrl || contact.HeadImgUrl || contact.avatar || '',
-          remark: contact.Remark || contact.remark || '',
-          signature: contact.Signature || contact.signature || '',
-          sex: contact.Sex || contact.sex || 0,
-          isOnline: false
-        }))
+        friends.value = contactList.map((contact: any) => {
+          // 处理可能是对象格式的字段
+          const getNickName = (contact: any) => {
+            if (contact.NickName) {
+              return typeof contact.NickName === 'object' && contact.NickName.string
+                ? contact.NickName.string
+                : contact.NickName
+            }
+            return contact.Nickname || contact.nickname || contact.UserName || '未知用户'
+          }
+
+          const getUserName = (contact: any) => {
+            if (contact.UserName) {
+              return typeof contact.UserName === 'object' && contact.UserName.string
+                ? contact.UserName.string
+                : contact.UserName
+            }
+            return contact.Wxid || contact.wxid
+          }
+
+          const getRemark = (contact: any) => {
+            if (contact.Remark) {
+              return typeof contact.Remark === 'object' && contact.Remark.string
+                ? contact.Remark.string
+                : contact.Remark
+            }
+            return contact.remark || ''
+          }
+
+          return {
+            wxid: getUserName(contact),
+            nickname: getNickName(contact),
+            avatar: contact.BigHeadImgUrl || contact.HeadImgUrl || contact.avatar || '',
+            remark: getRemark(contact),
+            signature: contact.Signature || contact.signature || '',
+            sex: contact.Sex || contact.sex || 0,
+            isOnline: false
+          }
+        })
 
         // 显示加载结果，包含缓存信息
         let message = `已加载 ${friends.value.length} 个好友`
+        if (response.Data?.total) {
+          message += ` (总计: ${response.Data.total})`
+        } else if (response.Data?.total_count) {
+          message += ` (总计: ${response.Data.total_count})`
+        }
         if (response.Message?.includes('缓存')) {
           message += forceRefreshCache.value ? ' (已强制刷新)' : ` (${response.Message})`
         } else if (forceRefreshCache.value) {
@@ -584,24 +696,46 @@ onMounted(() => {
   justify-content: center;
 }
 
-.friends-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 12px;
-  padding: 8px;
+// 虚拟滚动容器样式
+.friends-container {
+  height: 400px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-medium);
+}
+
+.friends-scroll-container {
+  height: 100%;
+  overflow-y: auto;
+  position: relative;
+}
+
+.friends-virtual-list {
+  position: relative;
+}
+
+.friends-visible-area {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
 }
 
 .friend-item {
   display: flex;
   align-items: center;
-  padding: 12px;
-  background: #f8f9fa;
-  border-radius: 8px;
-  transition: all 0.3s;
-  gap: 12px;
-  
+  padding: 16px;
+  background: #ffffff;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+  gap: 16px;
+  border: 1px solid #f0f0f0;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+
   &:hover {
-    background: #e9ecef;
+    background: #fafafa;
+    border-color: #e0e0e0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   }
   
   .friend-info {
@@ -610,28 +744,42 @@ onMounted(() => {
     
     .nickname {
       font-weight: 500;
-      margin-bottom: 4px;
+      font-size: 15px;
+      color: #1a1a1a;
+      margin-bottom: 6px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      line-height: 1.4;
+      
+      .remark-inline {
+        font-weight: 400;
+        color: #666;
+        font-size: 14px;
+        margin-left: 4px;
+      }
     }
     
     .wxid {
-      font-size: 12px;
-      color: #666;
-      margin-bottom: 2px;
-    }
-    
-    .remark {
-      font-size: 12px;
-      color: #409eff;
+      font-size: 13px;
+      color: #888;
+      font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+      letter-spacing: 0.5px;
     }
   }
   
   .friend-actions {
     flex-shrink: 0;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+    
+    &:hover {
+      opacity: 1;
+    }
   }
 }
+
+
 
 // 添加好友对话框样式
 .add-friend-content {
