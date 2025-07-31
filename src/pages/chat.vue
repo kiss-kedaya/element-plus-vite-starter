@@ -1,20 +1,21 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import { useFriendStore } from '@/stores/friend'
 import { ElMessage } from 'element-plus'
-import { 
-  User, 
-  ChatDotRound, 
-  Picture, 
-  Document, 
-  Send,
+import {
+  User,
+  ChatDotRound,
+  Picture,
+  Document,
+  Position,
   Plus,
   Setting,
   Search
 } from '@element-plus/icons-vue'
+import { createWebSocketConnection, closeWebSocketConnection, getWebSocketStatus } from '@/utils/websocket'
 import type { ChatSession, ChatMessage } from '@/types/chat'
 
 const router = useRouter()
@@ -26,14 +27,25 @@ const messageInput = ref('')
 const messageListRef = ref<HTMLElement>()
 const fileInputRef = ref<HTMLInputElement>()
 
-onMounted(() => {
+onMounted(async () => {
   if (!authStore.isLoggedIn) {
     router.push('/login')
     return
   }
-  
+
   // 加载好友列表和聊天会话
-  loadInitialData()
+  await loadInitialData()
+
+  // 建立 WebSocket 连接
+  if (authStore.currentAccount?.wxid) {
+    try {
+      await createWebSocketConnection(authStore.currentAccount.wxid)
+      console.log('WebSocket连接成功')
+    } catch (error) {
+      console.error('WebSocket连接失败:', error)
+      ElMessage.warning('实时消息连接失败，将无法接收新消息')
+    }
+  }
 })
 
 const loadInitialData = async () => {
@@ -59,9 +71,25 @@ const loadInitialData = async () => {
   }
 }
 
-const selectAccount = (account: any) => {
+const selectAccount = async (account: any) => {
+  // 关闭当前账号的 WebSocket 连接
+  if (authStore.currentAccount?.wxid) {
+    closeWebSocketConnection(authStore.currentAccount.wxid)
+  }
+
   authStore.setCurrentAccount(account.wxid)
-  loadInitialData()
+  await loadInitialData()
+
+  // 为新账号建立 WebSocket 连接
+  if (account.wxid) {
+    try {
+      await createWebSocketConnection(account.wxid)
+      console.log('WebSocket连接成功')
+    } catch (error) {
+      console.error('WebSocket连接失败:', error)
+      ElMessage.warning('实时消息连接失败，将无法接收新消息')
+    }
+  }
 }
 
 const selectSession = (session: ChatSession) => {
@@ -165,12 +193,21 @@ const goToFriends = () => {
 
 const logout = () => {
   if (authStore.currentAccount) {
+    // 关闭 WebSocket 连接
+    closeWebSocketConnection(authStore.currentAccount.wxid)
     authStore.removeAccount(authStore.currentAccount.wxid)
   }
   if (!authStore.isLoggedIn) {
     router.push('/')
   }
 }
+
+// 组件卸载时清理 WebSocket 连接
+onUnmounted(() => {
+  if (authStore.currentAccount?.wxid) {
+    closeWebSocketConnection(authStore.currentAccount.wxid)
+  }
+})
 </script>
 
 <template>
@@ -317,13 +354,13 @@ const logout = () => {
               @keydown.ctrl.enter="sendMessage"
               @paste="handlePaste"
             />
-            <el-button 
-              type="primary" 
+            <el-button
+              type="primary"
               @click="sendMessage"
               :loading="chatStore.isSending"
               class="send-button"
             >
-              <el-icon><Send /></el-icon>
+              <el-icon><Position /></el-icon>
               发送
             </el-button>
           </div>
