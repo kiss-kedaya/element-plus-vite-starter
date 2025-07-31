@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
@@ -26,14 +26,28 @@ const messageInput = ref('')
 const messageListRef = ref<HTMLElement>()
 const fileInputRef = ref<HTMLInputElement>()
 
-onMounted(() => {
+onMounted(async () => {
   if (!authStore.isLoggedIn) {
     router.push('/login')
     return
   }
-  
+
   // 加载好友列表和聊天会话
-  loadInitialData()
+  await loadInitialData()
+
+  // 确保WebSocket连接
+  if (authStore.currentAccount) {
+    try {
+      await chatStore.connectWebSocket(authStore.currentAccount.wxid)
+    } catch (error) {
+      console.error('WebSocket连接失败:', error)
+    }
+  }
+})
+
+onUnmounted(() => {
+  // 组件卸载时断开WebSocket连接
+  chatStore.disconnectWebSocket()
 })
 
 const loadInitialData = async () => {
@@ -59,9 +73,20 @@ const loadInitialData = async () => {
   }
 }
 
-const selectAccount = (account: any) => {
+const selectAccount = async (account: any) => {
+  const previousAccount = authStore.currentAccount
+
+  // 如果切换到不同的账号，清空聊天相关数据
+  if (previousAccount && previousAccount.wxid !== account.wxid) {
+    // 清空聊天会话和消息
+    chatStore.clearAllData()
+    ElMessage.info(`已切换到账号：${account.nickname}，正在加载聊天数据...`)
+  }
+
   authStore.setCurrentAccount(account.wxid)
-  loadInitialData()
+
+  // 自动加载新账号的聊天数据
+  await loadInitialData()
 }
 
 const selectSession = (session: ChatSession) => {

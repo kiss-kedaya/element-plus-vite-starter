@@ -49,7 +49,15 @@ export const useAuthStore = defineStore('auth', () => {
   const setCurrentAccount = (wxid: string) => {
     const account = accounts.value.find(a => a.wxid === wxid)
     if (account) {
+      const previousAccount = currentAccount.value
       currentAccount.value = account
+
+      // 如果是真正的账号切换（不是初始化），触发数据清空事件
+      if (previousAccount && previousAccount.wxid !== wxid) {
+        console.log(`账号切换：${previousAccount.wxid} -> ${wxid}`)
+        // 这里可以触发全局的数据清空事件
+        // 各个组件可以监听这个事件来清空自己的数据
+      }
     }
   }
 

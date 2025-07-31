@@ -150,8 +150,14 @@ const onlineAccountsCount = computed(() => {
 
 // 方法
 const selectAccount = (account) => {
+  const previousAccount = authStore.currentAccount
   authStore.setCurrentAccount(account.wxid)
-  ElMessage.success(`已切换到账号：${account.nickname}`)
+
+  if (previousAccount && previousAccount.wxid !== account.wxid) {
+    ElMessage.success(`已切换到账号：${account.nickname}，相关数据已重置`)
+  } else {
+    ElMessage.success(`已切换到账号：${account.nickname}`)
+  }
 }
 
 const handleLoginSuccess = (accountData) => {

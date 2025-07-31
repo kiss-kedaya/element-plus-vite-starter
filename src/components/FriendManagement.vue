@@ -38,7 +38,10 @@
           </el-avatar>
           <div class="user-info">
             <div class="nickname">{{ getDisplayValue(searchResult.nickname) }}</div>
-            <div class="wxid">微信号：{{ getDisplayValue(searchResult.wxid) }}</div>
+            <div class="wxid">
+              <span v-if="getDisplayValue(searchResult.alias).trim()">微信号：{{ getDisplayValue(searchResult.alias) }}</span>
+              <span class="wxid-info">[{{ getDisplayValue(searchResult.wxid) }}]</span>
+            </div>
             <div class="region" v-if="getDisplayValue(searchResult.region)">地区：{{ getDisplayValue(searchResult.region) }}</div>
           </div>
           <div class="actions">
@@ -114,6 +117,7 @@
                   :key="friend.wxid"
                   class="friend-item"
                   :style="{ height: `${itemHeight}px` }"
+                  @contextmenu.prevent="showContextMenu($event, friend)"
                 >
                   <el-avatar :src="friend.avatar" :size="40" lazy>
                     {{ getDisplayValue(friend.nickname).charAt(0) || '?' }}
@@ -123,7 +127,10 @@
                       {{ getDisplayValue(friend.nickname) || '未知用户' }}
                       <span v-if="getDisplayValue(friend.remark).trim()" class="remark-inline">({{ getDisplayValue(friend.remark) }})</span>
                     </div>
-                    <div class="wxid">{{ getDisplayValue(friend.wxid) || '未知ID' }}</div>
+                    <div class="wxid">
+                      <span v-if="getDisplayValue(friend.alias).trim()" class="alias">{{ getDisplayValue(friend.alias) }}</span>
+                      <span class="wxid-bracket">[{{ getDisplayValue(friend.wxid) || '未知ID' }}]</span>
+                    </div>
                   </div>
                   <div class="friend-actions">
                     <el-dropdown @command="handleFriendAction">
@@ -165,7 +172,10 @@
           </el-avatar>
           <div class="info">
             <div class="nickname">{{ searchResult.nickname }}</div>
-            <div class="wxid">微信号：{{ searchResult.wxid }}</div>
+            <div class="wxid">
+              <span v-if="getDisplayValue(searchResult.alias).trim()">微信号：{{ getDisplayValue(searchResult.alias) }}</span>
+              <span class="wxid-info">[{{ getDisplayValue(searchResult.wxid) }}]</span>
+            </div>
             <div class="signature" v-if="searchResult.signature">{{ searchResult.signature }}</div>
           </div>
         </div>
@@ -215,20 +225,57 @@
         <el-button type="primary" @click="updateRemark">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 右键菜单 -->
+    <div
+      v-if="contextMenu.visible"
+      class="context-menu"
+      :style="{
+        left: contextMenu.x + 'px',
+        top: contextMenu.y + 'px'
+      }"
+      @click.stop
+    >
+      <div class="context-menu-item" @click="handleContextMenuAction('chat')">
+        <el-icon><ChatDotRound /></el-icon>
+        <span>发送消息</span>
+      </div>
+      <div class="context-menu-item" @click="handleContextMenuAction('remark')">
+        <el-icon><Edit /></el-icon>
+        <span>修改备注</span>
+      </div>
+      <div class="context-menu-divider"></div>
+      <div class="context-menu-item danger" @click="handleContextMenuAction('delete')">
+        <el-icon><Delete /></el-icon>
+        <span>删除好友</span>
+      </div>
+    </div>
+
+    <!-- 右键菜单遮罩层 -->
+    <div
+      v-if="contextMenu.visible"
+      class="context-menu-overlay"
+      @click="hideContextMenu"
+      @contextmenu.prevent="hideContextMenu"
+    ></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, UserFilled, Refresh, MoreFilled, ChatDotRound, Edit, Delete } from '@element-plus/icons-vue'
 import { friendApi } from '@/api/friend'
+import { useAuthStore } from '@/stores/auth'
+import { useChatStore } from '@/stores/chat'
+import { useRouter } from 'vue-router'
 import type { SearchContactRequest, SendFriendRequestRequest } from '@/types/friend'
 
 // 定义好友类型
 interface Friend {
   wxid: string
   nickname: string
+  alias: string
   avatar: string
   remark: string
   signature: string
@@ -240,6 +287,7 @@ interface Friend {
 interface SearchResult {
   wxid: string
   nickname: string
+  alias: string
   avatar: string
   region: string
   signature: string
@@ -252,6 +300,11 @@ interface SearchResult {
 const props = defineProps<{
   account: any
 }>()
+
+// Stores
+const authStore = useAuthStore()
+const chatStore = useChatStore()
+const router = useRouter()
 
 // 响应式数据
 const searchForm = ref({
@@ -281,6 +334,14 @@ const addFriendForm = ref({
 // 好友数据
 const friends = ref<Friend[]>([])
 
+// 右键菜单相关
+const contextMenu = ref({
+  visible: false,
+  x: 0,
+  y: 0,
+  friend: null as Friend | null
+})
+
 // 虚拟滚动相关
 const scrollContainer = ref<HTMLElement>()
 const itemHeight = 80 // 每个好友项的高度
@@ -305,10 +366,12 @@ const filteredFriends = computed(() => {
   return validFriends.value.filter(friend => {
     const nickname = getDisplayValue(friend.nickname).toLowerCase()
     const wxid = getDisplayValue(friend.wxid).toLowerCase()
+    const alias = getDisplayValue(friend.alias).toLowerCase()
     const remark = getDisplayValue(friend.remark).toLowerCase()
 
     return nickname.includes(keyword) ||
            wxid.includes(keyword) ||
+           alias.includes(keyword) ||
            remark.includes(keyword)
   })
 })
@@ -450,22 +513,23 @@ const confirmAddFriend = async () => {
   }
 }
 
-const refreshFriends = async () => {
-  if (!props.account?.wxid) {
-    ElMessage.error('请先登录账号')
+// 为指定账号获取通讯录的通用函数
+const refreshFriendsForAccount = async (wxid: string, forceRefresh: boolean = false) => {
+  if (!wxid) {
+    ElMessage.error('账号ID不能为空')
     return
   }
 
   friendsLoading.value = true
   try {
     const params = {
-      Wxid: props.account.wxid,
+      Wxid: wxid,
       CurrentWxcontactSeq: 0,
       CurrentChatRoomContactSeq: 0,
-      force_refresh: forceRefreshCache.value
+      force_refresh: forceRefresh
     }
 
-    console.log('刷新通讯录参数:', params)
+    console.log('获取通讯录参数:', params)
 
     // 使用完整接口
     const response = await friendApi.getTotalContactList(params)
@@ -476,16 +540,7 @@ const refreshFriends = async () => {
       // 处理不同的响应格式
       let contactList = []
 
-      if (response.Data?.ContactList) {
-        contactList = response.Data.ContactList
-      } else if (response.Data?.MemberList) {
-        contactList = response.Data.MemberList
-      } else if (response.Data?.list) {
-        // 处理新的响应格式: {wxid: 'xxx', total: 1749, list: Array(1749)}
-        contactList = response.Data.list
-      } else if (response.Data?.details) {
-        // 处理包含details数组的格式: {wxid: 'xxx', usernames: Array, details: Array, cache_time: 'xxx', total_count: 46}
-        // details数组中每个元素都包含ContactList数组，需要合并所有ContactList
+      if (response.Data?.details && Array.isArray(response.Data.details)) {
         contactList = []
         response.Data.details.forEach((detail: any) => {
           if (detail.ContactList && Array.isArray(detail.ContactList)) {
@@ -499,8 +554,6 @@ const refreshFriends = async () => {
       }
 
       if (contactList && contactList.length > 0) {
-
-
         friends.value = contactList
           .map((contact: any) => {
             // 处理可能是对象格式的字段
@@ -542,6 +595,25 @@ const refreshFriends = async () => {
               return String(username || '')
             }
 
+            const getAlias = (contact: any) => {
+              let alias = ''
+              if (contact.Alias) {
+                if (typeof contact.Alias === 'object') {
+                  // 检查是否是空对象或有有效的 string 属性
+                  if (contact.Alias.string !== undefined && contact.Alias.string !== null && contact.Alias.string !== '') {
+                    alias = contact.Alias.string
+                  } else {
+                    alias = ''
+                  }
+                } else {
+                  alias = contact.Alias
+                }
+              } else {
+                alias = contact.alias || ''
+              }
+              return String(alias || '')
+            }
+
             const getRemark = (contact: any) => {
               let remark = ''
               if (contact.Remark) {
@@ -564,10 +636,12 @@ const refreshFriends = async () => {
 
             const nickname = getNickName(contact)
             const wxid = getUserName(contact)
+            const alias = getAlias(contact)
 
             return {
               wxid,
               nickname,
+              alias, // 微信号
               avatar: contact.BigHeadImgUrl || contact.HeadImgUrl || contact.avatar || '',
               remark: getRemark(contact),
               signature: contact.Signature || contact.signature || '',
@@ -600,26 +674,37 @@ const refreshFriends = async () => {
           message += ` (总计: ${response.Data.total_count})`
         }
         if (response.Message?.includes('缓存')) {
-          message += forceRefreshCache.value ? ' (已强制刷新)' : ` (${response.Message})`
-        } else if (forceRefreshCache.value) {
+          message += forceRefresh ? ' (已强制刷新)' : ` (${response.Message})`
+        } else if (forceRefresh) {
           message += ' (已强制刷新)'
         }
+
         ElMessage.success(message)
       } else {
         friends.value = []
-        ElMessage.info('通讯录为空或暂无好友')
+        ElMessage.info('该账号暂无好友数据')
       }
     } else {
-      throw new Error(response.Message || '获取好友列表失败')
+      ElMessage.error(response.Message || '获取通讯录失败')
     }
   } catch (error: any) {
-    console.error('刷新好友列表失败:', error)
-    ElMessage.error(`刷新失败: ${error.message || '网络错误'}`)
-    friends.value = []
+    ElMessage.error(error.message || '获取通讯录失败')
+    console.error('获取通讯录失败:', error)
   } finally {
     friendsLoading.value = false
   }
 }
+
+const refreshFriends = async () => {
+  if (!props.account?.wxid) {
+    ElMessage.error('请先登录账号')
+    return
+  }
+
+  await refreshFriendsForAccount(props.account.wxid, forceRefreshCache.value)
+}
+
+
 
 const handleFriendAction = async (command: string) => {
   const [action, wxid] = command.split('-')
@@ -631,9 +716,7 @@ const handleFriendAction = async (command: string) => {
   }
 
   if (action === 'chat') {
-    ElMessage.info(`准备与 ${getDisplayValue(friend.nickname)} 聊天`)
-    // 这里可以切换到聊天界面
-    // emit('switch-to-chat', friend)
+    await startChatWithFriend(friend)
   } else if (action === 'remark') {
     currentFriend.value = friend
     remarkForm.value.remark = getDisplayValue(friend.remark)
@@ -643,8 +726,122 @@ const handleFriendAction = async (command: string) => {
       await ElMessageBox.confirm(`确定要删除好友 ${getDisplayValue(friend.nickname)} 吗？`, '确认删除', {
         type: 'warning'
       })
-      
+
       const index = friends.value.findIndex(f => f.wxid === wxid)
+      friends.value.splice(index, 1)
+      ElMessage.success('好友已删除')
+    } catch {
+      // 用户取消
+    }
+  }
+}
+
+// 右键菜单相关方法
+const showContextMenu = (event: MouseEvent, friend: Friend) => {
+  event.preventDefault()
+
+  // 计算菜单位置，确保不超出屏幕边界
+  const menuWidth = 120
+  const menuHeight = 120
+  let x = event.clientX
+  let y = event.clientY
+
+  // 检查右边界
+  if (x + menuWidth > window.innerWidth) {
+    x = window.innerWidth - menuWidth - 10
+  }
+
+  // 检查下边界
+  if (y + menuHeight > window.innerHeight) {
+    y = window.innerHeight - menuHeight - 10
+  }
+
+  // 确保不超出左上边界
+  x = Math.max(10, x)
+  y = Math.max(10, y)
+
+  contextMenu.value = {
+    visible: true,
+    x: x,
+    y: y,
+    friend: friend
+  }
+}
+
+const hideContextMenu = () => {
+  contextMenu.value.visible = false
+  contextMenu.value.friend = null
+}
+
+// 开始与好友聊天的完整流程
+const startChatWithFriend = async (friend: Friend) => {
+  try {
+    if (!props.account?.wxid) {
+      ElMessage.error('请先登录账号')
+      return
+    }
+
+    const friendName = getDisplayValue(friend.nickname) || getDisplayValue(friend.alias) || '未知好友'
+    ElMessage.info(`正在准备与 ${friendName} 的聊天...`)
+
+    console.log('开始聊天流程:', {
+      account: props.account.wxid,
+      friend: friend.wxid,
+      friendName
+    })
+
+    // 1. 确保WebSocket连接
+    const isConnected = await chatStore.connectWebSocket(props.account.wxid)
+    if (!isConnected) {
+      ElMessage.warning('WebSocket连接失败，但仍可尝试发送消息')
+    } else {
+      console.log('WebSocket连接成功')
+    }
+
+    // 2. 创建或获取聊天会话
+    const session = chatStore.createOrGetSession(friend)
+    console.log('聊天会话已创建/获取:', session)
+
+    // 3. 同步消息历史
+    try {
+      await chatStore.syncMessages(props.account.wxid)
+      console.log('消息历史同步完成')
+    } catch (error) {
+      console.warn('消息历史同步失败:', error)
+    }
+
+    // 4. 跳转到聊天页面
+    await router.push('/chat')
+
+    // 5. 设置当前会话
+    chatStore.setCurrentSession(session.id)
+
+    ElMessage.success(`已开始与 ${friendName} 的聊天`)
+  } catch (error: any) {
+    console.error('开始聊天失败:', error)
+    ElMessage.error(error.message || '开始聊天失败，请重试')
+  }
+}
+
+const handleContextMenuAction = async (action: string) => {
+  if (!contextMenu.value.friend) return
+
+  const friend = contextMenu.value.friend
+  hideContextMenu()
+
+  if (action === 'chat') {
+    await startChatWithFriend(friend)
+  } else if (action === 'remark') {
+    currentFriend.value = friend
+    remarkForm.value.remark = getDisplayValue(friend.remark)
+    showRemarkDialog.value = true
+  } else if (action === 'delete') {
+    try {
+      await ElMessageBox.confirm(`确定要删除好友 ${getDisplayValue(friend.nickname)} 吗？`, '确认删除', {
+        type: 'warning'
+      })
+
+      const index = friends.value.findIndex(f => f.wxid === friend.wxid)
       friends.value.splice(index, 1)
       ElMessage.success('好友已删除')
     } catch {
@@ -716,7 +913,43 @@ const updateRemark = async () => {
 
 onMounted(() => {
   refreshFriends()
+
+  // 添加全局点击事件监听器，用于隐藏右键菜单
+  document.addEventListener('click', hideContextMenu)
+  document.addEventListener('contextmenu', hideContextMenu)
 })
+
+onUnmounted(() => {
+  // 清理事件监听器
+  document.removeEventListener('click', hideContextMenu)
+  document.removeEventListener('contextmenu', hideContextMenu)
+})
+
+// 监听当前账号变化，切换账号时清空好友列表并自动获取新账号的通讯录
+watch(
+  () => authStore.currentAccount?.wxid,
+  async (newWxid, oldWxid) => {
+    // 如果账号发生了变化（不是初始化）
+    if (oldWxid && newWxid && newWxid !== oldWxid) {
+      console.log(`账号从 ${oldWxid} 切换到 ${newWxid}，清空好友列表并获取新账号通讯录`)
+
+      // 清空当前好友列表
+      friends.value = []
+
+      // 重置搜索和过滤状态
+      friendFilter.value = ''
+      searchForm.value.keyword = ''
+      searchResult.value = null
+
+      // 显示切换提示
+      ElMessage.info('已切换账号，正在获取通讯录...')
+
+      // 自动获取新账号的缓存通讯录
+      await refreshFriendsForAccount(newWxid)
+    }
+  },
+  { immediate: false } // 不立即执行，避免初始化时触发
+)
 </script>
 
 <style scoped lang="scss">
@@ -762,6 +995,12 @@ onMounted(() => {
           font-size: 14px;
           color: #666;
           margin-bottom: 2px;
+
+          .wxid-info {
+            color: #999;
+            margin-left: 6px;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+          }
         }
       }
     }
@@ -839,11 +1078,17 @@ onMounted(() => {
   border: 1px solid #f0f0f0;
   margin-bottom: 8px;
   box-sizing: border-box;
+  cursor: pointer;
 
   &:hover {
     background: #fafafa;
     border-color: #e0e0e0;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+
+  &:active {
+    background: #f0f0f0;
+    transform: scale(0.98);
   }
   
   .friend-info {
@@ -873,6 +1118,17 @@ onMounted(() => {
       color: #888;
       font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
       letter-spacing: 0.5px;
+
+      .alias {
+        color: #666;
+        font-weight: 500;
+        margin-right: 6px;
+      }
+
+      .wxid-bracket {
+        color: #999;
+        font-weight: normal;
+      }
     }
   }
   
@@ -942,5 +1198,61 @@ onMounted(() => {
       }
     }
   }
+}
+
+/* 右键菜单样式 */
+.context-menu {
+  position: fixed;
+  z-index: 9999;
+  background: white;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 4px 0;
+  min-width: 120px;
+  user-select: none;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  font-size: 14px;
+  color: #606266;
+  cursor: pointer;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: #f5f7fa;
+  }
+
+  &.danger {
+    color: #f56c6c;
+
+    &:hover {
+      background-color: #fef0f0;
+    }
+  }
+
+  .el-icon {
+    margin-right: 8px;
+    font-size: 16px;
+  }
+}
+
+.context-menu-divider {
+  height: 1px;
+  background-color: #e4e7ed;
+  margin: 4px 0;
+}
+
+.context-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9998;
+  background: transparent;
 }
 </style>

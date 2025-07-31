@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { ChatSession, ChatMessage } from '@/types/chat'
 import { chatApi } from '@/api/chat'
+import { webSocketService } from '@/services/websocket'
 
 export const useChatStore = defineStore('chat', () => {
   // 状态
@@ -76,8 +77,9 @@ export const useChatStore = defineStore('chat', () => {
     try {
       const result = await chatApi.sendTextMessage({
         Wxid: wxid,
-        ToUserName: toUserName,
-        Content: content
+        ToWxid: toUserName,
+        Content: content,
+        Type: 1
       })
       
       if (result.Success) {
@@ -107,8 +109,8 @@ export const useChatStore = defineStore('chat', () => {
     try {
       const result = await chatApi.sendImageMessage({
         Wxid: wxid,
-        ToUserName: toUserName,
-        ImageData: imageData
+        ToWxid: toUserName,
+        Base64: imageData
       })
       
       if (result.Success) {
@@ -147,6 +149,83 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  const clearAllData = () => {
+    sessions.value = []
+    currentSession.value = null
+    messages.value = {}
+  }
+
+  // WebSocket连接管理
+  const connectWebSocket = async (wxid: string): Promise<boolean> => {
+    try {
+      // 设置事件监听器
+      webSocketService.on('chat_message', (data: any) => {
+        const chatMessage: ChatMessage = {
+          id: data.id || Date.now().toString(),
+          content: data.content || '',
+          timestamp: new Date(data.timestamp || Date.now()),
+          fromMe: data.fromMe || false,
+          type: data.type || 'text',
+          status: 'received'
+        }
+
+        if (data.sessionId) {
+          addMessage(data.sessionId, chatMessage)
+        }
+      })
+
+      webSocketService.on('system_message', (data: any) => {
+        if (data.message) {
+          // 这里可以处理系统消息，比如显示通知
+          console.log('系统消息:', data.message)
+        }
+      })
+
+      return await webSocketService.connect(wxid)
+    } catch (error) {
+      console.error('WebSocket连接失败:', error)
+      return false
+    }
+  }
+
+  const disconnectWebSocket = () => {
+    webSocketService.disconnect()
+  }
+
+  // 创建或获取聊天会话
+  const createOrGetSession = (friend: any): ChatSession => {
+    // 检查是否已存在会话
+    let session = sessions.value.find(s => s.id === friend.wxid)
+
+    if (!session) {
+      // 创建新会话
+      session = {
+        id: friend.wxid,
+        name: friend.remark || friend.nickname || friend.alias || '未知好友',
+        avatar: friend.avatar || '',
+        type: 'friend',
+        lastMessage: '',
+        lastMessageTime: new Date(),
+        unreadCount: 0,
+        isOnline: friend.isOnline || false
+      }
+
+      // 添加到会话列表
+      sessions.value.unshift(session)
+    }
+
+    return session
+  }
+
+  // 同步消息历史
+  const syncMessages = async (wxid: string) => {
+    try {
+      await chatApi.syncAndPushMessages(wxid)
+    } catch (error) {
+      console.error('同步消息失败:', error)
+    }
+  }
+
   return {
     // 状态
     sessions,
@@ -154,11 +233,11 @@ export const useChatStore = defineStore('chat', () => {
     messages,
     isLoading,
     isSending,
-    
+
     // 计算属性
     currentMessages,
     unreadCount,
-    
+
     // 方法
     setSessions,
     setCurrentSession,
@@ -167,6 +246,11 @@ export const useChatStore = defineStore('chat', () => {
     sendTextMessage,
     sendImageMessage,
     clearMessages,
-    updateMessageStatus
+    updateMessageStatus,
+    clearAllData,
+    connectWebSocket,
+    disconnectWebSocket,
+    createOrGetSession,
+    syncMessages
   }
 })

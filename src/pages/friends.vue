@@ -215,9 +215,19 @@ const goBack = () => {
   router.push('/chat')
 }
 
-const selectAccount = (account: any) => {
+const selectAccount = async (account: any) => {
+  // 如果切换到不同的账号，先清空当前好友列表
+  if (authStore.currentAccount?.wxid !== account.wxid) {
+    friends.value = []
+    filteredFriends.value = []
+    searchKeyword.value = ''
+    ElMessage.info(`已切换到账号：${account.nickname}，正在获取通讯录...`)
+  }
+
   authStore.setCurrentAccount(account.wxid)
-  loadFriends()
+
+  // 自动获取新账号的缓存通讯录
+  await loadFriends()
 }
 
 const getSexText = (sex: number) => {
