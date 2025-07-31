@@ -217,9 +217,9 @@ const scrollToBottom = () => {
 }
 
 const formatTime = (date: Date) => {
-  return date.toLocaleTimeString('zh-CN', { 
-    hour: '2-digit', 
-    minute: '2-digit' 
+  return date.toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit'
   })
 }
 
@@ -253,20 +253,21 @@ onUnmounted(() => {
       <div class="panel-header">
         <h3>账号列表</h3>
         <el-button type="primary" size="small" @click="router.push('/login')">
-          <el-icon><Plus /></el-icon>
+          <el-icon>
+            <Plus />
+          </el-icon>
           添加账号
         </el-button>
       </div>
-      
+
       <div class="account-list">
-        <div 
-          v-for="account in authStore.accounts" 
-          :key="account.wxid"
+        <div v-for="account in authStore.accounts" :key="account.wxid"
           :class="['account-item', { active: authStore.currentAccount?.wxid === account.wxid }]"
-          @click="selectAccount(account)"
-        >
+          @click="selectAccount(account)">
           <el-avatar :src="account.avatar" :size="40">
-            <el-icon><User /></el-icon>
+            <el-icon>
+              <User />
+            </el-icon>
           </el-avatar>
           <div class="account-info">
             <div class="nickname">{{ account.nickname }}</div>
@@ -276,14 +277,18 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
-      
+
       <div class="panel-footer">
         <el-button @click="goToFriends" link>
-          <el-icon><User /></el-icon>
+          <el-icon>
+            <User />
+          </el-icon>
           好友管理
         </el-button>
         <el-button @click="logout" link>
-          <el-icon><Setting /></el-icon>
+          <el-icon>
+            <Setting />
+          </el-icon>
           退出登录
         </el-button>
       </div>
@@ -293,26 +298,23 @@ onUnmounted(() => {
     <div class="session-panel">
       <div class="panel-header">
         <h3>聊天列表</h3>
-        <el-input 
-          placeholder="搜索聊天" 
-          size="small"
-          style="width: 150px;"
-        >
+        <el-input placeholder="搜索聊天" size="small" style="width: 150px;">
           <template #prefix>
-            <el-icon><Search /></el-icon>
+            <el-icon>
+              <Search />
+            </el-icon>
           </template>
         </el-input>
       </div>
-      
+
       <div class="session-list">
-        <div 
-          v-for="session in chatStore.sessions" 
-          :key="session.id"
+        <div v-for="session in chatStore.sessions" :key="session.id"
           :class="['session-item', { active: chatStore.currentSession?.id === session.id }]"
-          @click="selectSession(session)"
-        >
+          @click="selectSession(session)">
           <el-avatar :src="session.avatar" :size="40">
-            <el-icon><User /></el-icon>
+            <el-icon>
+              <User />
+            </el-icon>
           </el-avatar>
           <div class="session-info">
             <div class="session-name">{{ session.name }}</div>
@@ -320,11 +322,7 @@ onUnmounted(() => {
           </div>
           <div class="session-meta">
             <div class="time">{{ formatTime(session.lastMessageTime) }}</div>
-            <el-badge 
-              v-if="session.unreadCount > 0" 
-              :value="session.unreadCount" 
-              class="unread-badge"
-            />
+            <el-badge v-if="session.unreadCount > 0" :value="session.unreadCount" class="unread-badge" />
           </div>
         </div>
       </div>
@@ -338,26 +336,25 @@ onUnmounted(() => {
         </el-icon>
         <p>选择一个聊天开始对话</p>
       </div>
-      
+
       <div v-else class="chat-content">
         <!-- 聊天头部 -->
         <div class="chat-header">
           <el-avatar :src="chatStore.currentSession.avatar" :size="32">
-            <el-icon><User /></el-icon>
+            <el-icon>
+              <User />
+            </el-icon>
           </el-avatar>
           <div class="chat-title">
             <div class="name">{{ chatStore.currentSession.name }}</div>
             <div class="status">{{ chatStore.currentSession.isOnline ? '在线' : '离线' }}</div>
           </div>
         </div>
-        
+
         <!-- 消息列表 -->
         <div ref="messageListRef" class="message-list">
-          <div 
-            v-for="message in chatStore.currentMessages" 
-            :key="message.id"
-            :class="['message-item', { 'from-me': message.fromMe }]"
-          >
+          <div v-for="message in chatStore.currentMessages" :key="message.id"
+            :class="['message-item', { 'from-me': message.fromMe }]">
             <div class="message-content">
               <div v-if="message.type === 'text'" class="text-message">
                 {{ message.content }}
@@ -369,53 +366,42 @@ onUnmounted(() => {
             </div>
           </div>
         </div>
-        
+
         <!-- 输入区域 -->
         <div class="input-area">
           <div class="input-toolbar">
             <el-button @click="selectFile" link>
-              <el-icon><Picture /></el-icon>
+              <el-icon>
+                <Picture />
+              </el-icon>
             </el-button>
             <el-button link>
-              <el-icon><Document /></el-icon>
+              <el-icon>
+                <Document />
+              </el-icon>
             </el-button>
           </div>
-          
+
           <div class="input-box">
-            <el-input
-              v-model="messageInput"
-              type="textarea"
-              :rows="3"
-              placeholder="输入消息内容，支持粘贴图片..."
-              @keydown.ctrl.enter="sendMessage"
-              @paste="handlePaste"
-            />
-            <el-button
-              type="primary"
-              @click="sendMessage"
-              :loading="chatStore.isSending"
-              class="send-button"
-            >
-              <el-icon><Position /></el-icon>
+            <el-input v-model="messageInput" type="textarea" :rows="3" placeholder="输入消息内容，支持粘贴图片..."
+              @keydown.ctrl.enter="sendMessage" @paste="handlePaste" />
+            <el-button type="primary" @click="sendMessage" :loading="chatStore.isSending" class="send-button">
+              <el-icon>
+                <Position />
+              </el-icon>
               发送
             </el-button>
           </div>
-          
+
           <div class="input-tip">
             按 Ctrl+Enter 发送消息，支持粘贴图片
           </div>
         </div>
       </div>
     </div>
-    
+
     <!-- 隐藏的文件输入 -->
-    <input 
-      ref="fileInputRef"
-      type="file" 
-      accept="image/*,*/*"
-      style="display: none"
-      @change="handleFileSelect"
-    />
+    <input ref="fileInputRef" type="file" accept="image/*,*/*" style="display: none" @change="handleFileSelect" />
   </div>
 </template>
 

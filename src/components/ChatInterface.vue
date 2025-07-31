@@ -5,19 +5,19 @@
       <div class="sessions-header">
         <h3>聊天会话</h3>
         <el-button type="primary" size="small" @click="refreshSessions">
-          <el-icon><Refresh /></el-icon>
+          <el-icon>
+            <Refresh />
+          </el-icon>
         </el-button>
       </div>
-      
+
       <div class="sessions-list">
         <div v-if="sessions.length === 0" class="empty-sessions">
           <el-empty description="暂无聊天会话" :image-size="80" />
         </div>
-        
-        <div v-for="session in sessions" :key="session.id" 
-             class="session-item"
-             :class="{ active: currentSession?.id === session.id }"
-             @click="selectSession(session)">
+
+        <div v-for="session in sessions" :key="session.id" class="session-item"
+          :class="{ active: currentSession?.id === session.id }" @click="selectSession(session)">
           <el-avatar :src="session.avatar" :size="40">
             {{ session.name.charAt(0) }}
           </el-avatar>
@@ -42,7 +42,7 @@
           </template>
         </el-result>
       </div>
-      
+
       <div v-else class="chat-content">
         <!-- 聊天头部 -->
         <div class="chat-header">
@@ -57,12 +57,14 @@
           </div>
           <div class="chat-actions">
             <el-button type="text" @click="clearMessages">
-              <el-icon><Delete /></el-icon>
+              <el-icon>
+                <Delete />
+              </el-icon>
               清空消息
             </el-button>
           </div>
         </div>
-        
+
         <!-- 消息列表 -->
         <div class="messages-container" ref="messagesContainer">
           <div class="messages-list">
@@ -70,32 +72,36 @@
               <div class="message-time" v-if="showMessageTime(message)">
                 {{ formatMessageTime(message.timestamp) }}
               </div>
-              
+
               <div class="message-content" :class="{ 'is-self': message.isSelf }">
                 <el-avatar v-if="!message.isSelf" :src="message.avatar" :size="32">
                   {{ message.sender.charAt(0) }}
                 </el-avatar>
-                
+
                 <div class="message-bubble">
                   <div class="sender-name" v-if="!message.isSelf && currentSession.type === 'group'">
                     {{ message.sender }}
                   </div>
-                  
+
                   <div class="message-text" v-if="message.type === 'text'">
                     {{ message.content }}
                   </div>
-                  
+
                   <div class="message-image" v-else-if="message.type === 'image'">
                     <el-image :src="message.content" fit="cover" style="max-width: 200px; max-height: 200px;" />
                   </div>
-                  
+
                   <div class="message-status" v-if="message.isSelf">
-                    <el-icon v-if="message.status === 'sending'" class="is-loading"><Loading /></el-icon>
+                    <el-icon v-if="message.status === 'sending'" class="is-loading">
+                      <Loading />
+                    </el-icon>
                     <el-icon v-else-if="message.status === 'sent'" color="#67c23a"><Select /></el-icon>
-                    <el-icon v-else-if="message.status === 'failed'" color="#f56c6c"><Close /></el-icon>
+                    <el-icon v-else-if="message.status === 'failed'" color="#f56c6c">
+                      <Close />
+                    </el-icon>
                   </div>
                 </div>
-                
+
                 <el-avatar v-if="message.isSelf" :src="account.avatar" :size="32">
                   {{ account.nickname.charAt(0) }}
                 </el-avatar>
@@ -103,27 +109,27 @@
             </div>
           </div>
         </div>
-        
+
         <!-- 输入区域 -->
         <div class="input-area">
           <div class="input-toolbar">
             <el-button link @click="$refs.imageInput.click()">
-              <el-icon><Picture /></el-icon>
+              <el-icon>
+                <Picture />
+              </el-icon>
               图片
             </el-button>
             <el-button link @click="pasteImage">
-              <el-icon><DocumentCopy /></el-icon>
+              <el-icon>
+                <DocumentCopy />
+              </el-icon>
               粘贴
             </el-button>
           </div>
-          
+
           <div class="input-container">
-            <el-input v-model="messageInput" 
-                     type="textarea" 
-                     :rows="3" 
-                     placeholder="输入消息内容..."
-                     @keydown.ctrl.enter="sendMessage"
-                     @paste="handlePaste" />
+            <el-input v-model="messageInput" type="textarea" :rows="3" placeholder="输入消息内容..."
+              @keydown.ctrl.enter="sendMessage" @paste="handlePaste" />
             <div class="input-actions">
               <span class="input-tip">Ctrl+Enter 发送</span>
               <el-button type="primary" :loading="sendLoading" @click="sendMessage">
@@ -131,7 +137,7 @@
               </el-button>
             </div>
           </div>
-          
+
           <input ref="imageInput" type="file" accept="image/*" style="display: none" @change="handleImageSelect" />
         </div>
       </div>
@@ -349,11 +355,11 @@ const scrollToBottom = () => {
 const formatTime = (time) => {
   const now = new Date()
   const diff = now.getTime() - time.getTime()
-  
+
   if (diff < 1000 * 60) return '刚刚'
   if (diff < 1000 * 60 * 60) return `${Math.floor(diff / (1000 * 60))}分钟前`
   if (diff < 1000 * 60 * 60 * 24) return `${Math.floor(diff / (1000 * 60 * 60))}小时前`
-  
+
   return time.toLocaleDateString()
 }
 
@@ -429,7 +435,7 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  
+
   h3 {
     margin: 0;
     color: #333;
@@ -453,11 +459,11 @@ onUnmounted(() => {
   cursor: pointer;
   transition: background-color 0.3s;
   border-bottom: 1px solid #f5f5f5;
-  
+
   &:hover {
     background: #f8f9fa;
   }
-  
+
   &.active {
     background: #e3f2fd;
     border-right: 3px solid #409eff;
@@ -468,7 +474,7 @@ onUnmounted(() => {
   flex: 1;
   margin-left: 12px;
   min-width: 0;
-  
+
   .session-name {
     font-weight: 500;
     margin-bottom: 4px;
@@ -476,7 +482,7 @@ onUnmounted(() => {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  
+
   .last-message {
     font-size: 12px;
     color: #666;
@@ -491,7 +497,7 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: flex-end;
   gap: 4px;
-  
+
   .time {
     font-size: 11px;
     color: #999;
@@ -529,13 +535,13 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  
+
   .chat-title {
     .name {
       font-weight: 500;
       margin-bottom: 2px;
     }
-    
+
     .status {
       font-size: 12px;
       color: #666;
@@ -564,14 +570,14 @@ onUnmounted(() => {
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  
+
   &.is-self {
     flex-direction: row-reverse;
-    
+
     .message-bubble {
       background: #409eff;
       color: white;
-      
+
       .sender-name {
         color: rgba(255, 255, 255, 0.8);
       }
@@ -585,21 +591,21 @@ onUnmounted(() => {
   background: #f5f5f5;
   border-radius: 8px;
   position: relative;
-  
+
   .sender-name {
     font-size: 12px;
     color: #666;
     margin-bottom: 4px;
   }
-  
+
   .message-text {
     word-wrap: break-word;
     line-height: 1.4;
   }
-  
+
   .message-image {
     padding: 0;
-    
+
     :deep(.el-image) {
       border-radius: 4px;
     }
@@ -625,13 +631,13 @@ onUnmounted(() => {
 
 .input-container {
   position: relative;
-  
+
   .input-actions {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-top: 8px;
-    
+
     .input-tip {
       font-size: 12px;
       color: #999;
