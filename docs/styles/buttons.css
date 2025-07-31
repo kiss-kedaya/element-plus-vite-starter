@@ -1,0 +1,282 @@
+/* 统一简约按钮样式 */
+
+/* 基础按钮样式 - 参考"退出登录"和"删除账号"的简约风格 */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 80px;
+  white-space: nowrap;
+  font-family: var(--font-secondary);
+  letter-spacing: -0.01em;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* 主要按钮 - 蓝色 */
+.btn-primary {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: rgba(24, 144, 255, 0.1);
+  border-color: var(--primary-hover);
+  color: var(--primary-hover);
+}
+
+/* 成功按钮 - 绿色 */
+.btn-success {
+  border-color: var(--success-color);
+  color: var(--success-color);
+}
+
+.btn-success:hover:not(:disabled) {
+  background: rgba(82, 196, 26, 0.1);
+  border-color: #73d13d;
+  color: #73d13d;
+}
+
+/* 警告按钮 - 橙色 */
+.btn-warning {
+  border-color: var(--warning-color);
+  color: var(--warning-color);
+}
+
+.btn-warning:hover:not(:disabled) {
+  background: var(--warning-light);
+  border-color: var(--warning-hover);
+  color: var(--warning-hover);
+}
+
+/* 危险按钮 - 红色 */
+.btn-danger {
+  border-color: var(--error-color);
+  color: var(--error-color);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--error-light);
+  border-color: var(--error-hover);
+  color: var(--error-hover);
+}
+
+/* 次要按钮 - 灰色 */
+.btn-secondary {
+  border-color: #d9d9d9;
+  color: #666;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #f5f5f5;
+  border-color: #bfbfbf;
+  color: #333;
+}
+
+/* 信息按钮 - 浅蓝色 */
+.btn-info {
+  border-color: #1890ff;
+  color: #1890ff;
+}
+
+.btn-info:hover:not(:disabled) {
+  background: rgba(24, 144, 255, 0.1);
+  border-color: #40a9ff;
+  color: #40a9ff;
+}
+
+/* 按钮尺寸变体 */
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+  min-width: 60px;
+}
+
+.btn-lg {
+  padding: 12px 24px;
+  font-size: 14px;
+  min-width: 120px;
+}
+
+/* 按钮图标样式 */
+.btn i {
+  font-size: 12px;
+}
+
+.btn-sm i {
+  font-size: 11px;
+}
+
+.btn-lg i {
+  font-size: 13px;
+}
+
+/* 特殊场景的按钮样式 */
+
+/* 模态框按钮 */
+.modal-footer .btn {
+  min-width: 100px;
+}
+
+/* 账号详情页面按钮 */
+.account-detail-actions .btn {
+  min-width: 100px;
+}
+
+/* 头部工具栏按钮 */
+.header-buttons .btn {
+  min-width: auto;
+  padding: 6px 12px;
+}
+
+/* 配置工具栏按钮 */
+.config-actions .btn {
+  min-width: auto;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+/* 按钮组样式 */
+.btn-group {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.btn-group .btn {
+  margin: 0;
+}
+
+/* 垂直按钮组 */
+.btn-group-vertical {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.btn-group-vertical .btn {
+  width: 100%;
+}
+
+/* 响应式按钮 */
+@media (max-width: 768px) {
+  .btn {
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+  
+  .btn-sm {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  
+  .btn-lg {
+    padding: 14px 20px;
+    font-size: 15px;
+  }
+  
+  .btn-group {
+    flex-wrap: wrap;
+  }
+}
+
+/* 按钮加载状态 */
+.btn.loading {
+  position: relative;
+  color: transparent;
+  pointer-events: none;
+}
+
+.btn.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: btn-spin 0.8s linear infinite;
+}
+
+@keyframes btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 按钮焦点样式 */
+.btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.btn-warning:focus {
+  box-shadow: 0 0 0 2px rgba(250, 173, 20, 0.2);
+}
+
+.btn-danger:focus {
+  box-shadow: 0 0 0 2px rgba(255, 77, 79, 0.2);
+}
+
+.btn-success:focus {
+  box-shadow: 0 0 0 2px rgba(82, 196, 26, 0.2);
+}
+
+/* 按钮文本样式 */
+.btn-text {
+  border: none;
+  background: transparent;
+  color: var(--primary-color);
+  padding: 4px 8px;
+  min-width: auto;
+}
+
+.btn-text:hover:not(:disabled) {
+  background: rgba(24, 144, 255, 0.1);
+  transform: none;
+  box-shadow: none;
+}
+
+/* 链接样式按钮 */
+.btn-link {
+  border: none;
+  background: transparent;
+  color: var(--primary-color);
+  text-decoration: underline;
+  padding: 0;
+  min-width: auto;
+}
+
+.btn-link:hover:not(:disabled) {
+  color: var(--primary-hover);
+  background: transparent;
+  transform: none;
+  box-shadow: none;
+}

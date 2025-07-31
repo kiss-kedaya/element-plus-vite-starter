@@ -2,11 +2,12 @@
 // 暂时注释掉 LazyImage 导入
 // import LazyImage from '@/components/common/LazyImage.vue'
 import type { ChatMessage } from '@/types/chat'
-import { Document, Picture, RefreshRight, Loading } from '@element-plus/icons-vue'
+import { Document, Picture, RefreshRight, Loading, VideoPlay } from '@element-plus/icons-vue'
 import EmojiImage from '@/components/common/EmojiImage.vue'
 import ImageMessage from '@/components/common/ImageMessage.vue'
 import { computed } from 'vue'
 import { useChatStore } from '@/stores/chat'
+import { useAuthStore } from '@/stores/auth'
 
 interface Props {
   message: ChatMessage
@@ -31,6 +32,7 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const chatStore = useChatStore()
+const authStore = useAuthStore()
 
 // 安全地解析消息ID为数字
 const getMsgId = computed(() => {
@@ -118,6 +120,20 @@ function formatFileSize(size?: number) {
   return `${fileSize.toFixed(1)} ${units[index]}`
 }
 
+function formatVideoDuration(seconds?: number) {
+  if (!seconds)
+    return '未知时长'
+
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
+
+  if (minutes > 0) {
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
+  } else {
+    return `0:${remainingSeconds.toString().padStart(2, '0')}`
+  }
+}
+
 function handleRetry() {
   emit('retry', props.message)
 }
@@ -189,8 +205,8 @@ function getSenderDisplayName() {
             <ImageMessage
               v-if="chatStore.currentSession"
               :msg-id="getMsgId"
-              :wxid="chatStore.currentSession.sessionId"
-              :to-wxid="message.fromMe ? message.sessionId : chatStore.currentSession.sessionId"
+              :wxid="authStore.currentAccount?.wxid"
+              :to-wxid="chatStore.currentSession.id"
               :aes-key="message.imageAesKey"
               :md5="message.imageMd5"
               :data-len="message.imageDataLen"
@@ -269,8 +285,8 @@ function getSenderDisplayName() {
             <ImageMessage
               v-if="chatStore.currentSession"
               :msg-id="getMsgId"
-              :wxid="chatStore.currentSession.sessionId"
-              :to-wxid="message.fromMe ? message.sessionId : chatStore.currentSession.sessionId"
+              :wxid="authStore.currentAccount?.wxid"
+              :to-wxid="chatStore.currentSession.id"
               :aes-key="message.imageAesKey"
               :md5="message.imageMd5"
               :data-len="message.imageDataLen"
@@ -299,6 +315,22 @@ function getSenderDisplayName() {
               </div>
               <div class="file-size">
                 {{ formatFileSize(message.fileData?.size) }}
+              </div>
+            </div>
+          </div>
+
+          <!-- 视频消息 -->
+          <div v-else-if="message.type === 'video'" class="message-video">
+            <div class="video-placeholder">
+              <el-icon class="video-icon">
+                <VideoPlay />
+              </el-icon>
+              <div class="video-info">
+                <div class="video-title">视频消息</div>
+                <div class="video-details">
+                  <span v-if="message.videoPlayLength">{{ formatVideoDuration(message.videoPlayLength) }}</span>
+                  <span v-if="message.videoLength">{{ formatFileSize(message.videoLength) }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -552,6 +584,58 @@ function getSenderDisplayName() {
     .file-size {
       font-size: 12px;
       color: var(--el-text-color-secondary);
+    }
+  }
+}
+
+.message-video {
+  .video-placeholder {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 200px;
+    padding: 12px;
+    background: var(--el-color-primary-light-9);
+    border: 1px solid var(--el-color-primary-light-5);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+
+    &:hover {
+      background: var(--el-color-primary-light-8);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(64, 158, 255, 0.2);
+    }
+
+    .video-icon {
+      font-size: 32px;
+      color: var(--el-color-primary);
+      flex-shrink: 0;
+    }
+
+    .video-info {
+      flex: 1;
+
+      .video-title {
+        font-weight: 500;
+        margin-bottom: 4px;
+        color: var(--el-text-color-primary);
+      }
+
+      .video-details {
+        font-size: 12px;
+        color: var(--el-text-color-secondary);
+        display: flex;
+        gap: 8px;
+
+        span {
+          &:not(:last-child)::after {
+            content: '•';
+            margin-left: 8px;
+            color: var(--el-text-color-placeholder);
+          }
+        }
+      }
     }
   }
 }

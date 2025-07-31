@@ -1,0 +1,316 @@
+/* 性能优化样式 */
+
+/* GPU加速优化 */
+.gpu-accelerated {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* 动画性能优化 */
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-opacity {
+  will-change: opacity;
+}
+
+.will-change-scroll {
+  will-change: scroll-position;
+}
+
+/* 滚动性能优化 */
+.smooth-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 字体渲染优化 */
+.optimize-text {
+  text-rendering: optimizeSpeed;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 图像渲染优化 */
+.optimize-image {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* 减少重绘的样式 */
+.no-repaint {
+  contain: layout style paint;
+}
+
+/* 虚拟化列表优化 */
+.virtual-list {
+  contain: strict;
+  overflow: auto;
+  height: 100%;
+  /* 隐藏滚动条但保持滚动功能 */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 和 Edge */
+}
+
+.virtual-list::-webkit-scrollbar {
+  display: none; /* Chrome, Safari 和 Opera */
+}
+
+.virtual-item {
+  contain: layout;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+/* 懒加载优化 */
+.lazy-load {
+  opacity: 0;
+  transition: opacity var(--transition-normal);
+}
+
+.lazy-load.loaded {
+  opacity: 1;
+}
+
+/* 预加载优化 */
+.preload-hover:hover::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-hover);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  pointer-events: none;
+}
+
+/* 减少布局抖动 */
+.stable-layout {
+  min-height: 1px;
+  min-width: 1px;
+}
+
+/* 优化的阴影 */
+.optimized-shadow {
+  box-shadow: 
+    0 1px 3px rgba(0, 0, 0, 0.12),
+    0 1px 2px rgba(0, 0, 0, 0.24);
+  transition: box-shadow var(--transition-fast);
+}
+
+.optimized-shadow:hover {
+  box-shadow: 
+    0 3px 6px rgba(0, 0, 0, 0.16),
+    0 3px 6px rgba(0, 0, 0, 0.23);
+}
+
+/* 内容可见性优化 */
+.content-visibility-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 200px;
+}
+
+/* 减少重排的Flexbox */
+.flex-no-shrink {
+  flex-shrink: 0;
+}
+
+.flex-basis-auto {
+  flex-basis: auto;
+}
+
+/* 优化的网格布局 */
+.grid-optimized {
+  display: grid;
+  grid-template-rows: masonry;
+  contain: layout;
+}
+
+/* 减少绘制的边框 */
+.border-optimized {
+  outline: 1px solid var(--border-color);
+  outline-offset: -1px;
+}
+
+/* 硬件加速的变换 */
+.transform-gpu {
+  transform: translate3d(0, 0, 0);
+}
+
+/* 隐藏滚动条的优化版本 */
+.scrollbar-optimized {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 和 Edge */
+}
+
+.scrollbar-optimized::-webkit-scrollbar {
+  display: none; /* Chrome, Safari 和 Opera */
+}
+
+/* 减少重绘的hover效果 */
+.hover-optimized {
+  position: relative;
+  overflow: hidden;
+}
+
+.hover-optimized::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--primary-light);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  pointer-events: none;
+}
+
+.hover-optimized:hover::before {
+  opacity: 1;
+}
+
+/* 优化的模糊效果 */
+.backdrop-blur {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* 减少重排的定位 */
+.position-optimized {
+  position: relative;
+  z-index: 0;
+}
+
+/* 优化的渐变 */
+.gradient-optimized {
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  background-attachment: fixed;
+}
+
+/* 减少内存使用的动画 */
+@keyframes fadeInOptimized {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.fade-in-optimized {
+  animation: fadeInOptimized var(--transition-normal) ease-out;
+}
+
+/* 优化的表格 */
+.table-optimized {
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+/* 减少重绘的输入框 */
+.input-optimized {
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  transition: border-color var(--transition-fast);
+}
+
+.input-optimized:focus {
+  border-color: var(--primary-color);
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+/* 优化的卡片组件 */
+.card-optimized {
+  background: var(--bg-primary);
+  border-radius: var(--radius-medium);
+  box-shadow: var(--shadow-light);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  will-change: transform;
+}
+
+.card-optimized:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-medium);
+}
+
+/* 减少布局计算的网格 */
+.grid-performance {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--spacing-lg);
+  contain: layout;
+}
+
+/* 优化的加载状态 */
+.loading-optimized {
+  position: relative;
+  overflow: hidden;
+}
+
+.loading-optimized::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+/* 媒体查询优化 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* 高对比度模式优化 */
+@media (prefers-contrast: high) {
+  :root {
+    --border-color: #000000;
+    --text-primary: #000000;
+    --bg-primary: #ffffff;
+  }
+}
+
+/* 暗色模式准备 - 已移除自动检测，改为手动控制 */
+/*
+注释掉自动暗色模式检测，确保用户选择的主题能够强制应用
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text-primary: #ffffff;
+    --text-secondary: #cccccc;
+    --text-tertiary: #999999;
+    --bg-primary: #1a1a1a;
+    --bg-secondary: #2a2a2a;
+    --bg-tertiary: #3a3a3a;
+    --border-color: #404040;
+    --border-light: #333333;
+  }
+}
+*/

@@ -1,0 +1,598 @@
+/* 动画和骨架屏样式 */
+
+/* 基础动画 */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 骨架屏基础动画 */
+@keyframes skeleton-loading {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* 骨架屏基础样式 */
+.skeleton {
+  background: linear-gradient(90deg, #f5f5f5 25%, #e8e8e8 50%, #f5f5f5 75%);
+  background-size: 200px 100%;
+  animation: skeleton-loading 1.8s infinite ease-in-out;
+  border-radius: var(--radius-small);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  animation: skeleton-loading 2s infinite;
+}
+
+/* 系统信息骨架屏 */
+.system-info-card-skeleton {
+  background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-large);
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  box-shadow: var(--shadow-light);
+  min-height: 120px;
+}
+
+.system-info-card-skeleton .skeleton-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-large);
+  flex-shrink: 0;
+}
+
+.system-info-card-skeleton .skeleton-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.system-info-card-skeleton .skeleton-title {
+  height: 16px;
+  width: 80px;
+}
+
+.system-info-card-skeleton .skeleton-value {
+  height: 20px;
+  width: 120px;
+}
+
+/* 新的系统信息骨架屏样式 - 使用相同的结构 */
+.system-info-card.skeleton-card {
+  /* 继承正常的 system-info-card 样式，确保大小一致 */
+  pointer-events: none;
+}
+
+.system-info-card.skeleton-card:hover {
+  /* 禁用骨架屏的hover效果 */
+  border-color: var(--border-light);
+  transform: none;
+  box-shadow: var(--shadow-light);
+}
+
+.system-info-card .skeleton-icon {
+  /* 图标容器保持原有大小 */
+  background: var(--skeleton-bg);
+  border-radius: var(--radius-medium);
+}
+
+.system-info-card .skeleton-icon .skeleton-icon-placeholder {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-medium);
+}
+
+.system-info-card .info-label.skeleton {
+  /* 标签骨架屏 */
+  height: 14px;
+  width: 80px;
+  margin-bottom: 4px;
+}
+
+.system-info-card .info-value.skeleton {
+  /* 值骨架屏 */
+  height: 18px;
+  width: 120px;
+}
+
+/* 二维码显示区域基础样式 */
+.qrcode-display {
+  width: 280px;
+  height: 280px;
+  max-width: 90vw; /* 响应式宽度 */
+  max-height: 90vw; /* 响应式高度 */
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-medium);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  aspect-ratio: 1; /* 保持正方形比例 */
+}
+
+/* 二维码骨架屏样式 */
+.qrcode-skeleton {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  border: 2px dashed var(--border-color);
+  border-radius: var(--radius-medium);
+  box-sizing: border-box;
+  position: relative;
+  overflow: visible; /* 确保边框完全可见 */
+}
+
+.qrcode-skeleton-placeholder {
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+.skeleton-qr-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.skeleton-qr-text {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 可点击的骨架屏样式 */
+.qrcode-skeleton-clickable {
+  cursor: pointer;
+  transition: all 0.3s ease;
+  user-select: none;
+}
+
+.qrcode-skeleton-clickable:hover {
+  background: var(--bg-tertiary);
+  border: 2px dashed var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1), 0 4px 12px rgba(24, 144, 255, 0.15);
+}
+
+.qrcode-skeleton-clickable:hover .skeleton-qr-icon {
+  color: var(--primary-color);
+  opacity: 0.9;
+}
+
+.qrcode-skeleton-clickable:hover .skeleton-qr-text {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.qrcode-skeleton-clickable:active {
+  background: rgba(24, 144, 255, 0.1);
+  border: 2px dashed var(--primary-color);
+  box-shadow: 0 0 0 1px rgba(24, 144, 255, 0.2), 0 2px 6px rgba(24, 144, 255, 0.2);
+}
+
+.qrcode-skeleton-clickable[disabled] {
+  cursor: not-allowed;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.qrcode-skeleton-clickable[disabled]:hover {
+  background: var(--bg-secondary);
+  border: 2px dashed var(--border-color);
+  box-shadow: none;
+}
+
+/* 错误状态的骨架屏 */
+.qrcode-skeleton-error {
+  border: 2px dashed var(--error-color);
+  background: rgba(255, 77, 79, 0.05);
+}
+
+.qrcode-skeleton-error .skeleton-qr-icon {
+  color: var(--error-color);
+  opacity: 0.8;
+}
+
+.qrcode-skeleton-error .skeleton-qr-text {
+  color: var(--error-color);
+}
+
+.qrcode-skeleton-error:hover {
+  background: rgba(255, 77, 79, 0.1);
+  border: 2px dashed var(--error-color);
+  box-shadow: 0 0 0 2px rgba(255, 77, 79, 0.1), 0 4px 12px rgba(255, 77, 79, 0.15);
+}
+
+.qrcode-skeleton-error:hover .skeleton-qr-icon {
+  color: var(--error-color);
+  opacity: 0.9;
+}
+
+.qrcode-skeleton-error:hover .skeleton-qr-text {
+  color: var(--error-color);
+  font-weight: 600;
+}
+
+/* 账号卡片骨架屏 */
+.account-card-skeleton {
+  background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-large);
+  padding: 24px;
+  margin-bottom: 24px;
+  min-height: 150px;
+  box-shadow: var(--shadow-light);
+}
+
+.account-card-skeleton .skeleton-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.account-card-skeleton .skeleton-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.account-card-skeleton .skeleton-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.account-card-skeleton .skeleton-name {
+  height: 16px;
+  width: 120px;
+}
+
+.account-card-skeleton .skeleton-wxid {
+  height: 14px;
+  width: 180px;
+}
+
+.account-card-skeleton .skeleton-status {
+  width: 60px;
+  height: 20px;
+  border-radius: 10px;
+}
+
+.account-card-skeleton .skeleton-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-light);
+}
+
+.account-card-skeleton .skeleton-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.account-card-skeleton .skeleton-label {
+  height: 12px;
+  width: 60px;
+}
+
+.account-card-skeleton .skeleton-value {
+  height: 14px;
+  width: 100px;
+}
+
+/* 二维码显示容器 */
+.qrcode-display-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-medium);
+  box-sizing: border-box;
+}
+
+/* 主题切换动画 */
+@keyframes themeTransition {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+/* 主题切换时的页面过渡效果 */
+.theme-transitioning {
+  animation: themeTransition 0.3s ease-in-out;
+}
+
+/* 减少动画偏好设置支持 */
+@media (prefers-reduced-motion: reduce) {
+  .theme-transitioning {
+    animation: none !important;
+  }
+
+  .theme-icon-dark,
+  .theme-icon-light {
+    transition: opacity 0.1s ease !important;
+  }
+}
+
+/* 高对比度模式支持 */
+@media (prefers-contrast: high) {
+  .theme-toggle-btn {
+    border-width: 2px;
+  }
+
+  .theme-toggle-btn:focus {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
+/* 按钮涟漪效果动画 */
+@keyframes ripple-animation {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* 按钮点击反馈动画 */
+@keyframes button-click {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* 按钮加载脉冲动画 */
+@keyframes button-loading-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* 现代化刷新按钮动画 */
+@keyframes refresh-icon-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes refresh-button-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 0.9;
+  }
+}
+
+@keyframes refresh-shimmer {
+  0% {
+    background-position: -100% 0;
+  }
+  100% {
+    background-position: 100% 0;
+  }
+}
+
+/* 刷新按钮加载状态 */
+.btn.loading {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn.loading::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
+  animation: refresh-shimmer 1.5s ease-in-out infinite;
+}
+
+.btn.loading .fa-sync-alt,
+.btn.loading .fa-spinner {
+  animation: refresh-icon-spin 1s linear infinite;
+}
+
+.btn.loading {
+  animation: refresh-button-pulse 2s ease-in-out infinite;
+}
+
+/* 减少动画偏好设置支持 */
+@media (prefers-reduced-motion: reduce) {
+  @keyframes ripple-animation {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 0.3;
+    }
+  }
+
+  .btn.loading {
+    animation: none !important;
+  }
+
+  .btn.loading::before {
+    animation: none !important;
+  }
+
+  .btn.loading .fa-sync-alt,
+  .btn.loading .fa-spinner {
+    animation: none !important;
+  }
+
+  /* 主题切换动画的减少动画支持 */
+  .theme-transition-new-mask {
+    animation: none !important;
+    clip-path: circle(150% at var(--mouse-x, 50%) var(--mouse-y, 50%)) !important;
+  }
+}
+
+/* ========== 主题切换动画系统 ========== */
+
+/* 强制禁止主题切换按钮的所有旋转动画 */
+.theme-toggle-btn,
+.theme-toggle-btn *,
+.theme-toggle-btn::before,
+.theme-toggle-btn::after {
+  animation: none !important;
+  transform: none !important;
+}
+
+.theme-toggle-btn:hover {
+  transform: scale(1.05) !important;
+}
+
+.theme-toggle-btn:active {
+  transform: scale(0.95) !important;
+}
+
+/* 主题切换分割线扫描动画 */
+@keyframes themeTransitionSweep {
+  0% {
+    clip-path: circle(0% at var(--mouse-x, 50%) var(--mouse-y, 50%));
+    opacity: 1;
+  }
+  5% {
+    clip-path: circle(2% at var(--mouse-x, 50%) var(--mouse-y, 50%));
+    opacity: 1;
+  }
+  95% {
+    clip-path: circle(140% at var(--mouse-x, 50%) var(--mouse-y, 50%));
+    opacity: 1;
+  }
+  100% {
+    clip-path: circle(150% at var(--mouse-x, 50%) var(--mouse-y, 50%));
+    opacity: 0;
+  }
+}
+
+/* 主题切换遮罩容器样式 */
+.theme-transition-mask-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000; /* 低于主题切换按钮的z-index */
+  pointer-events: none;
+}
+
+.theme-transition-new-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  clip-path: circle(0% at var(--mouse-x, 50%) var(--mouse-y, 50%));
+  animation: themeTransitionSweep 1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  will-change: clip-path;
+}
+
+
+
+

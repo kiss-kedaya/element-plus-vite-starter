@@ -14,7 +14,7 @@ export interface ChatMessage {
   content: string
   timestamp: Date
   fromMe: boolean
-  type: 'text' | 'image' | 'file' | 'system' | 'emoji'
+  type: 'text' | 'image' | 'file' | 'video' | 'system' | 'emoji'
   status?: 'sending' | 'sent' | 'failed'
   imageData?: string
   imagePath?: string         // 图片文件路径
@@ -41,6 +41,16 @@ export interface ChatMessage {
   emojiData?: string         // 表情原始数据
   emojiAesKey?: string       // 表情AES密钥
   emojiMd5?: string          // 表情MD5
+  // 视频相关字段
+  videoAesKey?: string       // 视频AES密钥
+  videoCdnUrl?: string       // 视频CDN URL
+  videoLength?: number       // 视频文件大小
+  videoPlayLength?: number   // 视频播放时长（秒）
+  videoThumbUrl?: string     // 视频缩略图URL
+  videoThumbAesKey?: string  // 视频缩略图AES密钥
+  videoThumbWidth?: number   // 视频缩略图宽度
+  videoThumbHeight?: number  // 视频缩略图高度
+  videoMd5?: string          // 视频MD5
   // 新增字段用于重试和撤回功能
   originalContent?: string  // 原始内容，用于重试
   canRetry?: boolean       // 是否可以重试

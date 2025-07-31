@@ -176,6 +176,12 @@ export class WebSocketService {
     }
 
     data.messages.forEach((msg: any) => {
+      // 过滤掉不需要显示的消息类型
+      if (this.shouldFilterMessage(msg)) {
+        console.log('过滤消息:', msg.msgType, msg.msgTypeDesc, msg.contentType)
+        return
+      }
+
       // 判断是否为群聊消息
       const isGroupMessage = msg.isGroupMessage || msg.fromUser?.includes('@chatroom') || msg.toUser?.includes('@chatroom')
 
@@ -224,6 +230,12 @@ export class WebSocketService {
       if (msg.msgType === 3) {
         chatMessage.content = '[图片]'
 
+        console.log('处理图片消息，原始数据:', {
+          msgId: msg.msgId,
+          originalContent: msg.originalContent,
+          content: msg.content
+        })
+
         // 解析XML数据获取图片信息
         if (msg.originalContent) {
           // 提取AES密钥
@@ -238,17 +250,37 @@ export class WebSocketService {
             chatMessage.imageMd5 = md5Match[1]
           }
 
-          // 提取数据长度
+          // 提取数据长度 - 尝试多种可能的字段名
+          let dataLen = 0
           const lengthMatch = msg.originalContent.match(/length\s*=\s*"([^"]+)"/)
           if (lengthMatch) {
-            chatMessage.imageDataLen = parseInt(lengthMatch[1])
+            dataLen = parseInt(lengthMatch[1])
+          } else {
+            // 尝试其他可能的字段名
+            const dataSizeMatch = msg.originalContent.match(/datasize\s*=\s*"([^"]+)"/)
+            if (dataSizeMatch) {
+              dataLen = parseInt(dataSizeMatch[1])
+            } else {
+              const sizeMatch = msg.originalContent.match(/size\s*=\s*"([^"]+)"/)
+              if (sizeMatch) {
+                dataLen = parseInt(sizeMatch[1])
+              }
+            }
           }
+          chatMessage.imageDataLen = dataLen
 
           // 提取压缩类型（如果有）
           const compressMatch = msg.originalContent.match(/compresstype\s*=\s*"([^"]+)"/)
           if (compressMatch) {
             chatMessage.imageCompressType = parseInt(compressMatch[1])
           }
+
+          console.log('图片信息解析结果:', {
+            imageAesKey: chatMessage.imageAesKey,
+            imageMd5: chatMessage.imageMd5,
+            imageDataLen: chatMessage.imageDataLen,
+            imageCompressType: chatMessage.imageCompressType
+          })
         }
 
         // 检查是否有直接的图片数据
@@ -286,6 +318,66 @@ export class WebSocketService {
           path: msg.content,
         }
         chatMessage.content = '[文件]'
+      }
+
+      // 处理视频消息
+      if (msg.msgType === 43) {
+        chatMessage.content = '[视频]'
+
+        // 解析XML数据获取视频信息
+        if (msg.originalContent) {
+          // 提取AES密钥
+          const aesKeyMatch = msg.originalContent.match(/aeskey\s*=\s*"([^"]+)"/)
+          if (aesKeyMatch) {
+            chatMessage.videoAesKey = aesKeyMatch[1]
+          }
+
+          // 提取CDN视频URL
+          const cdnVideoUrlMatch = msg.originalContent.match(/cdnvideourl\s*=\s*"([^"]+)"/)
+          if (cdnVideoUrlMatch) {
+            chatMessage.videoCdnUrl = cdnVideoUrlMatch[1]
+          }
+
+          // 提取视频长度（文件大小）
+          const lengthMatch = msg.originalContent.match(/length\s*=\s*"([^"]+)"/)
+          if (lengthMatch) {
+            chatMessage.videoLength = parseInt(lengthMatch[1])
+          }
+
+          // 提取播放时长
+          const playLengthMatch = msg.originalContent.match(/playlength\s*=\s*"([^"]+)"/)
+          if (playLengthMatch) {
+            chatMessage.videoPlayLength = parseInt(playLengthMatch[1])
+          }
+
+          // 提取缩略图信息
+          const thumbUrlMatch = msg.originalContent.match(/cdnthumburl\s*=\s*"([^"]+)"/)
+          if (thumbUrlMatch) {
+            chatMessage.videoThumbUrl = thumbUrlMatch[1]
+          }
+
+          const thumbAesKeyMatch = msg.originalContent.match(/cdnthumbaeskey\s*=\s*"([^"]+)"/)
+          if (thumbAesKeyMatch) {
+            chatMessage.videoThumbAesKey = thumbAesKeyMatch[1]
+          }
+
+          // 提取缩略图尺寸
+          const thumbWidthMatch = msg.originalContent.match(/cdnthumbwidth\s*=\s*"([^"]+)"/)
+          if (thumbWidthMatch) {
+            chatMessage.videoThumbWidth = parseInt(thumbWidthMatch[1])
+          }
+
+          const thumbHeightMatch = msg.originalContent.match(/cdnthumbheight\s*=\s*"([^"]+)"/)
+          if (thumbHeightMatch) {
+            chatMessage.videoThumbHeight = parseInt(thumbHeightMatch[1])
+          }
+
+          // 提取MD5
+          const md5Match = msg.originalContent.match(/md5\s*=\s*"([^"]+)"/)
+          if (md5Match) {
+            chatMessage.videoMd5 = md5Match[1]
+          }
+        }
       }
 
       // 处理表情消息
@@ -379,6 +471,22 @@ export class WebSocketService {
     })
   }
 
+  // 判断是否应该过滤消息
+  private shouldFilterMessage(msg: any): boolean {
+    // 过滤状态通知消息
+    if (msg.msgType === 51 || msg.contentType === 'status') {
+      return true
+    }
+
+    // 过滤其他不需要显示的消息类型
+    const filteredMsgTypes = [
+      51,   // 状态通知
+      // 可以在这里添加其他需要过滤的消息类型
+    ]
+
+    return filteredMsgTypes.includes(msg.msgType)
+  }
+
   // 根据消息类型转换
   private getMsgType(msgType: number): string {
     switch (msgType) {
@@ -388,6 +496,8 @@ export class WebSocketService {
         return 'image'
       case 6: // 文件消息
         return 'file'
+      case 43: // 视频消息
+        return 'video'
       case 47: // 表情消息
         return 'emoji'
       case 10000: // 系统消息

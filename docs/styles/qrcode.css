@@ -1,0 +1,341 @@
+/* 二维码相关样式 */
+
+/* 二维码显示区域基础样式 */
+.qrcode-display {
+  width: 280px;
+  height: 280px;
+  max-width: 90vw; /* 响应式宽度 */
+  max-height: 90vw; /* 响应式高度 */
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-medium);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+  aspect-ratio: 1; /* 保持正方形比例 */
+}
+
+/* 确保二维码显示区域支持覆盖层 */
+.qrcode-display {
+  position: relative; /* 确保覆盖层能正确定位 */
+}
+
+/* 通用覆盖层基础样式 */
+.qrcode-display .user-scanned-overlay,
+.qrcode-display .qrcode-cancelled-overlay,
+.qrcode-display .qrcode-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: inherit; /* 继承父容器的圆角 */
+  z-index: 10;
+}
+
+/* 二维码显示容器 */
+.qrcode-display-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-medium);
+  box-sizing: border-box;
+}
+
+/* 二维码图片包装器 */
+.qrcode-image-wrapper {
+  width: 200px;
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  border-radius: var(--radius-small);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-light);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.qrcode-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* 二维码提示信息 */
+.qrcode-tips {
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.qrcode-tips i {
+  font-size: 20px;
+  margin-bottom: 8px;
+  color: var(--primary-color);
+}
+
+.qrcode-tips p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 二维码容器样式 */
+.qrcode-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 350px;
+  margin: 0 auto;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* 二维码状态样式 */
+.qrcode-status {
+  text-align: center;
+  margin: 16px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.qrcode-status.success {
+  color: var(--success-color);
+}
+
+.qrcode-status.warning {
+  color: var(--warning-color);
+}
+
+.qrcode-status.error {
+  color: var(--error-color);
+}
+
+/* 二维码操作链接样式 */
+.qrcode-action-link {
+  color: var(--primary-color);
+  cursor: pointer;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  border-bottom: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border-radius: var(--radius-small);
+}
+
+.qrcode-action-link:hover {
+  background: rgba(24, 144, 255, 0.1);
+  border-bottom-color: var(--primary-color);
+  transform: translateY(-1px);
+}
+
+.qrcode-action-link:active {
+  transform: translateY(0);
+}
+
+.qrcode-action-link[disabled],
+.qrcode-action-link.disabled {
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+  opacity: 0.6;
+  border-bottom-color: transparent;
+  transform: none;
+}
+
+.qrcode-action-link[disabled]:hover {
+  color: var(--text-tertiary);
+  border-bottom-color: transparent;
+  transform: none;
+}
+
+/* 二维码操作按钮区域 */
+.qrcode-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+/* 二维码错误状态 */
+.qrcode-error {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--error-color);
+  text-align: center;
+  padding: 20px;
+}
+
+.qrcode-error i {
+  font-size: 48px;
+  opacity: 0.6;
+}
+
+.qrcode-error h4 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.qrcode-error p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 用户扫码后的覆盖层样式 */
+.user-scanned-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 20px;
+  border-radius: var(--radius-medium);
+  z-index: 10;
+  animation: fadeInScale 0.3s ease-out;
+}
+
+.user-scanned-overlay .user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-scanned-overlay .user-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  aspect-ratio: 1;
+  border: 3px solid var(--primary-color);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.2);
+}
+
+.user-scanned-overlay .avatar-fallback {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 600;
+  border: 3px solid var(--primary-color);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.2);
+}
+
+.user-scanned-overlay .user-details {
+  text-align: center;
+}
+
+.user-scanned-overlay .user-nickname {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.user-scanned-overlay .scan-status {
+  font-size: 14px;
+  color: var(--success-color);
+  font-weight: 500;
+}
+
+.user-scanned-overlay .confirm-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  text-align: center;
+}
+
+.user-scanned-overlay .confirm-hint i {
+  font-size: 24px;
+  color: var(--primary-color);
+}
+
+/* 取消登录覆盖层样式 */
+.qrcode-cancelled-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 20px;
+  border-radius: var(--radius-medium);
+  z-index: 10;
+  animation: fadeInScale 0.3s ease-out;
+}
+
+.qrcode-cancelled-overlay .cancel-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.qrcode-cancelled-overlay .cancel-info i {
+  font-size: 48px;
+  color: var(--error-color);
+  margin-bottom: 8px;
+}
+
+.qrcode-cancelled-overlay .cancel-message {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--error-color);
+  margin-bottom: 4px;
+}
+
+.qrcode-cancelled-overlay .cancel-user {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.qrcode-cancelled-overlay .btn {
+  margin-top: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+}

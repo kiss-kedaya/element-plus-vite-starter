@@ -1,0 +1,1028 @@
+/* 配置管理页面样式 */
+
+/* 配置页面特定布局 */
+#config-section {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+#config-section.active {
+  display: flex;
+}
+
+.config-header {
+  margin-bottom: 24px;
+  flex-shrink: 0; /* 防止头部被压缩 */
+}
+
+.config-header h1 {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.config-subtitle {
+  font-size: 16px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.config-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 16px 20px;
+  background: var(--bg-primary);
+  border-radius: var(--radius-medium);
+  box-shadow: var(--shadow-light);
+  flex-shrink: 0; /* 防止工具栏被压缩 */
+}
+
+/* 宽屏下的工具栏优化 */
+@media (min-width: 1200px) {
+  .config-toolbar {
+    padding: 20px 32px;
+    margin-bottom: 32px;
+    flex-wrap: nowrap;
+  }
+
+  .config-actions {
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .config-search {
+    flex-shrink: 0;
+  }
+
+  .config-search input {
+    width: 350px;
+  }
+}
+
+/* 中等宽度屏幕的工具栏 */
+@media (min-width: 900px) and (max-width: 1199px) {
+  .config-toolbar {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .config-actions {
+    order: 1;
+    flex: 1;
+    justify-content: flex-start;
+  }
+
+  .config-search {
+    order: 2;
+    flex: 1;
+    justify-content: flex-end;
+  }
+
+  .config-search input {
+    width: 280px;
+  }
+}
+
+.config-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.config-actions .btn {
+  font-size: 13px;
+  padding: 6px 12px;
+  min-width: auto;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.config-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.config-search i {
+  position: absolute;
+  left: 12px;
+  color: var(--text-tertiary);
+  z-index: 1;
+}
+
+.config-search input {
+  padding: 8px 12px 8px 36px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-small);
+  font-size: 14px;
+  width: 280px;
+  transition: all 0.3s ease;
+}
+
+.config-search input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.config-content {
+  width: 100%;
+  min-height: 400px;
+  max-height: calc(100vh - 280px); /* 动态计算高度，减去头部和工具栏的高度 */
+  overflow-y: auto;
+  padding-right: 8px;
+  flex: 1; /* 让内容区域占据剩余空间 */
+}
+
+/* 隐藏滚动条但保持滚动功能 */
+.config-content {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE 和 Edge */
+}
+
+.config-content::-webkit-scrollbar {
+  display: none; /* Chrome, Safari 和 Opera */
+}
+
+/* 宽屏下的配置内容容器 */
+@media (min-width: 1200px) {
+  .config-content {
+    max-width: none;
+    max-height: calc(100vh - 320px); /* 在宽屏下调整高度计算 */
+  }
+
+  .config-files {
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+}
+
+@media (min-width: 1800px) {
+  .config-content {
+    max-height: calc(100vh - 280px); /* 在超宽屏下进一步优化高度 */
+  }
+
+  .config-files {
+    max-width: 1800px;
+  }
+}
+
+.config-loading,
+.config-error,
+.config-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.config-loading i,
+.config-error i,
+.config-empty i {
+  margin-bottom: 16px;
+  color: var(--text-tertiary);
+}
+
+.config-loading h3,
+.config-error h3,
+.config-empty h3 {
+  font-size: 18px;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.config-error {
+  color: var(--error-color);
+}
+
+.config-error i {
+  color: var(--error-color);
+}
+
+.config-files {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 宽屏下的配置文件布局优化 */
+@media (min-width: 1200px) {
+  .config-files {
+    gap: 24px;
+  }
+
+  .config-file-card {
+    margin-bottom: 32px;
+  }
+
+  .config-file-header {
+    padding: 24px 32px;
+  }
+
+  .config-file-content {
+    padding: 0 32px 32px;
+  }
+}
+
+.config-file-card {
+  background: var(--bg-primary);
+  border-radius: var(--radius-medium);
+  box-shadow: var(--shadow-light);
+  overflow: hidden;
+  transition: all 0.3s ease;
+  margin-bottom: 24px;
+}
+
+.config-file-card:last-child {
+  margin-bottom: 0;
+}
+
+.config-file-card:hover {
+  box-shadow: var(--shadow-medium);
+}
+
+.config-file-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid var(--border-light);
+  cursor: pointer;
+  background: var(--bg-secondary);
+  transition: all 0.3s ease;
+}
+
+.config-file-header:hover {
+  background: var(--bg-tertiary);
+}
+
+.config-file-info h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 4px 0;
+}
+
+.config-file-info p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.config-file-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.config-file-status.modified {
+  color: var(--warning-color);
+}
+
+.config-file-status.saved {
+  color: var(--success-color);
+}
+
+.config-file-content {
+  padding: 0 20px 20px;
+  display: none;
+}
+
+.config-file-card.expanded .config-file-content {
+  display: block;
+}
+
+.config-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 宽屏下的配置分类优化 */
+@media (min-width: 1200px) {
+  .config-category-items {
+    gap: 20px;
+  }
+
+  .config-category {
+    margin-bottom: 32px;
+  }
+
+  .config-category-header {
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+  }
+
+  .config-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+    padding: 20px;
+    border-left: 3px solid transparent;
+    transition: all 0.3s ease;
+  }
+
+  .config-item:hover {
+    border-left-color: var(--primary-color);
+    background: var(--bg-hover);
+  }
+
+  .config-item-header {
+    flex: 0 0 300px;
+    margin-bottom: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    padding-right: 16px;
+    border-right: 1px solid var(--border-light);
+  }
+
+  .config-item-info {
+    flex: 1;
+  }
+
+  .config-item-label {
+    font-size: 15px;
+    margin-bottom: 6px;
+  }
+
+  .config-item-description {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .config-item-type {
+    margin-left: 0;
+    margin-top: 8px;
+  }
+
+  .config-item-input {
+    flex: 1;
+    min-width: 0;
+    align-items: center;
+  }
+
+  .config-input {
+    max-width: none;
+    font-size: 14px;
+  }
+}
+
+.config-category {
+  margin-bottom: 24px;
+}
+
+.config-category:last-child {
+  margin-bottom: 0;
+}
+
+.config-category-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.config-category-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.config-category-title i {
+  color: var(--warning-color);
+}
+
+.config-category-count {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  background: var(--bg-tertiary);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.config-category-items {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.config-item {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-small);
+  padding: 16px;
+  transition: all 0.3s ease, transform 0.2s ease;
+  position: relative;
+}
+
+.config-item:hover {
+  border-color: var(--border-color);
+  box-shadow: var(--shadow-light);
+}
+
+.config-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.config-item-info {
+  flex: 1;
+}
+
+.config-item-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.config-sensitive-icon {
+  color: var(--warning-color);
+  font-size: 12px;
+}
+
+.config-item-description {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.config-item-type {
+  margin-left: 16px;
+}
+
+.config-item-input {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.config-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-small);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.config-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: var(--shadow-focus);
+}
+
+.config-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.config-input[type="checkbox"] {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.config-input[type="number"] {
+  max-width: 200px;
+}
+
+.config-input[type="password"] {
+  font-family: monospace;
+}
+
+.config-save-btn {
+  flex-shrink: 0;
+  min-width: 80px;
+}
+
+.config-save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 超宽屏优化 */
+@media (min-width: 1600px) {
+  .config-item-header {
+    flex: 0 0 450px;
+  }
+
+  .config-item {
+    gap: 40px;
+    padding: 28px;
+  }
+
+  .config-item-label {
+    font-size: 16px;
+  }
+
+  .config-item-description {
+    font-size: 14px;
+  }
+
+  .config-input {
+    font-size: 15px;
+    padding: 10px 14px;
+  }
+
+  .config-save-btn {
+    min-width: 100px;
+    padding: 10px 16px;
+  }
+}
+
+.config-type-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.config-type-badge.string {
+  background: rgba(24, 144, 255, 0.1);
+  color: var(--primary-color);
+}
+
+.config-type-badge.number {
+  background: rgba(82, 196, 26, 0.1);
+  color: var(--success-color);
+}
+
+.config-type-badge.boolean {
+  background: rgba(250, 140, 22, 0.1);
+  color: var(--warning-color);
+}
+
+/* 中等屏幕优化 */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .config-toolbar {
+    padding: 18px 24px;
+  }
+
+  .config-search input {
+    width: 300px;
+  }
+
+  .config-file-header {
+    padding: 20px 24px;
+  }
+
+  .config-file-content {
+    padding: 0 24px 24px;
+  }
+
+  .config-item {
+    padding: 18px;
+  }
+}
+
+/* 小屏幕响应式设计 */
+@media (max-width: 767px) {
+  .config-toolbar {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+    padding: 16px;
+  }
+
+  .config-actions {
+    justify-content: center;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+
+  .config-actions .btn {
+    font-size: 11px;
+    padding: 6px 8px;
+    min-width: auto;
+  }
+
+  .config-search {
+    justify-content: center;
+  }
+
+  .config-search input {
+    width: 100%;
+    max-width: 300px;
+  }
+
+  .config-file-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 16px;
+  }
+
+  .config-file-content {
+    padding: 0 16px 16px;
+  }
+
+  .config-item {
+    padding: 16px;
+  }
+
+  .config-item-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .config-item-input {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .config-input[type="number"] {
+    max-width: none;
+  }
+
+  .config-save-btn {
+    min-width: 100%;
+  }
+}
+
+/* 搜索统计样式 */
+.search-stats {
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  background: var(--primary-light);
+  border: 1px solid var(--primary-color);
+  border-radius: var(--radius-small);
+  display: none;
+}
+
+.search-stats-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.search-stats-content i {
+  color: var(--primary-color);
+  margin-right: 8px;
+}
+
+.search-stats-content span {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.search-stats-content.no-results {
+  background: var(--warning-light);
+  border-color: var(--warning-color);
+}
+
+.search-stats-content.no-results i {
+  color: var(--warning-color);
+}
+
+.search-stats-content.no-results span {
+  color: var(--warning-color);
+}
+
+/* 配置文件卡片改进 - 合并到上面的样式中 */
+
+/* 配置项输入框改进 */
+.config-input:hover {
+  border-color: var(--primary-hover);
+}
+
+/* 已修改配置项的样式 */
+.config-item.config-modified {
+  position: relative;
+  background: var(--warning-light);
+  border: 1px solid var(--warning-color);
+  border-radius: var(--radius-medium);
+  box-shadow: var(--shadow-light);
+}
+
+.config-item.config-modified::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--warning-color);
+  border-radius: var(--radius-small) 0 0 var(--radius-small);
+}
+
+.config-item.config-modified .config-item-label::after {
+  content: '●';
+  color: var(--warning-color);
+  margin-left: 8px;
+  font-size: 12px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* 保存全部按钮状态指示 */
+#save-all-config.has-changes {
+  background: var(--warning-color);
+  color: white;
+  box-shadow: var(--shadow-medium);
+  animation: glow 2s infinite alternate;
+}
+
+@keyframes glow {
+  from {
+    box-shadow: var(--shadow-medium);
+  }
+  to {
+    box-shadow: var(--shadow-heavy);
+  }
+}
+
+/* ==================== 演示模式样式 ==================== */
+
+/* 演示模式配置项特殊样式 */
+.config-item-demo-mode {
+  position: relative;
+  background: linear-gradient(135deg, var(--primary-light) 0%, rgba(64, 150, 255, 0.05) 100%);
+  border: 2px solid var(--primary-color);
+  border-radius: var(--radius-medium);
+  box-shadow: var(--shadow-medium);
+  margin-bottom: 20px;
+}
+
+.config-item-demo-mode::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary-color), rgba(64, 150, 255, 0.6), var(--primary-color));
+  border-radius: var(--radius-medium) var(--radius-medium) 0 0;
+}
+
+/* 演示模式图标 */
+.config-demo-icon {
+  color: var(--primary-color);
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+/* 演示模式徽章 */
+.config-demo-badge {
+  display: inline-block;
+  background: var(--primary-color);
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  margin-left: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* 演示模式提示横幅 */
+.demo-mode-notice {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+  border: 1px solid #ffc107;
+  border-radius: var(--radius-medium);
+  margin-bottom: 20px;
+  animation: slideInDown 0.3s ease-out;
+}
+
+.demo-mode-notice-content {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  gap: 12px;
+}
+
+.demo-mode-icon {
+  color: #856404;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.demo-mode-text {
+  color: #856404;
+  font-weight: 600;
+  flex: 1;
+}
+
+.demo-mode-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.demo-mode-subtitle {
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+.demo-mode-close {
+  color: #856404;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-small);
+  transition: all var(--transition-fast);
+}
+
+.demo-mode-close:hover {
+  background: rgba(133, 100, 4, 0.1);
+  transform: scale(1.1);
+}
+
+/* 只读状态的输入框样式 */
+.config-input.demo-mode-readonly {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-color: var(--border-light);
+  cursor: not-allowed;
+  opacity: 0.7;
+  position: relative;
+}
+
+.config-input.demo-mode-readonly::after {
+  content: '🔒';
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* 禁用状态的保存按钮 */
+.config-save-btn.demo-mode-disabled {
+  background: var(--bg-tertiary);
+  color: var(--text-disabled);
+  border-color: var(--border-light);
+  cursor: not-allowed;
+  opacity: 0.5;
+  position: relative;
+}
+
+.config-save-btn.demo-mode-disabled::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.1) 2px,
+    rgba(0, 0, 0, 0.1) 4px
+  );
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.config-save-btn.demo-mode-disabled:hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* 批量保存按钮的演示模式样式 */
+#save-all-config.demo-mode-disabled {
+  background: var(--bg-tertiary);
+  color: var(--text-disabled);
+  border-color: var(--border-light);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+#save-all-config.demo-mode-disabled::before {
+  content: '🔒 演示模式';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-disabled);
+}
+
+#save-all-config.demo-mode-disabled .fas {
+  opacity: 0;
+}
+
+/* 暗色主题下的演示模式样式 */
+[data-theme="dark"] .demo-mode-notice {
+  background: linear-gradient(135deg, #2d2006 0%, #3d2a00 100%);
+  border-color: #ffc107;
+}
+
+[data-theme="dark"] .demo-mode-icon,
+[data-theme="dark"] .demo-mode-text,
+[data-theme="dark"] .demo-mode-close {
+  color: #ffc107;
+}
+
+[data-theme="dark"] .demo-mode-close:hover {
+  background: rgba(255, 193, 7, 0.1);
+}
+
+/* 动画效果 */
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 演示模式配置项的脉冲动画 */
+.config-item-demo-mode {
+  animation: demoModePulse 3s ease-in-out infinite;
+}
+
+@keyframes demoModePulse {
+  0%, 100% {
+    box-shadow: var(--shadow-medium);
+  }
+  50% {
+    box-shadow: 0 4px 20px rgba(64, 150, 255, 0.3);
+  }
+}
+
+/* 移动端优化 */
+@media (max-width: 768px) {
+  .demo-mode-notice-content {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .demo-mode-icon {
+    font-size: 16px;
+  }
+
+  .demo-mode-text {
+    font-size: 14px;
+  }
+
+  .config-demo-badge {
+    font-size: 10px;
+    padding: 1px 6px;
+  }
+}
+
+/* 减少动画偏好设置支持 */
+@media (prefers-reduced-motion: reduce) {
+  .demo-mode-notice {
+    animation: none !important;
+  }
+
+  .config-item-demo-mode {
+    animation: none !important;
+  }
+
+  .demo-mode-close {
+    transition: none !important;
+  }
+}

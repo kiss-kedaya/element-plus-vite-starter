@@ -1,0 +1,449 @@
+/* 响应式设计 */
+
+/* 移动端样式 */
+@media (max-width: 768px) {
+  .header-container {
+    padding: 0 16px;
+  }
+
+  .mobile-menu-btn {
+    display: flex;
+  }
+
+  .nav-menu {
+    display: none;
+  }
+
+  .search-box {
+    display: none;
+  }
+
+  .header-right {
+    gap: 8px;
+  }
+
+  .config-btn {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .config-btn i {
+    margin-right: 4px;
+  }
+
+  /* 移动端主题切换按钮 */
+  .theme-toggle-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
+  }
+
+  .logo {
+    font-size: 16px;
+  }
+
+  .logo i {
+    font-size: 20px;
+  }
+
+  .logo span {
+    display: inline-block;
+    white-space: nowrap;
+  }
+
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    width: var(--sidebar-width);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar.collapsed {
+    width: var(--sidebar-width);
+  }
+
+  .sidebar.collapsed .category-text,
+  .sidebar.collapsed .sidebar-header h3,
+  .sidebar.collapsed .category-count {
+    display: block;
+  }
+
+  .sidebar.collapsed .category-item {
+    justify-content: space-between;
+    padding: 8px 12px;
+  }
+
+  .sidebar.collapsed .category-name {
+    justify-content: flex-start;
+  }
+
+  .sidebar-toggle {
+    display: none;
+  }
+
+  /* 移动端显示导航菜单 */
+  .mobile-nav-menu {
+    display: block;
+  }
+
+  .content-area {
+    margin-left: 0 !important;
+    padding: 16px;
+    width: 100vw !important;
+    max-width: 100vw;
+  }
+
+  .overview-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .system-info-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .system-info-card {
+    padding: 16px;
+  }
+
+  .system-info-card .info-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+  }
+
+  .system-info-card .info-value {
+    font-size: 16px;
+  }
+
+  /* 移动端骨架屏样式调整 */
+  .system-info-card.skeleton-card .skeleton-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .system-info-card .info-label.skeleton {
+    height: 12px;
+    width: 70px;
+  }
+
+  .system-info-card .info-value.skeleton {
+    height: 16px;
+    width: 100px;
+  }
+
+  .accounts-overview {
+    grid-template-columns: 1fr;
+  }
+
+  /* 移动端账号卡片优化 */
+  .account-card {
+    padding: 20px;
+    border-radius: 12px;
+  }
+
+  .account-card-header {
+    gap: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+  }
+
+  .account-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+  }
+
+  .account-nickname {
+    font-size: 16px;
+  }
+
+  .account-wxid {
+    font-size: 12px;
+    max-width: 180px;
+  }
+
+  .account-detail-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 2px 0;
+  }
+
+  .account-detail-row.important {
+    grid-template-columns: 1fr;
+    padding: 10px 12px;
+    margin: 6px -2px;
+    border-radius: 6px;
+  }
+
+  .account-detail.horizontal {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 6px 0;
+  }
+
+  .account-detail.horizontal .account-detail-value {
+    text-align: left;
+  }
+
+  .account-detail-value.important {
+    font-size: 12px;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* 移动端二维码骨架样式优化 */
+  .skeleton-qr-icon {
+    font-size: 36px;
+    margin-bottom: 12px;
+  }
+
+  .skeleton-qr-text {
+    font-size: 13px;
+  }
+
+  /* 移动端可点击骨架屏 */
+  .qrcode-skeleton-clickable:hover {
+    transform: none; /* 移动端不需要hover效果 */
+  }
+
+  .qrcode-skeleton-clickable:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease;
+  }
+
+  /* 移动端模态框优化 */
+  .api-modal {
+    padding: 8px;
+  }
+
+  .api-modal-content {
+    max-height: 98vh;
+  }
+
+  .api-modal-header {
+    padding: 16px 20px;
+    flex-shrink: 0; /* 防止头部被压缩 */
+  }
+
+  .api-modal-header h3 {
+    font-size: 16px;
+  }
+
+  .api-modal-body {
+    padding: 16px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .apis-content.grid-view {
+    grid-template-columns: 1fr;
+  }
+
+  .apis-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .apis-toolbar {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* 超小屏幕优化 (小于400px) */
+@media (max-width: 400px) {
+  .add-account-modal-content {
+    width: 98%;
+    max-height: 99vh;
+    margin: 0;
+  }
+
+  .add-account-modal-content .api-modal-header {
+    padding: 12px 16px;
+  }
+
+  .add-account-modal-content .api-modal-body {
+    padding: 12px;
+  }
+
+  .method-tab {
+    padding: 8px 10px;
+    font-size: 12px;
+    gap: 4px;
+  }
+
+  .apis-content.grid-view {
+    grid-template-columns: 1fr;
+  }
+
+  .apis-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .apis-toolbar {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* 平板端样式 */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .content-area {
+    padding: 20px;
+  }
+
+  .overview-cards {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+  }
+
+  .accounts-overview {
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  }
+
+  .apis-content.grid-view {
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+}
+
+/* 大屏幕样式 */
+@media (min-width: 1025px) {
+  .mobile-menu-btn {
+    display: none;
+  }
+
+  .nav-menu {
+    display: flex;
+  }
+
+  .sidebar-overlay {
+    display: none !important;
+  }
+
+  .content-area {
+    padding: 32px;
+  }
+
+  .overview-cards {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  }
+
+  .accounts-overview {
+    grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+  }
+
+  .apis-content.grid-view {
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  }
+
+  /* 大屏幕下账号卡片内部布局优化 */
+  .account-detail-row {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 20px;
+  }
+
+  .account-detail-row.important {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+
+  /* 大屏幕下可以显示更多信息 */
+  .account-detail-value.long-text {
+    max-width: 200px;
+  }
+}
+
+/* 刷新按钮移动端优化 */
+@media (max-width: 768px) {
+  /* 移动端刷新按钮样式 */
+  #refresh-accounts-overview {
+    padding: 10px 14px;
+    font-size: 13px;
+    min-height: 44px; /* 确保足够的触摸目标大小 */
+  }
+
+  #refresh-accounts-overview .fa-sync-alt,
+  #refresh-accounts-overview .fa-spinner {
+    font-size: 14px;
+    margin-right: 6px;
+  }
+
+
+
+  /* 移动端点击反馈 */
+  .btn-clicked {
+    transform: scale(0.92);
+    transition: transform 0.1s ease;
+  }
+
+  /* 移动端涟漪效果优化 */
+  .ripple {
+    animation-duration: 0.4s !important;
+  }
+
+  /* 移动端头部按钮组间距 */
+  .header-buttons {
+    gap: 8px;
+  }
+
+  .header-buttons .btn {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+  }
+}
+
+/* 小屏幕设备优化 */
+@media (max-width: 480px) {
+  #refresh-accounts-overview {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  #refresh-accounts-overview .fa-sync-alt,
+  #refresh-accounts-overview .fa-spinner {
+    font-size: 12px;
+    margin-right: 4px;
+  }
+
+
+
+  /* 减少动画强度 */
+  .btn-clicked {
+    transform: scale(0.94);
+  }
+}
+
+/* 触摸设备优化 */
+@media (hover: none) and (pointer: coarse) {
+  /* 触摸设备上的按钮优化 */
+  #refresh-accounts-overview {
+    min-height: 48px; /* 更大的触摸目标 */
+    padding: 12px 16px;
+  }
+
+  /* 触摸设备上禁用悬停效果 */
+  #refresh-accounts-overview:hover {
+    transform: none !important;
+    box-shadow: var(--shadow-light) !important;
+  }
+
+  /* 触摸设备上的涟漪效果更明显 */
+  .ripple {
+    background: rgba(255, 255, 255, 0.4) !important;
+  }
+}
