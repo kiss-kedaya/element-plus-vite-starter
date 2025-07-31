@@ -100,9 +100,9 @@ export const loginApi = {
   },
 
   // 获取已登录账号列表
-  getLoggedAccounts: async (): Promise<{ data: any[] }> => {
-    const response = await request.get<any[]>('/Login/GetLoggedAccounts', { api_key: 'api_kedaya' })
-    return { data: response.data }
+  getLoggedAccounts: async (): Promise<any> => {
+    const response = await request.get<any>('/Login/GetLoggedAccounts', { api_key: 'api_kedaya' })
+    return response
   },
 
   // 设置代理

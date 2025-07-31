@@ -56,6 +56,7 @@ declare module 'vue' {
     FriendManagement_backup: typeof import('./components/FriendManagement_backup.vue')['default']
     GroupManagement: typeof import('./components/GroupManagement.vue')['default']
     HelloWorld: typeof import('./components/HelloWorld.vue')['default']
+    LazyImage: typeof import('./components/common/LazyImage.vue')['default']
     LoadingSpinner: typeof import('./components/common/LoadingSpinner.vue')['default']
     LoginForm: typeof import('./components/LoginForm.vue')['default']
     Logos: typeof import('./components/Logos.vue')['default']
@@ -63,5 +64,7 @@ declare module 'vue' {
     MessageItem: typeof import('./components/business/MessageItem.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    VirtualList: typeof import('./components/common/VirtualList.vue')['default']
+    VirtualMessageList: typeof import('./components/common/VirtualMessageList.vue')['default']
   }
 }

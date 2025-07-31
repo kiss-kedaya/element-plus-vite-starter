@@ -10,13 +10,6 @@
     </div>
     
     <div class="message-wrapper">
-      <!-- 头像 -->
-      <div v-if="!message.fromMe" class="message-avatar">
-        <el-avatar :size="32" :src="avatar">
-          {{ avatarText }}
-        </el-avatar>
-      </div>
-      
       <!-- 消息内容 -->
       <div class="message-content-wrapper">
         <div class="message-content" :class="contentClass">
@@ -52,24 +45,11 @@
           </div>
         </div>
         
-        <!-- 消息状态 -->
-        <div v-if="message.fromMe" class="message-status">
-          <el-icon v-if="message.status === 'sending'" class="status-sending">
-            <Loading />
-          </el-icon>
-          <el-icon v-else-if="message.status === 'sent'" class="status-sent">
-            <Check />
-          </el-icon>
-          <el-icon v-else-if="message.status === 'read'" class="status-read">
-            <Select />
-          </el-icon>
-        </div>
-        
         <!-- 重试按钮 -->
         <div v-if="message.status === 'failed' && message.canRetry" class="message-retry">
-          <el-button 
-            type="danger" 
-            size="small" 
+          <el-button
+            type="danger"
+            size="small"
             :icon="RefreshRight"
             circle
             @click="handleRetry"
@@ -90,7 +70,9 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Document, Loading, Check, Select, RefreshRight } from '@element-plus/icons-vue'
+import { Document, RefreshRight } from '@element-plus/icons-vue'
+// 暂时注释掉 LazyImage 导入
+// import LazyImage from '@/components/common/LazyImage.vue'
 import type { ChatMessage } from '@/types/chat'
 
 interface Props {
@@ -179,6 +161,13 @@ const handleContextMenu = (event: MouseEvent) => {
   event.preventDefault()
   emit('contextmenu', event, props.message)
 }
+
+// 暂时注释掉图片预览方法
+// const handleImagePreview = (src: string) => {
+//   // 图片预览逻辑，可以使用 Element Plus 的图片预览
+//   // 或者自定义预览组件
+//   console.log('预览图片:', src)
+// }
 </script>
 
 <style lang="scss" scoped>
@@ -197,7 +186,7 @@ const handleContextMenu = (event: MouseEvent) => {
 .message-time {
   text-align: center;
   font-size: 12px;
-  color: var(--el-text-color-secondary);
+  color: #999999;
   margin-bottom: 8px;
 }
 
@@ -205,10 +194,14 @@ const handleContextMenu = (event: MouseEvent) => {
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  
-  &.message-from-me {
-    flex-direction: row-reverse;
-  }
+}
+
+.message-from-me .message-wrapper {
+  justify-content: flex-end;
+}
+
+.message-from-other .message-wrapper {
+  justify-content: flex-start;
 }
 
 .message-avatar {
@@ -220,60 +213,29 @@ const handleContextMenu = (event: MouseEvent) => {
   align-items: flex-end;
   gap: 4px;
   max-width: 70%;
-  
-  .message-from-me & {
-    flex-direction: row-reverse;
-  }
 }
 
 .message-content {
   position: relative;
-  padding: 8px 12px;
-  border-radius: 8px;
+  padding: 12px 16px;
+  border-radius: 12px;
   word-wrap: break-word;
-  
-  &.content-from-me {
-    background: #409eff;
-    color: white;
-    
-    &::after {
-      content: '';
-      position: absolute;
-      right: -6px;
-      bottom: 8px;
-      width: 0;
-      height: 0;
-      border-left: 6px solid #409eff;
-      border-top: 6px solid transparent;
-      border-bottom: 6px solid transparent;
-    }
-  }
-  
-  &.content-from-other {
-    background: #f5f5f5;
-    color: var(--el-text-color-primary);
-    
-    &::after {
-      content: '';
-      position: absolute;
-      left: -6px;
-      bottom: 8px;
-      width: 0;
-      height: 0;
-      border-right: 6px solid #f5f5f5;
-      border-top: 6px solid transparent;
-      border-bottom: 6px solid transparent;
-    }
-  }
-  
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--el-text-color-primary);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  backdrop-filter: blur(10px);
+
   &.content-failed {
-    opacity: 0.6;
-    border: 1px solid var(--el-color-danger);
+    opacity: 0.8;
+    border-color: rgba(245, 108, 108, 0.3);
+    background: rgba(254, 240, 240, 0.9);
   }
 }
 
 .message-text {
   line-height: 1.4;
+  font-size: 14px;
 }
 
 .message-image {
@@ -318,18 +280,7 @@ const handleContextMenu = (event: MouseEvent) => {
   border-radius: 4px;
 }
 
-.message-status {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-  
-  .status-sending {
-    animation: spin 1s linear infinite;
-  }
-  
-  .status-read {
-    color: var(--el-color-primary);
-  }
-}
+
 
 .message-retry {
   .el-button {
@@ -337,8 +288,5 @@ const handleContextMenu = (event: MouseEvent) => {
   }
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
+
 </style>

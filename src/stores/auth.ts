@@ -118,11 +118,16 @@ export const useAuthStore = defineStore('auth', () => {
       if (response && Array.isArray(response.Data)) {
         accountsData = response.Data
         // 使用 response.Data 数据
+      } else if (response && Array.isArray(response.data)) {
+        accountsData = response.data
+        // 使用 response.data 数据
       } else if (Array.isArray(response)) {
         accountsData = response
         // 使用 response 数据
       } else {
         console.error('未识别的响应格式，response:', response)
+        // 如果没有数据，设置为空数组
+        accountsData = []
       }
 
       // 转换为前端需要的格式

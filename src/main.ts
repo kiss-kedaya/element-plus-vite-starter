@@ -2,6 +2,9 @@ import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import App from './App.vue'
 import { pinia } from './stores'
+// 暂时注释掉懒加载相关导入，避免启动错误
+// import { lazy, lazyContainer } from './directives/lazy'
+// import { componentPreloader, smartPreloader } from './utils/lazyLoad'
 
 // 强制禁用夜间模式
 document.documentElement.classList.remove('dark')
@@ -72,6 +75,25 @@ const router = createRouter({
 })
 
 const app = createApp(App)
+
+// 暂时注释掉全局指令注册
+// app.directive('lazy', lazy)
+// app.directive('lazy-container', lazyContainer)
+
 app.use(pinia)
 app.use(router)
+
 app.mount('#app')
+
+// 暂时注释掉智能预加载
+// setTimeout(() => {
+//   try {
+//     smartPreloader.smartPreload({
+//       Dashboard: () => import('./pages/dashboard.vue'),
+//       ChatInterface: () => import('./components/ChatInterface.vue'),
+//       FriendManagement: () => import('./components/FriendManagement.vue')
+//     })
+//   } catch (error) {
+//     console.warn('智能预加载失败:', error)
+//   }
+// }, 3000)

@@ -20,6 +20,9 @@ import { useChatStore } from '@/stores/chat'
 import { useFriendStore } from '@/stores/friend'
 import { closeWebSocketConnection, createWebSocketConnection } from '@/utils/websocket'
 import MessageItem from '@/components/business/MessageItem.vue'
+// 暂时注释掉虚拟滚动相关导入
+// import VirtualMessageList from '@/components/common/VirtualMessageList.vue'
+// import LazyImage from '@/components/common/LazyImage.vue'
 import { useNotification } from '@/composables'
 
 // Props
@@ -39,6 +42,11 @@ const messageInput = ref('')
 const messagesContainer = ref<HTMLElement>()
 const fileInputRef = ref<HTMLInputElement>()
 const searchKeyword = ref('')
+
+// 暂时注释掉虚拟滚动相关变量
+// const virtualListRef = ref<InstanceType<typeof VirtualMessageList>>()
+// const messagesContainerHeight = ref(400)
+// const isLoadingHistory = ref(false)
 
 // 右键菜单相关
 const contextMenu = ref({
@@ -186,6 +194,28 @@ async function clearCurrentMessages() {
   }
 }
 
+// 暂时注释掉虚拟滚动相关方法
+// function loadMoreHistory() {
+//   if (isLoadingHistory.value || !chatStore.currentSession) return
+//
+//   isLoadingHistory.value = true
+//
+//   // 模拟加载历史消息
+//   setTimeout(() => {
+//     // 这里应该调用实际的API加载历史消息
+//     // chatStore.loadHistoryMessages(chatStore.currentSession.id)
+//     isLoadingHistory.value = false
+//   }, 1000)
+// }
+
+// function handleReachBottom() {
+//   // 到达底部时的处理
+// }
+
+// function handleMessagesScroll(scrollTop: number) {
+//   // 滚动时的处理
+// }
+
 // 重试发送消息
 async function retryMessage(message: any) {
   if (!props.account || !chatStore.currentSession) return
@@ -299,25 +329,40 @@ function formatSessionTime(timestamp: Date | string): string {
   }
 }
 
-function showMessageTime(message: any) {
-  // 简化：每条消息都显示时间
-  return true
+function showMessageTime(message: any, index: number) {
+  // 第一条消息总是显示时间
+  if (index === 0) return true
+
+  // 获取当前消息和前一条消息
+  const messages = chatStore.currentMessages
+  const prevMessage = messages[index - 1]
+
+  if (!prevMessage) return true
+
+  // 比较时间，如果是同一分钟则不显示
+  const currentTime = new Date(message.timestamp)
+  const prevTime = new Date(prevMessage.timestamp)
+
+  const currentMinute = currentTime.getHours() * 60 + currentTime.getMinutes()
+  const prevMinute = prevTime.getHours() * 60 + prevTime.getMinutes()
+
+  // 如果不是同一天，显示时间
+  if (currentTime.toDateString() !== prevTime.toDateString()) {
+    return true
+  }
+
+  // 如果不是同一分钟，显示时间
+  return currentMinute !== prevMinute
 }
 
-// 获取联系人头像
+// 获取联系人头像 - 已移除头像显示，返回空字符串
 function getContactAvatar(message: any) {
-  if (message.fromMe) return ''
-
-  const contact = friendStore.friends.find(f => f.wxid === chatStore.currentSession?.id)
-  return contact?.headUrl || contact?.avatar || ''
+  return ''
 }
 
-// 获取联系人头像文字
+// 获取联系人头像文字 - 已移除头像显示，返回空字符串
 function getContactAvatarText(message: any) {
-  if (message.fromMe) return ''
-
-  const contact = friendStore.friends.find(f => f.wxid === chatStore.currentSession?.id)
-  return contact?.nickname?.charAt(0) || contact?.remark?.charAt(0) || '?'
+  return ''
 }
 
 // 监听账号变化
@@ -345,6 +390,25 @@ watch(() => props.account?.wxid, async (newWxid, oldWxid) => {
   }
 })
 
+// 暂时注释掉容器高度计算
+// function calculateMessagesContainerHeight() {
+//   nextTick(() => {
+//     const container = document.querySelector('.chat-main')
+//     if (container) {
+//       const containerRect = container.getBoundingClientRect()
+//       const headerHeight = 60 // 聊天头部高度
+//       const inputHeight = 120 // 输入区域高度
+//       const padding = 40 // 内边距
+//
+//       messagesContainerHeight.value = containerRect.height - headerHeight - inputHeight - padding
+//     }
+//   })
+// }
+
+// function handleResize() {
+//   calculateMessagesContainerHeight()
+// }
+
 onMounted(async () => {
   if (props.account?.wxid) {
     await loadFriendsAsSessions()
@@ -360,17 +424,24 @@ onMounted(async () => {
     }
   }
 
+  // 暂时注释掉容器高度计算
+  // calculateMessagesContainerHeight()
+
+  // 监听窗口大小变化
+  // window.addEventListener('resize', handleResize)
+
   // 添加全局点击事件监听器来隐藏右键菜单
   document.addEventListener('click', hideContextMenu)
 })
 
 onUnmounted(() => {
+  // 清理事件监听器
+  // window.removeEventListener('resize', handleResize)
+  document.removeEventListener('click', hideContextMenu)
+
   if (props.account?.wxid) {
     closeWebSocketConnection(props.account.wxid)
   }
-
-  // 移除全局点击事件监听器
-  document.removeEventListener('click', hideContextMenu)
 })
 </script>
 
@@ -451,22 +522,23 @@ onUnmounted(() => {
         </div>
 
         <!-- 消息列表 -->
-        <div ref="messagesContainer" class="messages-container">
-          <div class="messages-list">
-            <!-- 空消息状态 -->
-            <div v-if="chatStore.currentMessages.length === 0" class="empty-messages">
-              <div class="empty-messages-content">
-                <el-icon class="empty-messages-icon"><ChatDotRound /></el-icon>
-                <p>暂无聊天记录</p>
-                <span>发送一条消息开始聊天吧</span>
-              </div>
+        <div class="messages-container">
+          <!-- 空消息状态 -->
+          <div v-if="chatStore.currentMessages.length === 0" class="empty-messages">
+            <div class="empty-messages-content">
+              <el-icon class="empty-messages-icon"><ChatDotRound /></el-icon>
+              <p>暂无聊天记录</p>
+              <span>发送一条消息开始聊天吧</span>
             </div>
+          </div>
 
+          <!-- 传统消息列表（暂时替换虚拟滚动） -->
+          <div v-else ref="messagesContainer" class="messages-list">
             <MessageItem
-              v-for="message in chatStore.currentMessages"
+              v-for="(message, index) in chatStore.currentMessages"
               :key="message.id"
               :message="message"
-              :show-time="showMessageTime(message)"
+              :show-time="showMessageTime(message, index)"
               :avatar="getContactAvatar(message)"
               :avatar-text="getContactAvatarText(message)"
               :my-avatar="props.account?.headUrl || props.account?.avatar"
@@ -705,17 +777,21 @@ onUnmounted(() => {
 }
 
 .unread-badge {
-  background: linear-gradient(135deg, #409eff, #67c23a);
-  color: white;
-  font-size: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #666666;
+  font-size: 11px;
+  font-weight: 500;
   padding: 2px 6px;
-  border-radius: 10px;
-  min-width: 18px;
-  height: 18px;
+  border-radius: 12px;
+  min-width: 16px;
+  height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-left: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(8px);
   flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
 }
@@ -765,6 +841,7 @@ onUnmounted(() => {
 
 .chat-avatar {
   flex-shrink: 0;
+  margin-right: 12px;
 }
 
 .chat-title {

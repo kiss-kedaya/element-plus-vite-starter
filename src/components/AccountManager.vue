@@ -1,3 +1,61 @@
+<script setup lang="ts">
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+
+// 定义事件
+const emit = defineEmits(['close'])
+
+// Store
+const authStore = useAuthStore()
+
+// 方法
+function formatTime(time) {
+  return time.toLocaleString()
+}
+
+async function reconnect(account) {
+  try {
+    ElMessage.info(`正在重连账号 ${account.nickname}...`)
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    account.status = 'online'
+    account.loginTime = new Date()
+    ElMessage.success('重连成功')
+  }
+  catch (error) {
+    ElMessage.error('重连失败')
+  }
+}
+
+async function disconnect(account) {
+  try {
+    await ElMessageBox.confirm(`确定要断开账号 ${account.nickname} 吗？`, '确认断开', {
+      type: 'warning',
+    })
+
+    authStore.updateAccountStatus(account.wxid, 'offline')
+    ElMessage.success('账号已断开')
+  }
+  catch {
+    // 用户取消
+  }
+}
+
+async function removeAccount(account) {
+  try {
+    await ElMessageBox.confirm(`确定要删除账号 ${account.nickname} 吗？此操作不可恢复！`, '确认删除', {
+      type: 'error',
+    })
+
+    authStore.removeAccount(account.wxid)
+    ElMessage.success('账号已删除')
+  }
+  catch {
+    // 用户取消
+  }
+}
+</script>
+
 <template>
   <div class="account-manager">
     <el-table :data="authStore.accounts" style="width: 100%">
@@ -32,61 +90,6 @@
     </el-table>
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { useAuthStore } from '@/stores/auth'
-
-// Store
-const authStore = useAuthStore()
-
-// 定义事件
-const emit = defineEmits(['close'])
-
-// 方法
-const formatTime = (time) => {
-  return time.toLocaleString()
-}
-
-const reconnect = async (account) => {
-  try {
-    ElMessage.info(`正在重连账号 ${account.nickname}...`)
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    account.status = 'online'
-    account.loginTime = new Date()
-    ElMessage.success('重连成功')
-  } catch (error) {
-    ElMessage.error('重连失败')
-  }
-}
-
-const disconnect = async (account) => {
-  try {
-    await ElMessageBox.confirm(`确定要断开账号 ${account.nickname} 吗？`, '确认断开', {
-      type: 'warning'
-    })
-
-    authStore.updateAccountStatus(account.wxid, 'offline')
-    ElMessage.success('账号已断开')
-  } catch {
-    // 用户取消
-  }
-}
-
-const removeAccount = async (account) => {
-  try {
-    await ElMessageBox.confirm(`确定要删除账号 ${account.nickname} 吗？此操作不可恢复！`, '确认删除', {
-      type: 'error'
-    })
-
-    authStore.removeAccount(account.wxid)
-    ElMessage.success('账号已删除')
-  } catch {
-    // 用户取消
-  }
-}
-</script>
 
 <style scoped lang="scss">
 .account-manager {
