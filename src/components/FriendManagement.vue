@@ -34,12 +34,12 @@
         <el-divider content-position="left">搜索结果</el-divider>
         <div class="user-card">
           <el-avatar :src="searchResult.avatar" :size="50">
-            {{ (searchResult.nickname || '').toString().charAt(0) || '?' }}
+            {{ getDisplayValue(searchResult.nickname).charAt(0) || '?' }}
           </el-avatar>
           <div class="user-info">
-            <div class="nickname">{{ searchResult.nickname }}</div>
-            <div class="wxid">微信号：{{ searchResult.wxid }}</div>
-            <div class="region" v-if="searchResult.region">地区：{{ searchResult.region }}</div>
+            <div class="nickname">{{ getDisplayValue(searchResult.nickname) }}</div>
+            <div class="wxid">微信号：{{ getDisplayValue(searchResult.wxid) }}</div>
+            <div class="region" v-if="getDisplayValue(searchResult.region)">地区：{{ getDisplayValue(searchResult.region) }}</div>
           </div>
           <div class="actions">
             <el-button type="primary" :loading="addFriendLoading" @click="openAddFriendDialog">
@@ -55,7 +55,7 @@
     <el-card class="friends-card" shadow="never">
       <template #header>
         <div class="card-header">
-          <span>好友列表 ({{ filteredFriends.length }}{{ filteredFriends.length !== friends.length ? ` / ${friends.length}` : '' }})</span>
+          <span>好友列表 ({{ filteredFriends.length }}{{ filteredFriends.length !== validFriends.length ? ` / ${validFriends.length}` : '' }})</span>
           <div class="header-actions">
             <el-input v-model="friendFilter" placeholder="搜索好友" size="small" style="width: 200px">
               <template #prefix>
@@ -116,14 +116,14 @@
                   :style="{ height: `${itemHeight}px` }"
                 >
                   <el-avatar :src="friend.avatar" :size="40" lazy>
-                    {{ (friend.nickname || '').toString().charAt(0) || '?' }}
+                    {{ getDisplayValue(friend.nickname).charAt(0) || '?' }}
                   </el-avatar>
                   <div class="friend-info">
-                    <div class="nickname" :title="friend.nickname">
-                      {{ friend.nickname }}
-                      <span v-if="friend.remark && String(friend.remark).trim()" class="remark-inline">({{ friend.remark }})</span>
+                    <div class="nickname" :title="getDisplayValue(friend.nickname)">
+                      {{ getDisplayValue(friend.nickname) || '未知用户' }}
+                      <span v-if="getDisplayValue(friend.remark).trim()" class="remark-inline">({{ getDisplayValue(friend.remark) }})</span>
                     </div>
-                    <div class="wxid">{{ friend.wxid }}</div>
+                    <div class="wxid">{{ getDisplayValue(friend.wxid) || '未知ID' }}</div>
                   </div>
                   <div class="friend-actions">
                     <el-dropdown @command="handleFriendAction">
@@ -289,15 +289,24 @@ const visibleCount = Math.ceil(containerHeight / itemHeight) + 2 // 可见项数
 const scrollTop = ref(0)
 
 // 计算属性
+const validFriends = computed(() => {
+  // 确保只返回有效的好友（昵称和wxid都不为空）
+  return friends.value.filter(friend => {
+    const nickname = getDisplayValue(friend.nickname).trim()
+    const wxid = getDisplayValue(friend.wxid).trim()
+    return nickname !== '' && wxid !== ''
+  })
+})
+
 const filteredFriends = computed(() => {
-  if (!friendFilter.value) return friends.value
+  if (!friendFilter.value) return validFriends.value
 
   const keyword = friendFilter.value.toLowerCase()
-  return friends.value.filter(friend => {
-    const nickname = (friend.nickname || '').toString().toLowerCase()
-    const wxid = (friend.wxid || '').toString().toLowerCase()
-    const remark = (friend.remark || '').toString().toLowerCase()
-    
+  return validFriends.value.filter(friend => {
+    const nickname = getDisplayValue(friend.nickname).toLowerCase()
+    const wxid = getDisplayValue(friend.wxid).toLowerCase()
+    const remark = getDisplayValue(friend.remark).toLowerCase()
+
     return nickname.includes(keyword) ||
            wxid.includes(keyword) ||
            remark.includes(keyword)
@@ -490,48 +499,101 @@ const refreshFriends = async () => {
       }
 
       if (contactList && contactList.length > 0) {
-        friends.value = contactList.map((contact: any) => {
-          // 处理可能是对象格式的字段
-          const getNickName = (contact: any) => {
-            if (contact.NickName) {
-              return typeof contact.NickName === 'object' && contact.NickName.string
-                ? contact.NickName.string
-                : contact.NickName
-            }
-            return contact.Nickname || contact.nickname || contact.UserName || '未知用户'
-          }
 
-          const getUserName = (contact: any) => {
-            if (contact.UserName) {
-              return typeof contact.UserName === 'object' && contact.UserName.string
-                ? contact.UserName.string
-                : contact.UserName
-            }
-            return contact.Wxid || contact.wxid
-          }
 
-          const getRemark = (contact: any) => {
-            if (contact.Remark) {
-              return typeof contact.Remark === 'object' && contact.Remark.string
-                ? contact.Remark.string
-                : contact.Remark
+        friends.value = contactList
+          .map((contact: any) => {
+            // 处理可能是对象格式的字段
+            const getNickName = (contact: any) => {
+              let nickname = ''
+              if (contact.NickName) {
+                if (typeof contact.NickName === 'object') {
+                  // 检查是否是空对象或有有效的 string 属性
+                  if (contact.NickName.string !== undefined && contact.NickName.string !== null && contact.NickName.string !== '') {
+                    nickname = contact.NickName.string
+                  } else {
+                    nickname = ''
+                  }
+                } else {
+                  nickname = contact.NickName
+                }
+              } else {
+                nickname = contact.Nickname || contact.nickname || ''
+              }
+              return String(nickname || '')
             }
-            return contact.remark || ''
-          }
 
-          return {
-            wxid: getUserName(contact),
-            nickname: getNickName(contact),
-            avatar: contact.BigHeadImgUrl || contact.HeadImgUrl || contact.avatar || '',
-            remark: getRemark(contact),
-            signature: contact.Signature || contact.signature || '',
-            sex: contact.Sex || contact.sex || 0,
-            isOnline: false
-          }
-        })
+            const getUserName = (contact: any) => {
+              let username = ''
+              if (contact.UserName) {
+                if (typeof contact.UserName === 'object') {
+                  // 检查是否是空对象或有有效的 string 属性
+                  if (contact.UserName.string !== undefined && contact.UserName.string !== null && contact.UserName.string !== '') {
+                    username = contact.UserName.string
+                  } else {
+                    username = ''
+                  }
+                } else {
+                  username = contact.UserName
+                }
+              } else {
+                username = contact.Wxid || contact.wxid || ''
+              }
+              return String(username || '')
+            }
+
+            const getRemark = (contact: any) => {
+              let remark = ''
+              if (contact.Remark) {
+                if (typeof contact.Remark === 'object') {
+                  // 如果是对象，检查是否有 string 属性
+                  if (contact.Remark.string !== undefined && contact.Remark.string !== null && contact.Remark.string !== '') {
+                    remark = contact.Remark.string
+                  } else {
+                    // 如果是空对象 {}，返回空字符串
+                    remark = ''
+                  }
+                } else {
+                  remark = contact.Remark
+                }
+              } else {
+                remark = contact.remark || ''
+              }
+              return String(remark || '')
+            }
+
+            const nickname = getNickName(contact)
+            const wxid = getUserName(contact)
+
+            return {
+              wxid,
+              nickname,
+              avatar: contact.BigHeadImgUrl || contact.HeadImgUrl || contact.avatar || '',
+              remark: getRemark(contact),
+              signature: contact.Signature || contact.signature || '',
+              sex: contact.Sex || contact.sex || 0,
+              isOnline: false,
+              // 添加标记用于过滤
+              isValid: nickname.trim() !== '' && wxid.trim() !== ''
+            }
+          })
+          .filter((friend: any) => {
+            // 过滤掉昵称和wxid都为空的联系人
+            return friend.isValid && friend.nickname !== '未知用户'
+          })
+          .map((friend: any) => {
+            // 移除临时的 isValid 属性
+            const { isValid, ...cleanFriend } = friend
+            return cleanFriend
+          })
 
         // 显示加载结果，包含缓存信息
-        let message = `已加载 ${friends.value.length} 个好友`
+        const totalContacts = contactList.length
+        const validContacts = friends.value.length
+        let message = `已加载 ${validContacts} 个有效好友`
+        if (totalContacts > validContacts) {
+          message += ` (总联系人: ${totalContacts}，已过滤 ${totalContacts - validContacts} 个无效联系人)`
+        }
         if (response.Data?.total) {
           message += ` (总计: ${response.Data.total})`
         } else if (response.Data?.total_count) {
@@ -569,16 +631,16 @@ const handleFriendAction = async (command: string) => {
   }
 
   if (action === 'chat') {
-    ElMessage.info(`准备与 ${friend.nickname} 聊天`)
+    ElMessage.info(`准备与 ${getDisplayValue(friend.nickname)} 聊天`)
     // 这里可以切换到聊天界面
     // emit('switch-to-chat', friend)
   } else if (action === 'remark') {
     currentFriend.value = friend
-    remarkForm.value.remark = friend.remark || ''
+    remarkForm.value.remark = getDisplayValue(friend.remark)
     showRemarkDialog.value = true
   } else if (action === 'delete') {
     try {
-      await ElMessageBox.confirm(`确定要删除好友 ${friend.nickname} 吗？`, '确认删除', {
+      await ElMessageBox.confirm(`确定要删除好友 ${getDisplayValue(friend.nickname)} 吗？`, '确认删除', {
         type: 'warning'
       })
       
@@ -589,6 +651,52 @@ const handleFriendAction = async (command: string) => {
       // 用户取消
     }
   }
+}
+
+// 处理可能是对象的显示值
+const getDisplayValue = (value: any): string => {
+  if (value === null || value === undefined) {
+    return ''
+  }
+
+  // 如果是字符串，直接返回
+  if (typeof value === 'string') {
+    return value
+  }
+
+  // 如果是数字，转换为字符串
+  if (typeof value === 'number') {
+    return String(value)
+  }
+
+  // 如果是对象，尝试各种可能的属性
+  if (typeof value === 'object') {
+    // 检查是否是空对象
+    if (Object.keys(value).length === 0) {
+      return ''
+    }
+
+    // 尝试 string 属性
+    if (value.string !== undefined && value.string !== null && value.string !== '') {
+      return String(value.string)
+    }
+
+    // 尝试 value 属性
+    if (value.value !== undefined && value.value !== null && value.value !== '') {
+      return String(value.value)
+    }
+
+    // 尝试 text 属性
+    if (value.text !== undefined && value.text !== null && value.text !== '') {
+      return String(value.text)
+    }
+
+    // 如果都没有有效值，返回空字符串
+    return ''
+  }
+
+  // 其他情况直接转换为字符串
+  return String(value)
 }
 
 const updateRemark = async () => {

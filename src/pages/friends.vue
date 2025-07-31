@@ -227,6 +227,52 @@ const getSexText = (sex: number) => {
     default: return '未知'
   }
 }
+
+// 处理可能是对象的显示值
+const getDisplayValue = (value: any): string => {
+  if (value === null || value === undefined) {
+    return ''
+  }
+
+  // 如果是字符串，直接返回
+  if (typeof value === 'string') {
+    return value
+  }
+
+  // 如果是数字，转换为字符串
+  if (typeof value === 'number') {
+    return String(value)
+  }
+
+  // 如果是对象，尝试各种可能的属性
+  if (typeof value === 'object') {
+    // 检查是否是空对象
+    if (Object.keys(value).length === 0) {
+      return ''
+    }
+
+    // 尝试 string 属性
+    if (value.string !== undefined && value.string !== null && value.string !== '') {
+      return String(value.string)
+    }
+
+    // 尝试 value 属性
+    if (value.value !== undefined && value.value !== null && value.value !== '') {
+      return String(value.value)
+    }
+
+    // 尝试 text 属性
+    if (value.text !== undefined && value.text !== null && value.text !== '') {
+      return String(value.text)
+    }
+
+    // 如果都没有有效值，返回空字符串
+    return ''
+  }
+
+  // 其他情况直接转换为字符串
+  return String(value)
+}
 </script>
 
 <template>
@@ -304,12 +350,12 @@ const getSexText = (sex: number) => {
                 </el-avatar>
                 
                 <div class="friend-info">
-                  <div class="friend-name">{{ friend.remark || friend.nickname }}</div>
-                  <div class="friend-wxid">{{ friend.wxid }}</div>
+                  <div class="friend-name">{{ getDisplayValue(friend.remark) || getDisplayValue(friend.nickname) }}</div>
+                  <div class="friend-wxid">{{ getDisplayValue(friend.wxid) }}</div>
                   <div class="friend-meta">
                     {{ getSexText(friend.sex) }}
-                    <span v-if="friend.signature" class="signature">
-                      | {{ friend.signature }}
+                    <span v-if="getDisplayValue(friend.signature)" class="signature">
+                      | {{ getDisplayValue(friend.signature) }}
                     </span>
                   </div>
                 </div>
@@ -369,9 +415,9 @@ const getSexText = (sex: number) => {
                   </el-avatar>
                   
                   <div class="contact-info">
-                    <div class="contact-name">{{ contact.nickname }}</div>
-                    <div class="contact-wxid">{{ contact.wxid }}</div>
-                    <div class="contact-signature">{{ contact.signature || '暂无签名' }}</div>
+                    <div class="contact-name">{{ getDisplayValue(contact.nickname) }}</div>
+                    <div class="contact-wxid">{{ getDisplayValue(contact.wxid) }}</div>
+                    <div class="contact-signature">{{ getDisplayValue(contact.signature) || '暂无签名' }}</div>
                   </div>
                   
                   <el-button type="primary" @click="addFriend(contact)">
