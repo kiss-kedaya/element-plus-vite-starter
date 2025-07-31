@@ -1,0 +1,284 @@
+// ===== 颜色系统 =====
+
+// 主色调
+:root {
+  // 主色
+  --color-primary: #409eff;
+  --color-primary-light-1: #53a8ff;
+  --color-primary-light-2: #66b1ff;
+  --color-primary-light-3: #79bbff;
+  --color-primary-light-4: #8cc5ff;
+  --color-primary-light-5: #a0cfff;
+  --color-primary-light-6: #b3d8ff;
+  --color-primary-light-7: #c6e2ff;
+  --color-primary-light-8: #d9ecff;
+  --color-primary-light-9: #ecf5ff;
+  --color-primary-dark-1: #337ecc;
+  --color-primary-dark-2: #2d70b3;
+
+  // 成功色
+  --color-success: #67c23a;
+  --color-success-light-1: #75c947;
+  --color-success-light-2: #83d054;
+  --color-success-light-3: #91d661;
+  --color-success-light-4: #9fdd6e;
+  --color-success-light-5: #ade47b;
+  --color-success-light-6: #bbea88;
+  --color-success-light-7: #c9f195;
+  --color-success-light-8: #d7f7a2;
+  --color-success-light-9: #e5feaf;
+  --color-success-dark-1: #529b2e;
+  --color-success-dark-2: #467a27;
+
+  // 警告色
+  --color-warning: #e6a23c;
+  --color-warning-light-1: #e9ad4a;
+  --color-warning-light-2: #ecb858;
+  --color-warning-light-3: #efc366;
+  --color-warning-light-4: #f2ce74;
+  --color-warning-light-5: #f5d982;
+  --color-warning-light-6: #f8e490;
+  --color-warning-light-7: #fbef9e;
+  --color-warning-light-8: #fefaac;
+  --color-warning-light-9: #fdf6ba;
+  --color-warning-dark-1: #b8821e;
+  --color-warning-dark-2: #a0701a;
+
+  // 危险色
+  --color-danger: #f56c6c;
+  --color-danger-light-1: #f67979;
+  --color-danger-light-2: #f78686;
+  --color-danger-light-3: #f89393;
+  --color-danger-light-4: #f9a0a0;
+  --color-danger-light-5: #faadad;
+  --color-danger-light-6: #fbbaba;
+  --color-danger-light-7: #fcc7c7;
+  --color-danger-light-8: #fdd4d4;
+  --color-danger-light-9: #fee1e1;
+  --color-danger-dark-1: #c45656;
+  --color-danger-dark-2: #a04848;
+
+  // 信息色
+  --color-info: #909399;
+  --color-info-light-1: #9ca0a6;
+  --color-info-light-2: #a8acb3;
+  --color-info-light-3: #b4b9c0;
+  --color-info-light-4: #c0c5cd;
+  --color-info-light-5: #ccd2da;
+  --color-info-light-6: #d8dee7;
+  --color-info-light-7: #e4eaf4;
+  --color-info-light-8: #f0f7ff;
+  --color-info-light-9: #f4f4f5;
+  --color-info-dark-1: #73767a;
+  --color-info-dark-2: #5d6066;
+
+  // 中性色
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --color-text-primary: #303133;
+  --color-text-regular: #606266;
+  --color-text-secondary: #909399;
+  --color-text-placeholder: #a8abb2;
+  --color-text-disabled: #c0c4cc;
+
+  // 边框色
+  --color-border-darker: #cdd0d6;
+  --color-border-dark: #d4d7de;
+  --color-border-base: #dcdfe6;
+  --color-border-light: #e4e7ed;
+  --color-border-lighter: #ebeef5;
+  --color-border-extra-light: #f2f6fc;
+
+  // 填充色
+  --color-fill-darker: #e6e8eb;
+  --color-fill-dark: #ebedf0;
+  --color-fill-base: #f0f2f5;
+  --color-fill-light: #f5f7fa;
+  --color-fill-lighter: #fafafa;
+  --color-fill-blank: #ffffff;
+
+  // 背景色
+  --color-bg-page: #f2f3f5;
+  --color-bg-overlay: rgba(255, 255, 255, 0.8);
+  --color-bg-mask: rgba(0, 0, 0, 0.5);
+
+  // 玻璃态效果
+  --glass-bg: rgba(255, 255, 255, 0.1);
+  --glass-bg-light: rgba(255, 255, 255, 0.05);
+  --glass-bg-dark: rgba(255, 255, 255, 0.15);
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+  --glass-backdrop: blur(4px);
+
+  // 阴影
+  --shadow-base: 0 2px 4px rgba(0, 0, 0, 0.12), 0 0 6px rgba(0, 0, 0, 0.04);
+  --shadow-light: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  --shadow-dark: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-heavy: 0 8px 24px rgba(0, 0, 0, 0.2);
+
+  // ===== 尺寸系统 =====
+
+  // 间距
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-xxl: 24px;
+  --spacing-xxxl: 32px;
+
+  // 圆角
+  --border-radius-xs: 2px;
+  --border-radius-sm: 4px;
+  --border-radius-md: 6px;
+  --border-radius-lg: 8px;
+  --border-radius-xl: 12px;
+  --border-radius-xxl: 16px;
+  --border-radius-round: 50%;
+
+  // 边框宽度
+  --border-width-base: 1px;
+  --border-width-thick: 2px;
+
+  // ===== 字体系统 =====
+
+  // 字体大小
+  --font-size-xs: 10px;
+  --font-size-sm: 12px;
+  --font-size-base: 14px;
+  --font-size-md: 16px;
+  --font-size-lg: 18px;
+  --font-size-xl: 20px;
+  --font-size-xxl: 24px;
+  --font-size-xxxl: 32px;
+
+  // 行高
+  --line-height-xs: 1.2;
+  --line-height-sm: 1.4;
+  --line-height-base: 1.5;
+  --line-height-lg: 1.6;
+  --line-height-xl: 1.8;
+
+  // 字重
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  // 字体族
+  --font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  --font-family-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+
+  // ===== 动画系统 =====
+
+  // 过渡时间
+  --transition-duration-fast: 0.15s;
+  --transition-duration-base: 0.3s;
+  --transition-duration-slow: 0.5s;
+
+  // 缓动函数
+  --transition-ease-in: cubic-bezier(0.55, 0, 1, 0.45);
+  --transition-ease-out: cubic-bezier(0, 0.55, 0.45, 1);
+  --transition-ease-in-out: cubic-bezier(0.645, 0.045, 0.355, 1);
+  --transition-ease-out-back: cubic-bezier(0.12, 0.4, 0.29, 1.46);
+  --transition-ease-in-back: cubic-bezier(0.71, -0.46, 0.88, 0.6);
+  --transition-ease-in-out-back: cubic-bezier(0.71, -0.46, 0.29, 1.46);
+
+  // 常用过渡
+  --transition-all: all var(--transition-duration-base) var(--transition-ease-in-out);
+  --transition-fade: opacity var(--transition-duration-base) var(--transition-ease-in-out);
+  --transition-border: border-color var(--transition-duration-base) var(--transition-ease-in-out);
+  --transition-box-shadow: box-shadow var(--transition-duration-base) var(--transition-ease-in-out);
+  --transition-color: color var(--transition-duration-base) var(--transition-ease-in-out);
+  --transition-background: background-color var(--transition-duration-base) var(--transition-ease-in-out);
+
+  // ===== Z-index 层级 =====
+  --z-index-dropdown: 1000;
+  --z-index-sticky: 1020;
+  --z-index-fixed: 1030;
+  --z-index-modal-backdrop: 1040;
+  --z-index-modal: 1050;
+  --z-index-popover: 1060;
+  --z-index-tooltip: 1070;
+  --z-index-toast: 1080;
+
+  // ===== 组件特定变量 =====
+
+  // 按钮
+  --button-height-sm: 24px;
+  --button-height-base: 32px;
+  --button-height-lg: 40px;
+  --button-padding-horizontal: var(--spacing-lg);
+  --button-padding-vertical: var(--spacing-sm);
+
+  // 输入框
+  --input-height-sm: 24px;
+  --input-height-base: 32px;
+  --input-height-lg: 40px;
+  --input-padding-horizontal: var(--spacing-md);
+  --input-padding-vertical: var(--spacing-sm);
+
+  // 卡片
+  --card-padding: var(--spacing-lg);
+  --card-border-radius: var(--border-radius-lg);
+  --card-shadow: var(--shadow-light);
+
+  // 模态框
+  --modal-padding: var(--spacing-xxl);
+  --modal-border-radius: var(--border-radius-xl);
+  --modal-shadow: var(--shadow-heavy);
+
+  // 消息
+  --message-padding: var(--spacing-md) var(--spacing-lg);
+  --message-border-radius: var(--border-radius-md);
+  --message-shadow: var(--shadow-base);
+
+  // 头像
+  --avatar-size-sm: 24px;
+  --avatar-size-base: 32px;
+  --avatar-size-lg: 40px;
+  --avatar-size-xl: 56px;
+  --avatar-size-xxl: 80px;
+
+  // 聊天界面
+  --chat-sidebar-width: 280px;
+  --chat-header-height: 60px;
+  --chat-input-height: 120px;
+  --chat-message-max-width: 60%;
+  --chat-bubble-padding: var(--spacing-md) var(--spacing-lg);
+  --chat-bubble-border-radius: var(--border-radius-lg);
+}
+
+// ===== 暗色主题 =====
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-text-primary: #e5eaf3;
+    --color-text-regular: #cfd3dc;
+    --color-text-secondary: #a3a6ad;
+    --color-text-placeholder: #8d9095;
+    --color-text-disabled: #6c6e72;
+
+    --color-border-darker: #4c4d4f;
+    --color-border-dark: #414243;
+    --color-border-base: #363637;
+    --color-border-light: #2b2a2b;
+    --color-border-lighter: #262727;
+    --color-border-extra-light: #1d1e1f;
+
+    --color-fill-darker: #48494b;
+    --color-fill-dark: #3d3e40;
+    --color-fill-base: #323334;
+    --color-fill-light: #282829;
+    --color-fill-lighter: #1d1e1f;
+    --color-fill-blank: #141414;
+
+    --color-bg-page: #0a0a0a;
+    --color-bg-overlay: rgba(0, 0, 0, 0.8);
+
+    --glass-bg: rgba(0, 0, 0, 0.1);
+    --glass-bg-light: rgba(0, 0, 0, 0.05);
+    --glass-bg-dark: rgba(0, 0, 0, 0.15);
+    --glass-border: rgba(255, 255, 255, 0.1);
+  }
+}

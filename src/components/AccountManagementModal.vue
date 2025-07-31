@@ -1,9 +1,10 @@
 <template>
-  <el-dialog
+  <BaseModal
     v-model="visible"
     :title="`管理账号 - ${account?.nickname || ''}`"
     width="800px"
-    :before-close="handleClose"
+    custom-class="account-management-modal"
+    @close="handleClose"
   >
     <div v-if="account" class="account-management">
       <!-- 账号基本信息 -->
@@ -222,10 +223,10 @@
         </div>
       </el-card>
     </div>
-  </el-dialog>
+  </BaseModal>
 
   <!-- 重新登录对话框 - 移到外层避免嵌套 -->
-  <el-dialog
+  <BaseModal
     v-model="showReloginDialog"
     title="设备复用重新登录"
     width="400px"
@@ -251,12 +252,13 @@
     <template #footer>
       <el-button @click="showReloginDialog = false">取消</el-button>
     </template>
-  </el-dialog>
+  </BaseModal>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import BaseModal from '@/components/common/BaseModal.vue'
 import { Refresh, SwitchButton, Delete, Timer } from '@element-plus/icons-vue'
 import type { LoginAccount, ProxyConfig } from '@/types/auth'
 import { loginApi } from '@/api/auth'

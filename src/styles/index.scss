@@ -1,6 +1,10 @@
 // import dark theme
 @use 'element-plus/theme-chalk/src/dark/css-vars.scss' as *;
 
+// 导入自定义样式系统
+@import './variables.scss';
+@import './utilities.scss';
+
 // :root {
 //   --ep-color-primary: red;
 // }

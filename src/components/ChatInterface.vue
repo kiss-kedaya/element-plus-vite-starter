@@ -19,6 +19,8 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useFriendStore } from '@/stores/friend'
 import { closeWebSocketConnection, createWebSocketConnection } from '@/utils/websocket'
+import MessageItem from '@/components/business/MessageItem.vue'
+import { useNotification } from '@/composables'
 
 // Props
 const props = defineProps<{
@@ -28,6 +30,9 @@ const props = defineProps<{
 // Stores
 const chatStore = useChatStore()
 const friendStore = useFriendStore()
+
+// Composables
+const { showError, showSuccess, confirmDelete } = useNotification()
 
 // 响应式数据
 const messageInput = ref('')
@@ -81,7 +86,7 @@ async function loadFriendsAsSessions() {
     // 好友会话加载完成，不显示提示
   }
   catch (error) {
-    ElMessage.error('加载好友列表失败')
+    showError('加载好友列表失败')
     console.error('加载好友失败:', error)
   }
 }
@@ -103,7 +108,7 @@ async function sendMessage() {
     scrollToBottom()
   }
   catch (error) {
-    ElMessage.error('发送消息失败')
+    showError('发送消息失败')
     console.error('发送消息失败:', error)
   }
 }
@@ -142,7 +147,7 @@ async function sendImage(file: File) {
     reader.readAsDataURL(file)
   }
   catch (error) {
-    ElMessage.error('发送图片失败')
+    showError('发送图片失败')
     console.error('发送图片失败:', error)
   }
 }
@@ -159,7 +164,7 @@ function handleFileSelect(event: Event) {
       sendImage(file)
     }
     else {
-      ElMessage.info('暂不支持该文件类型')
+      showError('暂不支持该文件类型')
     }
   }
 }
@@ -192,7 +197,7 @@ async function retryMessage(message: any) {
       message.id
     )
   } catch (error) {
-    ElMessage.error('重试发送失败')
+    showError('重试发送失败')
     console.error('重试发送失败:', error)
   }
 }
@@ -236,7 +241,7 @@ async function recallMessage() {
     hideContextMenu()
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error('撤回消息失败')
+      showError('撤回消息失败')
       console.error('撤回消息失败:', error)
     }
   }
@@ -297,6 +302,22 @@ function formatSessionTime(timestamp: Date | string): string {
 function showMessageTime(message: any) {
   // 简化：每条消息都显示时间
   return true
+}
+
+// 获取联系人头像
+function getContactAvatar(message: any) {
+  if (message.fromMe) return ''
+
+  const contact = friendStore.friends.find(f => f.wxid === chatStore.currentSession?.id)
+  return contact?.headUrl || contact?.avatar || ''
+}
+
+// 获取联系人头像文字
+function getContactAvatarText(message: any) {
+  if (message.fromMe) return ''
+
+  const contact = friendStore.friends.find(f => f.wxid === chatStore.currentSession?.id)
+  return contact?.nickname?.charAt(0) || contact?.remark?.charAt(0) || '?'
 }
 
 // 监听账号变化
@@ -441,44 +462,18 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div v-for="message in chatStore.currentMessages" :key="message.id" class="message-item">
-              <!-- 时间显示 - 居中 -->
-              <div v-if="showMessageTime(message)" class="message-time-center">
-                {{ formatMessageTime(message.timestamp) }}
-              </div>
-
-              <div
-                class="message-content"
-                :class="{ 'from-me': message.fromMe }"
-                @contextmenu="showContextMenu($event, message)"
-              >
-                <div class="message-bubble">
-                  <div v-if="message.type === 'text'" class="message-text">
-                    {{ message.content }}
-                  </div>
-
-                  <div v-else-if="message.type === 'image'" class="message-image">
-                    <img :src="message.imageData" alt="图片">
-                  </div>
-
-                  <div v-else-if="message.type === 'system'" class="message-system">
-                    {{ message.content }}
-                  </div>
-
-                  <!-- 失败重试按钮 -->
-                  <div v-if="message.status === 'failed' && message.canRetry" class="message-retry">
-                    <el-button
-                      type="danger"
-                      size="small"
-                      :icon="RefreshRight"
-                      circle
-                      @click="retryMessage(message)"
-                      title="重新发送"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
+            <MessageItem
+              v-for="message in chatStore.currentMessages"
+              :key="message.id"
+              :message="message"
+              :show-time="showMessageTime(message)"
+              :avatar="getContactAvatar(message)"
+              :avatar-text="getContactAvatarText(message)"
+              :my-avatar="props.account?.headUrl || props.account?.avatar"
+              :my-avatar-text="props.account?.nickname?.charAt(0) || '我'"
+              @retry="retryMessage"
+              @contextmenu="showContextMenu"
+            />
           </div>
         </div>
 
