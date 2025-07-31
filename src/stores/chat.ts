@@ -262,6 +262,8 @@ export const useChatStore = defineStore('chat', () => {
 
   // 处理聊天消息
   const handleChatMessage = (data: any) => {
+    console.log('处理聊天消息:', data)
+    
     const chatMessage: ChatMessage = {
       id: data.id || Date.now().toString(),
       content: data.content || '',
@@ -272,16 +274,37 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     const sessionId = data.sessionId || (data.fromMe ? data.toUser : data.fromUser)
+    console.log('消息会话ID:', sessionId, '消息内容:', chatMessage.content)
+    
     if (sessionId) {
+      // 确保会话存在
+      let session = sessions.value.find(s => s.id === sessionId)
+      if (!session) {
+        // 如果会话不存在，创建一个新会话
+        session = {
+          id: sessionId,
+          name: sessionId, // 临时使用sessionId作为名称
+          avatar: '',
+          type: 'friend',
+          lastMessage: '',
+          lastMessageTime: new Date(),
+          unreadCount: 0,
+          isOnline: false
+        }
+        sessions.value.unshift(session)
+        console.log('创建新会话:', sessionId)
+      }
+      
       addMessage(sessionId, chatMessage)
+      console.log('消息已添加到会话:', sessionId, '当前消息数量:', messages.value[sessionId]?.length || 0)
 
       // 如果当前没有选中会话，自动选中这个会话
       if (!currentSession.value) {
-        const session = sessions.value.find(s => s.id === sessionId)
-        if (session) {
-          setCurrentSession(sessionId)
-        }
+        setCurrentSession(sessionId)
+        console.log('自动选中会话:', sessionId)
       }
+    } else {
+      console.warn('无法确定消息的会话ID:', data)
     }
   }
 
@@ -330,6 +353,21 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  // 测试WebSocket消息处理
+  const testWebSocketMessage = () => {
+    const testMessage = {
+      id: `test_${Date.now()}`,
+      content: '这是一条测试消息',
+      timestamp: new Date(),
+      fromMe: false,
+      type: 'text',
+      sessionId: 'test_session'
+    }
+    
+    console.log('发送测试WebSocket消息:', testMessage)
+    handleChatMessage(testMessage)
+  }
+
   return {
     // 状态
     sessions,
@@ -357,6 +395,7 @@ export const useChatStore = defineStore('chat', () => {
     connectWebSocket,
     disconnectWebSocket,
     createOrGetSession,
-    syncMessages
+    syncMessages,
+    testWebSocketMessage
   }
 })

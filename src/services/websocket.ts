@@ -61,18 +61,21 @@ export class WebSocketService {
   connect(wxid?: string): Promise<boolean> {
     return new Promise((resolve, reject) => {
       if (this.isConnecting) {
+        console.log('WebSocket正在连接中，等待完成...')
         reject(new Error('WebSocket正在连接中'))
         return
       }
 
       // 如果已经连接到相同的wxid，直接返回成功
       if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentWxid === wxid) {
+        console.log(`WebSocket已连接到 ${wxid}，复用现有连接`)
         resolve(true)
         return
       }
 
       // 如果连接到不同的wxid，先断开当前连接
       if (this.ws && this.currentWxid !== wxid) {
+        console.log(`切换WebSocket连接从 ${this.currentWxid} 到 ${wxid}`)
         this.disconnect()
       }
 
@@ -169,10 +172,11 @@ export class WebSocketService {
   // 处理微信消息
   private handleWeChatMessage(data: any) {
     if (!data.messages || data.messages.length === 0) {
+      console.log('收到空的微信消息数据:', data)
       return
     }
 
-    console.log(`收到 ${data.count || data.messages.length} 条微信消息`)
+    console.log(`收到 ${data.count || data.messages.length} 条微信消息`, data)
 
     data.messages.forEach((msg: any) => {
       // 转换为标准聊天消息格式
@@ -186,8 +190,10 @@ export class WebSocketService {
         sessionId: msg.isSelf ? msg.toUser : msg.fromUser
       }
 
+      console.log('准备发送聊天消息事件:', chatMessage)
       // 发送聊天消息事件
       this.emit('chat_message', chatMessage)
+      console.log('聊天消息事件已发送')
     })
   }
 

@@ -18,7 +18,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useFriendStore } from '@/stores/friend'
-import { closeWebSocketConnection, createWebSocketConnection } from '@/utils/websocket'
+// 移除旧的WebSocket导入，使用chatStore的WebSocket管理
 import MessageItem from '@/components/business/MessageItem.vue'
 // 暂时注释掉虚拟滚动相关导入
 // import VirtualMessageList from '@/components/common/VirtualMessageList.vue'
@@ -367,24 +367,32 @@ function getContactAvatarText(message: any) {
 
 // 监听账号变化
 watch(() => props.account?.wxid, async (newWxid, oldWxid) => {
-  if (oldWxid) {
-    closeWebSocketConnection(oldWxid)
+  // 只有当wxid真正改变时才重新连接
+  if (oldWxid && oldWxid !== newWxid) {
+    console.log(`账号从 ${oldWxid} 切换到 ${newWxid}`)
+    // 注意：不要断开WebSocket，让WebSocketService自己管理连接切换
   }
 
-  if (newWxid) {
-    // 清空之前的数据
-    chatStore.clearAllData()
+  if (newWxid && newWxid !== oldWxid) {
+    // 清空之前的数据（只有在真正切换账号时）
+    if (oldWxid) {
+      chatStore.clearAllData()
+    }
 
     // 加载新账号的好友作为会话
     await loadFriendsAsSessions()
 
     // 尝试建立 WebSocket 连接（静默失败）
     try {
-      await createWebSocketConnection(newWxid)
-      console.log('WebSocket连接成功')
+      const connected = await chatStore.connectWebSocket(newWxid)
+      if (connected) {
+        console.log(`WebSocket连接成功: ${newWxid}`)
+      } else {
+        console.warn(`WebSocket连接失败: ${newWxid}，将在模拟模式下运行`)
+      }
     }
     catch (error) {
-      console.warn('WebSocket连接失败，将在模拟模式下运行')
+      console.warn(`WebSocket连接失败: ${newWxid}，将在模拟模式下运行`, error)
       // 不显示错误消息，因为这在开发环境中是正常的
     }
   }
@@ -415,8 +423,12 @@ onMounted(async () => {
 
     // 尝试建立 WebSocket 连接（静默失败）
     try {
-      await createWebSocketConnection(props.account.wxid)
-      console.log('WebSocket连接成功')
+      const connected = await chatStore.connectWebSocket(props.account.wxid)
+      if (connected) {
+        console.log('WebSocket连接成功')
+      } else {
+        console.warn('WebSocket连接失败，将在模拟模式下运行')
+      }
     }
     catch (error) {
       console.warn('WebSocket连接失败，将在模拟模式下运行')
@@ -439,9 +451,9 @@ onUnmounted(() => {
   // window.removeEventListener('resize', handleResize)
   document.removeEventListener('click', hideContextMenu)
 
-  if (props.account?.wxid) {
-    closeWebSocketConnection(props.account.wxid)
-  }
+  // 注意：不要在这里断开WebSocket连接，让WebSocketService管理连接生命周期
+  // 只有在真正需要断开时（比如用户退出登录）才断开
+  console.log('ChatInterface组件卸载，保持WebSocket连接')
 })
 </script>
 

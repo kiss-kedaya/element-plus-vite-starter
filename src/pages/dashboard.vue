@@ -42,10 +42,12 @@
               {{ account.nickname.charAt(0) }}
             </el-avatar>
             <div class="account-info">
-              <div class="nickname">{{ account.nickname }}</div>
+              <div class="nickname">
+                {{ account.nickname }}
+                <span v-if="account.alias" class="alias-inline">[{{ account.alias }}]</span>
+              </div>
               <div class="account-details">
                 <div class="account-wxid">{{ account.wxid }}</div>
-                <div class="account-device">{{ account.deviceType }}</div>
               </div>
               <div class="status">
                 <el-tag :type="account.status === 'online' ? 'primary' : 'danger'" size="small" effect="light">
@@ -434,6 +436,14 @@ onMounted(async () => {
       white-space: nowrap;
       font-size: var(--font-size-base);
       line-height: 1.4;
+
+      .alias-inline {
+        font-weight: 400;
+        font-size: var(--font-size-xs);
+        color: var(--text-tertiary);
+        font-family: 'Courier New', monospace;
+        margin-left: 4px;
+      }
     }
 
     .account-details {
