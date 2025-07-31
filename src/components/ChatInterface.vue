@@ -140,10 +140,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted } from 'vue'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Delete, Loading, Select, Close, Picture, DocumentCopy } from '@element-plus/icons-vue'
 import { chatApi } from '@/api/chat'
+import { createWebSocketConnection, closeWebSocketConnection, getWebSocketStatus } from '@/utils/websocket'
 import type { SendTextMessageRequest, SendImageMessageRequest } from '@/types/chat'
 
 // Props
@@ -365,9 +366,43 @@ const showMessageTime = (message) => {
   return true
 }
 
-onMounted(() => {
+onMounted(async () => {
   if (sessions.value.length > 0) {
     selectSession(sessions.value[0])
+  }
+
+  // 建立 WebSocket 连接
+  if (props.account?.wxid) {
+    try {
+      await createWebSocketConnection(props.account.wxid)
+      console.log('WebSocket连接成功')
+    } catch (error) {
+      console.error('WebSocket连接失败:', error)
+      ElMessage.warning('实时消息连接失败，将无法接收新消息')
+    }
+  }
+})
+
+// 监听账号变化，重新建立连接
+watch(() => props.account?.wxid, async (newWxid, oldWxid) => {
+  if (oldWxid) {
+    closeWebSocketConnection(oldWxid)
+  }
+
+  if (newWxid) {
+    try {
+      await createWebSocketConnection(newWxid)
+      console.log('WebSocket连接成功')
+    } catch (error) {
+      console.error('WebSocket连接失败:', error)
+      ElMessage.warning('实时消息连接失败，将无法接收新消息')
+    }
+  }
+})
+
+onUnmounted(() => {
+  if (props.account?.wxid) {
+    closeWebSocketConnection(props.account.wxid)
   }
 })
 </script>
