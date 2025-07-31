@@ -37,6 +37,10 @@ export interface ChatMessage {
   retryCount?: number      // 重试次数
   // 系统消息相关字段
   extraData?: any          // 系统消息的额外数据
+  // 撤回消息所需字段
+  clientMsgId?: number     // 客户端消息ID
+  createTime?: number      // 创建时间戳
+  newMsgId?: number        // 新消息ID
 }
 
 export interface SendTextMessageRequest {

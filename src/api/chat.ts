@@ -65,5 +65,16 @@ export const chatApi = {
   // 测试WebSocket消息推送
   testWebSocket: (wxid: string): Promise<MessageResponse> => {
     return api.get(`/Msg/TestWebSocket?wxid=${wxid}`)
+  },
+
+  // 撤回消息
+  revokeMessage: (params: {
+    Wxid: string;
+    ToUserName: string;
+    ClientMsgId: number;
+    CreateTime: number;
+    NewMsgId: number;
+  }): Promise<MessageResponse> => {
+    return api.post('/Msg/Revoke', params)
   }
 }

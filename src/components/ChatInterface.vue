@@ -16,6 +16,7 @@ import {
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { friendApi } from '@/api/friend'
 // 移除旧的WebSocket导入，使用chatStore的WebSocket管理
 import MessageItem from '@/components/business/MessageItem.vue'
 // 暂时注释掉虚拟滚动相关导入
@@ -238,14 +239,50 @@ async function retryMessage(message: any) {
 function showContextMenu(event: MouseEvent, message: any) {
   event.preventDefault()
 
-  // 只有自己发送的消息才能撤回
-  if (!message.fromMe || message.type === 'system')
+  console.log('右键点击消息详情:', {
+    id: message.id,
+    content: message.content,
+    fromMe: message.fromMe,
+    type: message.type,
+    status: message.status,
+    canRecall: message.canRecall,
+    canRetry: message.canRetry,
+  })
+
+  // 只有自己发送的消息且可以撤回的才显示右键菜单
+  if (!message.fromMe || message.type === 'system' || !message.canRecall) {
+    console.log('不显示右键菜单，原因:', {
+      notFromMe: !message.fromMe,
+      isSystem: message.type === 'system',
+      cannotRecall: !message.canRecall,
+    })
     return
+  }
+
+  // 获取聊天容器的位置
+  const chatContainer = document.querySelector('.chat-interface')
+  const containerRect = chatContainer?.getBoundingClientRect()
+
+  // 计算相对于视口的位置，考虑页面滚动
+  let x = event.clientX
+  let y = event.clientY
+
+  // 确保菜单不会超出视口边界
+  const menuWidth = 120
+  const menuHeight = 50
+
+  if (x + menuWidth > window.innerWidth) {
+    x = window.innerWidth - menuWidth - 10
+  }
+
+  if (y + menuHeight > window.innerHeight) {
+    y = window.innerHeight - menuHeight - 10
+  }
 
   contextMenu.value = {
     visible: true,
-    x: event.clientX,
-    y: event.clientY,
+    x,
+    y,
     message,
   }
 }
@@ -271,7 +308,6 @@ async function recallMessage() {
       chatStore.currentSession.id,
       contextMenu.value.message.id,
     )
-
     hideContextMenu()
   }
   catch (error) {
@@ -457,6 +493,10 @@ function addTestMessages() {
       sessionId,
       isGroupMessage: isGroup,
       actualSender: props.account?.wxid || 'me',
+      canRecall: true, // 添加可撤回标志
+      clientMsgId: Date.now() + 1,
+      createTime: Math.floor((Date.now() - 240000) / 1000),
+      newMsgId: Date.now() + 1,
     },
     {
       id: `test_${Date.now()}_3`,
@@ -490,6 +530,10 @@ function addTestMessages() {
       sessionId,
       isGroupMessage: isGroup,
       actualSender: props.account?.wxid || 'me',
+      canRecall: true, // 添加可撤回标志
+      clientMsgId: Date.now(),
+      createTime: Math.floor(Date.now() / 1000),
+      newMsgId: Date.now(),
     },
   ]
 
@@ -530,6 +574,101 @@ function addSystemMessage() {
 
   // 滚动到底部
   scrollToBottom()
+}
+
+// 刷新联系人信息
+const isRefreshingContact = ref(false)
+
+async function refreshContactInfo() {
+  if (!props.account?.wxid || !chatStore.currentSession || isRefreshingContact.value) {
+    return
+  }
+
+  isRefreshingContact.value = true
+
+  try {
+    console.log('开始刷新联系人信息:', chatStore.currentSession.id)
+
+    // 调用friendApi获取联系人详情，强制刷新
+    const result = await friendApi.getFriendDetail({
+      Wxid: props.account.wxid,
+      Towxids: chatStore.currentSession.id,
+      ChatRoom: chatStore.currentSession.id.includes('@chatroom') ? chatStore.currentSession.id : '',
+      force_refresh: true, // 强制刷新
+    })
+
+    if (result.Success && result.Data) {
+      let contactData = null
+
+      // 处理两种不同的数据格式
+      if (Array.isArray(result.Data) && result.Data.length > 0) {
+        // 格式1: Data 是数组
+        contactData = result.Data[0]
+      }
+      else if (result.Data.ContactList && result.Data.ContactList.length > 0) {
+        // 格式2: Data 是对象，联系人信息在 ContactList 中
+        contactData = result.Data.ContactList[0]
+      }
+
+      if (contactData) {
+        console.log('获取到联系人详情:', contactData)
+
+        // 判断是否为群聊
+        const isGroup = chatStore.currentSession.id.includes('@chatroom')
+
+        // 更新当前会话信息
+        let updatedName = chatStore.currentSession.name
+        let updatedAvatar = chatStore.currentSession.avatar
+
+        if (isGroup) {
+          // 对于群聊，优先从ContactList中获取群名称
+          if (contactData.ContactList && contactData.ContactList.length > 0) {
+            updatedName = contactData.ContactList[0].NickName?.string || chatStore.currentSession.name
+          }
+          else {
+            updatedName = contactData.NickName?.string || contactData.Remark?.string || chatStore.currentSession.name
+          }
+          updatedAvatar = contactData.SmallHeadImgUrl || contactData.BigHeadImgUrl || chatStore.currentSession.avatar
+        }
+        else {
+          // 个人联系人：优先显示备注，其次昵称
+          updatedName = contactData.Remark?.string || contactData.NickName?.string || contactData.Alias || chatStore.currentSession.name
+          updatedAvatar = contactData.SmallHeadImgUrl || contactData.BigHeadImgUrl || chatStore.currentSession.avatar
+        }
+
+        // 使用chatStore的updateSessionInfo方法更新会话信息
+        const updatedSession = chatStore.updateSessionInfo(chatStore.currentSession.id, {
+          name: updatedName,
+          avatar: updatedAvatar,
+          type: isGroup ? 'group' : 'friend',
+        })
+
+        if (updatedSession) {
+          console.log('联系人信息已更新:', updatedName, updatedAvatar)
+          showSuccess('联系人信息已更新')
+        }
+        else {
+          console.warn('未找到对应的会话')
+          showError('更新会话信息失败')
+        }
+      }
+      else {
+        console.warn('未获取到联系人详情数据')
+        showError('未能获取到联系人详情')
+      }
+    }
+    else {
+      console.warn('API调用失败或返回数据为空')
+      showError('未能获取到联系人详情')
+    }
+  }
+  catch (error) {
+    console.error('刷新联系人信息失败:', error)
+    showError('刷新联系人信息失败')
+  }
+  finally {
+    isRefreshingContact.value = false
+  }
 }
 
 // 监听账号变化
@@ -716,6 +855,12 @@ onUnmounted(() => {
             </div>
           </div>
           <div class="chat-actions">
+            <el-button link class="action-btn" :loading="isRefreshingContact" @click="refreshContactInfo">
+              <el-icon>
+                <Refresh />
+              </el-icon>
+              刷新信息
+            </el-button>
             <el-button link class="action-btn" @click="addTestMessages">
               添加测试消息
             </el-button>
@@ -754,17 +899,19 @@ onUnmounted(() => {
         </div>
 
         <!-- 右键菜单 -->
-        <div
-          v-if="contextMenu.visible" class="context-menu"
-          :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }" @click.stop
-        >
-          <div class="context-menu-item" @click="recallMessage">
-            <el-icon>
-              <Delete />
-            </el-icon>
-            撤回消息
+        <Teleport to="body">
+          <div
+            v-if="contextMenu.visible" class="context-menu"
+            :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }" @click.stop
+          >
+            <div class="context-menu-item" @click="recallMessage">
+              <el-icon>
+                <Delete />
+              </el-icon>
+              撤回消息
+            </div>
           </div>
-        </div>
+        </Teleport>
 
         <!-- 输入区域 -->
         <div class="input-area">
@@ -1300,12 +1447,11 @@ onUnmounted(() => {
 // 右键菜单样式
 .context-menu {
   position: fixed;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #ffffff;
+  border: 2px solid #409eff;
   border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  backdrop-filter: blur(10px);
-  z-index: 9999;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  z-index: 10000;
   min-width: 120px;
   overflow: hidden;
 

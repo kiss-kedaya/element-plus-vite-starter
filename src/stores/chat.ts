@@ -239,6 +239,7 @@ export const useChatStore = defineStore('chat', () => {
 
     // 立即显示消息，状态为发送中
     const messageId = Date.now().toString()
+    const currentTime = Date.now()
     const message: ChatMessage = {
       id: messageId,
       content,
@@ -253,10 +254,14 @@ export const useChatStore = defineStore('chat', () => {
       sessionId: toUserName,
       isGroupMessage: toUserName.includes('@chatroom'),
       actualSender: wxid,
+      clientMsgId: parseInt(messageId),
+      createTime: Math.floor(currentTime / 1000),
+      newMsgId: parseInt(messageId),
     }
     addMessage(toUserName, message)
 
     try {
+      console.log('开始发送消息:', { wxid, toUserName, content, messageId })
       const result = await chatApi.sendTextMessage({
         Wxid: wxid,
         ToWxid: toUserName,
@@ -264,11 +269,15 @@ export const useChatStore = defineStore('chat', () => {
         Type: 1,
       })
 
+      console.log('发送消息API返回:', result)
+
       if (result.Success) {
-        // 更新消息状态为已发送
-        updateMessageStatus(toUserName, messageId, 'sent', true)
+        console.log('消息发送成功，准备更新状态')
+        // 更新消息状态为已发送，并传递真实的消息数据
+        updateMessageStatus(toUserName, messageId, 'sent', false, result)
       }
       else {
+        console.log('消息发送失败，准备更新状态为失败')
         // 更新消息状态为失败
         updateMessageStatus(toUserName, messageId, 'failed', true)
       }
@@ -288,6 +297,28 @@ export const useChatStore = defineStore('chat', () => {
 
   const sendImageMessage = async (wxid: string, toUserName: string, imageData: string) => {
     isSending.value = true
+
+    // 立即显示消息，状态为发送中
+    const messageId = Date.now().toString()
+    const currentTime = Date.now()
+    const message: ChatMessage = {
+      id: messageId,
+      content: '[图片]',
+      timestamp: new Date(),
+      fromMe: true,
+      type: 'image',
+      imageData,
+      status: 'sending',
+      sessionId: toUserName,
+      isGroupMessage: toUserName.includes('@chatroom'),
+      actualSender: wxid,
+      canRecall: false, // 发送中时不能撤回
+      clientMsgId: parseInt(messageId),
+      createTime: Math.floor(currentTime / 1000),
+      newMsgId: parseInt(messageId),
+    }
+    addMessage(toUserName, message)
+
     try {
       const result = await chatApi.sendImageMessage({
         Wxid: wxid,
@@ -296,25 +327,20 @@ export const useChatStore = defineStore('chat', () => {
       })
 
       if (result.Success) {
-        const message: ChatMessage = {
-          id: Date.now().toString(),
-          content: '[图片]',
-          timestamp: new Date(),
-          fromMe: true,
-          type: 'image',
-          imageData,
-          status: 'sent',
-          sessionId: toUserName,
-          isGroupMessage: toUserName.includes('@chatroom'),
-          actualSender: wxid,
-        }
-        addMessage(toUserName, message)
+        // 更新消息状态为已发送，并传递真实的消息数据
+        updateMessageStatus(toUserName, messageId, 'sent', false, result)
+      }
+      else {
+        // 更新消息状态为失败
+        updateMessageStatus(toUserName, messageId, 'failed', true)
       }
 
       return result
     }
     catch (error) {
       console.error('发送图片失败:', error)
+      // 更新消息状态为失败，允许重试
+      updateMessageStatus(toUserName, messageId, 'failed', true)
       throw error
     }
     finally {
@@ -326,7 +352,7 @@ export const useChatStore = defineStore('chat', () => {
     delete messages.value[sessionId]
   }
 
-  const updateMessageStatus = (sessionId: string, messageId: string, status: ChatMessage['status'], canRetry: boolean = false) => {
+  const updateMessageStatus = (sessionId: string, messageId: string, status: ChatMessage['status'], canRetry: boolean = false, realMessageData?: any) => {
     const sessionMessages = messages.value[sessionId]
     if (sessionMessages) {
       const message = sessionMessages.find(m => m.id === messageId)
@@ -334,6 +360,27 @@ export const useChatStore = defineStore('chat', () => {
         message.status = status
         message.canRetry = canRetry && status === 'failed'
         message.canRecall = status === 'sent' && message.fromMe
+
+        console.log('更新消息状态:', {
+          messageId,
+          status,
+          fromMe: message.fromMe,
+          canRecall: message.canRecall,
+          canRetry: message.canRetry
+        })
+
+        // 如果有真实的消息数据，更新消息的真实ID
+        if (realMessageData && realMessageData.Data && realMessageData.Data.List && realMessageData.Data.List.length > 0) {
+          const msgData = realMessageData.Data.List[0]
+          message.clientMsgId = msgData.ClientMsgid
+          message.createTime = msgData.Createtime
+          message.newMsgId = msgData.NewMsgId
+          console.log('更新消息真实ID:', {
+            clientMsgId: message.clientMsgId,
+            createTime: message.createTime,
+            newMsgId: message.newMsgId
+          })
+        }
       }
     }
   }
@@ -370,29 +417,43 @@ export const useChatStore = defineStore('chat', () => {
       return
 
     const message = sessionMessages.find(m => m.id === messageId)
-    if (!message || !message.canRecall)
+    if (!message || !message.fromMe)
       return
 
     try {
-      // 这里需要调用撤回消息的API
-      // const result = await chatApi.recallMessage({ Wxid: wxid, MessageId: messageId })
+      // 调用撤回消息的API
+      const result = await chatApi.revokeMessage({
+        Wxid: wxid,
+        ToUserName: sessionId,
+        ClientMsgId: message.clientMsgId || parseInt(message.id) || Date.now(),
+        CreateTime: message.createTime || Math.floor(message.timestamp.getTime() / 1000),
+        NewMsgId: message.newMsgId || parseInt(message.id) || Date.now(),
+      })
 
-      // 暂时直接从本地删除消息
-      const messageIndex = sessionMessages.findIndex(m => m.id === messageId)
-      if (messageIndex !== -1) {
-        sessionMessages.splice(messageIndex, 1)
-      }
+      if (result.Success) {
+        // API调用成功，从本地删除消息
+        const messageIndex = sessionMessages.findIndex(m => m.id === messageId)
+        if (messageIndex !== -1) {
+          sessionMessages.splice(messageIndex, 1)
+        }
 
-      // 添加系统消息提示撤回
-      const recallNotice: ChatMessage = {
-        id: Date.now().toString(),
-        content: '你撤回了一条消息',
-        timestamp: new Date(),
-        fromMe: false,
-        type: 'system',
-        status: 'sent',
+        // 添加系统消息提示撤回
+        const recallNotice: ChatMessage = {
+          id: Date.now().toString(),
+          content: '你撤回了一条消息',
+          timestamp: new Date(),
+          fromMe: false,
+          type: 'system',
+          status: 'sent',
+          sessionId: sessionId,
+        }
+        sessionMessages.push(recallNotice)
+
+        console.log('消息撤回成功')
+      } else {
+        console.error('撤回消息失败:', result.Message)
+        throw new Error(result.Message || '撤回消息失败')
       }
-      sessionMessages.push(recallNotice)
     }
     catch (error) {
       console.error('撤回消息失败:', error)
@@ -650,6 +711,35 @@ export const useChatStore = defineStore('chat', () => {
     handleChatMessage(testMessage)
   }
 
+  // 更新会话信息
+  const updateSessionInfo = (sessionId: string, updates: Partial<ChatSession>) => {
+    const sessionIndex = sessions.value.findIndex(s => s.id === sessionId)
+    if (sessionIndex !== -1) {
+      // 创建新的会话对象来触发响应式更新
+      const updatedSession = {
+        ...sessions.value[sessionIndex],
+        ...updates
+      }
+
+      // 替换数组中的会话对象
+      sessions.value[sessionIndex] = updatedSession
+
+      // 如果这是当前选中的会话，也要更新currentSession
+      if (currentSession.value?.id === sessionId) {
+        currentSession.value = updatedSession
+      }
+
+      // 自动保存到缓存
+      const authStore = useAuthStore()
+      if (authStore.currentAccount?.wxid) {
+        saveCachedData(authStore.currentAccount.wxid)
+      }
+
+      return updatedSession
+    }
+    return null
+  }
+
   return {
     // 状态
     sessions,
@@ -679,6 +769,7 @@ export const useChatStore = defineStore('chat', () => {
     createOrGetSession,
     syncMessages,
     testWebSocketMessage,
+    updateSessionInfo,
 
     // 缓存相关方法
     loadCachedData,
