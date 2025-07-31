@@ -1,12 +1,12 @@
-import { ElMessage } from 'element-plus'
 import type { ChatMessage } from '@/types/chat'
+import { ElMessage } from 'element-plus'
 import { WEBSOCKET_CONFIG } from '@/config/websocket'
 
 // 事件类型定义
 export interface WebSocketEvents {
-  'chat_message': (data: any) => void
-  'system_message': (data: any) => void
-  'connection_status': (connected: boolean) => void
+  chat_message: (data: any) => void
+  system_message: (data: any) => void
+  connection_status: (connected: boolean) => void
 }
 
 export class WebSocketService {
@@ -120,8 +120,8 @@ export class WebSocketService {
           this.isConnecting = false
           reject(error)
         }
-
-      } catch (error) {
+      }
+      catch (error) {
         this.isConnecting = false
         console.error('创建WebSocket连接失败:', error)
         reject(error)
@@ -139,8 +139,6 @@ export class WebSocketService {
     this.reconnectAttempts = 0
     this.currentWxid = undefined
   }
-
-
 
   // 处理接收到的消息
   private handleMessage(data: string) {
@@ -164,7 +162,8 @@ export class WebSocketService {
         default:
           console.log('收到未知类型的消息:', message)
       }
-    } catch (error) {
+    }
+    catch (error) {
       console.error('解析WebSocket消息失败:', error)
     }
   }
@@ -187,7 +186,7 @@ export class WebSocketService {
         fromMe: msg.isSelf || false,
         type: this.getMsgType(msg.msgType),
         status: 'received',
-        sessionId: msg.isSelf ? msg.toUser : msg.fromUser
+        sessionId: msg.isSelf ? msg.toUser : msg.fromUser,
       }
 
       console.log('准备发送聊天消息事件:', chatMessage)
@@ -211,15 +210,13 @@ export class WebSocketService {
     }
   }
 
-
-
   // 开始心跳
   private startHeartbeat() {
     this.heartbeatInterval = window.setInterval(() => {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) {
         const heartbeat = {
           type: 'heartbeat',
-          timestamp: Date.now()
+          timestamp: Date.now(),
         }
         this.ws.send(JSON.stringify(heartbeat))
       }
@@ -237,7 +234,6 @@ export class WebSocketService {
   // 安排重连
   private scheduleReconnect() {
     this.reconnectAttempts++
-    console.log(`准备第${this.reconnectAttempts}次重连... (wxid: ${this.currentWxid || '未指定'})`)
 
     setTimeout(() => {
       if (this.reconnectAttempts <= this.maxReconnectAttempts) {
