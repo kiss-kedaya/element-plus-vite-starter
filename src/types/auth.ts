@@ -68,8 +68,12 @@ export interface LoginResponse {
 
 export interface QRCodeResponse extends LoginResponse {
   Data?: {
+    QrUrl?: string
+    QrBase64?: string
+    Uuid?: string
+    DeviceId?: string
+    // 保持向后兼容
     QRCodeUrl?: string
     QRCodeData?: string
-    DeviceId?: string
   }
 }

@@ -88,6 +88,23 @@ export const useChatStore = defineStore('chat', () => {
 
   const sendTextMessage = async (wxid: string, toUserName: string, content: string) => {
     isSending.value = true
+
+    // 立即显示消息，状态为发送中
+    const messageId = Date.now().toString()
+    const message: ChatMessage = {
+      id: messageId,
+      content,
+      timestamp: new Date(),
+      fromMe: true,
+      type: 'text',
+      status: 'sending',
+      originalContent: content,
+      canRetry: false,
+      canRecall: false,
+      retryCount: 0
+    }
+    addMessage(toUserName, message)
+
     try {
       const result = await chatApi.sendTextMessage({
         Wxid: wxid,
@@ -95,23 +112,20 @@ export const useChatStore = defineStore('chat', () => {
         Content: content,
         Type: 1
       })
-      
+
       if (result.Success) {
-        // 添加到本地消息列表
-        const message: ChatMessage = {
-          id: Date.now().toString(),
-          content,
-          timestamp: new Date(),
-          fromMe: true,
-          type: 'text',
-          status: 'sent'
-        }
-        addMessage(toUserName, message)
+        // 更新消息状态为已发送
+        updateMessageStatus(toUserName, messageId, 'sent', true)
+      } else {
+        // 更新消息状态为失败
+        updateMessageStatus(toUserName, messageId, 'failed', true)
       }
-      
+
       return result
     } catch (error) {
       console.error('发送消息失败:', error)
+      // 更新消息状态为失败，允许重试
+      updateMessageStatus(toUserName, messageId, 'failed', true)
       throw error
     } finally {
       isSending.value = false
@@ -153,13 +167,72 @@ export const useChatStore = defineStore('chat', () => {
     delete messages.value[sessionId]
   }
 
-  const updateMessageStatus = (sessionId: string, messageId: string, status: ChatMessage['status']) => {
+  const updateMessageStatus = (sessionId: string, messageId: string, status: ChatMessage['status'], canRetry: boolean = false) => {
     const sessionMessages = messages.value[sessionId]
     if (sessionMessages) {
       const message = sessionMessages.find(m => m.id === messageId)
       if (message) {
         message.status = status
+        message.canRetry = canRetry && status === 'failed'
+        message.canRecall = status === 'sent' && message.fromMe
       }
+    }
+  }
+
+  // 重试发送消息
+  const retryMessage = async (wxid: string, sessionId: string, messageId: string) => {
+    const sessionMessages = messages.value[sessionId]
+    if (!sessionMessages) return
+
+    const message = sessionMessages.find(m => m.id === messageId)
+    if (!message || !message.canRetry || !message.originalContent) return
+
+    // 删除原消息
+    const messageIndex = sessionMessages.findIndex(m => m.id === messageId)
+    if (messageIndex !== -1) {
+      sessionMessages.splice(messageIndex, 1)
+    }
+
+    // 重新发送消息（会显示在最下方）
+    try {
+      await sendTextMessage(wxid, sessionId, message.originalContent)
+    } catch (error) {
+      console.error('重试发送消息失败:', error)
+    }
+  }
+
+  // 撤回消息
+  const recallMessage = async (wxid: string, sessionId: string, messageId: string) => {
+    const sessionMessages = messages.value[sessionId]
+    if (!sessionMessages) return
+
+    const message = sessionMessages.find(m => m.id === messageId)
+    if (!message || !message.canRecall) return
+
+    try {
+      // 这里需要调用撤回消息的API
+      // const result = await chatApi.recallMessage({ Wxid: wxid, MessageId: messageId })
+
+      // 暂时直接从本地删除消息
+      const messageIndex = sessionMessages.findIndex(m => m.id === messageId)
+      if (messageIndex !== -1) {
+        sessionMessages.splice(messageIndex, 1)
+      }
+
+      // 添加系统消息提示撤回
+      const recallNotice: ChatMessage = {
+        id: Date.now().toString(),
+        content: '你撤回了一条消息',
+        timestamp: new Date(),
+        fromMe: false,
+        type: 'system',
+        status: 'sent'
+      }
+      sessionMessages.push(recallNotice)
+
+    } catch (error) {
+      console.error('撤回消息失败:', error)
+      throw error
     }
   }
 
@@ -278,6 +351,8 @@ export const useChatStore = defineStore('chat', () => {
     sendImageMessage,
     clearMessages,
     updateMessageStatus,
+    retryMessage,
+    recallMessage,
     clearAllData,
     connectWebSocket,
     disconnectWebSocket,

@@ -222,38 +222,40 @@
         </div>
       </el-card>
     </div>
+  </el-dialog>
 
-    <!-- 重新登录对话框 -->
-    <el-dialog
-      v-model="showReloginDialog"
-      title="设备复用重新登录"
-      width="400px"
-      append-to-body
-    >
-      <div v-if="qrCodeUrl" class="qr-login">
-        <div class="qr-container">
-          <img :src="qrCodeUrl" alt="登录二维码" class="qr-image" />
-        </div>
-        <p class="qr-tip">请使用微信扫描二维码登录</p>
-        <el-button @click="refreshQRCode" :loading="qrLoading">
-          刷新二维码
-        </el-button>
+  <!-- 重新登录对话框 - 移到外层避免嵌套 -->
+  <el-dialog
+    v-model="showReloginDialog"
+    title="设备复用重新登录"
+    width="400px"
+    append-to-body
+  >
+    <div v-if="qrCodeUrl" class="qr-login">
+      <div class="qr-container">
+        <img :src="qrCodeUrl" alt="登录二维码" class="qr-image" />
       </div>
-      
-      <div v-else class="qr-loading">
-        <el-skeleton :rows="3" animated />
-        <p>正在生成登录二维码...</p>
+      <div class="qr-status">
+        <p :class="['qr-status-text', getStatusClass()]">{{ qrStatus }}</p>
       </div>
-      
-      <template #footer>
-        <el-button @click="showReloginDialog = false">取消</el-button>
-      </template>
-    </el-dialog>
+      <el-button @click="refreshQRCode" :loading="qrLoading">
+        刷新二维码
+      </el-button>
+    </div>
+
+    <div v-else class="qr-loading">
+      <el-skeleton :rows="3" animated />
+      <p>{{ qrStatus }}</p>
+    </div>
+
+    <template #footer>
+      <el-button @click="showReloginDialog = false">取消</el-button>
+    </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, SwitchButton, Delete, Timer } from '@element-plus/icons-vue'
 import type { LoginAccount, ProxyConfig } from '@/types/auth'
@@ -290,6 +292,9 @@ const heartbeatLoading = ref(false)
 const showReloginDialog = ref(false)
 const qrCodeUrl = ref('')
 const qrLoading = ref(false)
+const qrStatus = ref('等待获取二维码')
+const qrCheckTimer = ref<NodeJS.Timeout | null>(null)
+const currentUuid = ref('')
 
 // 代理预设配置
 const proxyPresets = [
@@ -428,23 +433,50 @@ const clearProxy = async () => {
 const generateQRCode = async () => {
   if (!props.account) return
 
+  // 清除之前的检查定时器
+  if (qrCheckTimer.value) {
+    clearInterval(qrCheckTimer.value)
+    qrCheckTimer.value = null
+  }
+
   qrLoading.value = true
+  qrStatus.value = '正在获取二维码...'
+
   try {
-    // 使用设备复用生成二维码
-    const response = await loginApi.getQRCode(props.account.deviceType || 'iPad', {
+    // 使用设备复用专用接口生成二维码
+    const response = await loginApi.getQRCodeForDeviceReuse({
       DeviceID: props.account.deviceId || props.account.imei || '',
       DeviceName: props.account.deviceName,
       Proxy: props.account.proxy
     })
 
-    if (response.Success && response.Data?.QRCodeUrl) {
-      qrCodeUrl.value = response.Data.QRCodeUrl
+    if (response.Success && response.Data?.QrUrl) {
+      qrCodeUrl.value = response.Data.QrUrl
+      // 获取UUID用于状态检查
+      currentUuid.value = response.Data.Uuid || response.Data.uuid || ''
+      qrStatus.value = '请使用微信扫描二维码'
+
+      // 开始检查二维码状态
+      if (currentUuid.value) {
+        startQRCodeCheck()
+      }
+    } else if (response.Success && response.Data?.QrBase64) {
+      // 如果没有QrUrl但有QrBase64，使用base64数据
+      qrCodeUrl.value = response.Data.QrBase64
+      currentUuid.value = response.Data.Uuid || response.Data.uuid || ''
+      qrStatus.value = '请使用微信扫描二维码'
+
+      // 开始检查二维码状态
+      if (currentUuid.value) {
+        startQRCodeCheck()
+      }
     } else {
       throw new Error(response.Message || '生成二维码失败')
     }
   } catch (error: any) {
     ElMessage.error(error.message || '生成二维码失败')
     console.error('生成二维码失败:', error)
+    qrStatus.value = '生成二维码失败'
   } finally {
     qrLoading.value = false
   }
@@ -452,6 +484,158 @@ const generateQRCode = async () => {
 
 const refreshQRCode = () => {
   generateQRCode()
+}
+
+// 开始检查二维码状态
+const startQRCodeCheck = () => {
+  // 清除之前的检查定时器
+  if (qrCheckTimer.value) {
+    clearInterval(qrCheckTimer.value)
+    qrCheckTimer.value = null
+  }
+
+  // 每2秒检查一次二维码状态
+  qrCheckTimer.value = setInterval(async () => {
+    try {
+      await checkQRCodeStatus()
+    } catch (error) {
+      console.error('检测二维码状态失败:', error)
+    }
+  }, 2000)
+
+  // 设置5分钟超时
+  setTimeout(() => {
+    if (qrCheckTimer.value) {
+      clearInterval(qrCheckTimer.value)
+      qrCheckTimer.value = null
+      qrStatus.value = '二维码已过期，请刷新'
+    }
+  }, 300000) // 5分钟
+}
+
+// 检查二维码状态
+const checkQRCodeStatus = async () => {
+  if (!currentUuid.value) return
+
+  try {
+    const response = await fetch('http://localhost:8059/api/Login/LoginCheckQR', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: `uuid=${encodeURIComponent(currentUuid.value)}`
+    })
+
+    const result = await response.json()
+
+    if (result.Success && result.Message === "登录成功") {
+      // 登录成功
+      if (qrCheckTimer.value) {
+        clearInterval(qrCheckTimer.value)
+        qrCheckTimer.value = null
+      }
+
+      qrStatus.value = '登录成功！正在初始化...'
+      ElMessage.success('扫码登录成功！')
+
+      // 执行二次登录
+      if (result.Data && result.Data.wxid) {
+        await performSecondAuth(result.Data.wxid)
+      }
+
+      // 关闭模态框并刷新
+      setTimeout(() => {
+        showReloginDialog.value = false
+        emit('refresh')
+      }, 2000)
+
+    } else if (result.Success && result.Data) {
+      // API调用成功，根据Data中的状态判断
+      const data = result.Data
+
+      if (data.expiredTime <= 0) {
+        // 二维码已过期
+        if (qrCheckTimer.value) {
+          clearInterval(qrCheckTimer.value)
+          qrCheckTimer.value = null
+        }
+        qrStatus.value = '二维码已过期，请刷新'
+
+      } else if (data.status === 0) {
+        // 等待扫码
+        qrStatus.value = `等待扫码... (${data.expiredTime}秒后过期)`
+
+      } else if (data.status === 1) {
+        // 已扫码，等待确认
+        qrStatus.value = `${data.nickName || '用户'}已扫码，请在手机上确认登录 (${data.expiredTime}秒后过期)`
+
+      } else if (data.status === 4) {
+        // 用户取消登录
+        if (qrCheckTimer.value) {
+          clearInterval(qrCheckTimer.value)
+          qrCheckTimer.value = null
+        }
+        qrStatus.value = '用户取消登录'
+
+      } else {
+        // 其他状态
+        qrStatus.value = `状态: ${data.status} (${data.expiredTime}秒后过期)`
+      }
+
+    } else {
+      // API调用失败
+      console.error('二维码检测失败:', result)
+      qrStatus.value = `检测失败: ${result.Message || '未知错误'}`
+    }
+  } catch (error: any) {
+    console.error('检测二维码状态失败:', error)
+    qrStatus.value = '网络错误，检测失败'
+  }
+}
+
+// 执行二次登录
+const performSecondAuth = async (wxid: string) => {
+  try {
+    const response = await fetch('http://localhost:8059/api/Login/LoginTwiceAutoAuth', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: `wxid=${encodeURIComponent(wxid)}`
+    })
+
+    const result = await response.json()
+
+    if (result.Success) {
+      qrStatus.value = '二次登录成功！'
+    } else {
+      qrStatus.value = `二次登录失败: ${result.Message}`
+    }
+  } catch (error: any) {
+    console.error('二次登录失败:', error)
+    qrStatus.value = `二次登录失败: ${error.message}`
+  }
+}
+
+// 获取状态样式类
+const getStatusClass = () => {
+  const status = qrStatus.value
+  if (status.includes('成功') || status.includes('已扫码')) {
+    return 'status-success'
+  } else if (status.includes('失败') || status.includes('过期') || status.includes('取消') || status.includes('错误')) {
+    return 'status-error'
+  } else if (status.includes('等待') || status.includes('扫码')) {
+    return 'status-warning'
+  }
+  return 'status-info'
+}
+
+// 清理定时器
+const clearQRTimer = () => {
+  if (qrCheckTimer.value) {
+    clearInterval(qrCheckTimer.value)
+    qrCheckTimer.value = null
+  }
 }
 
 // 开启心跳
@@ -539,8 +723,20 @@ const removeAccount = async () => {
 watch(showReloginDialog, (show) => {
   if (show) {
     qrCodeUrl.value = ''
+    qrStatus.value = '等待获取二维码'
     generateQRCode()
+  } else {
+    // 对话框关闭时清理定时器
+    clearQRTimer()
+    qrCodeUrl.value = ''
+    currentUuid.value = ''
+    qrStatus.value = '等待获取二维码'
   }
+})
+
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  clearQRTimer()
 })
 </script>
 
@@ -725,6 +921,44 @@ watch(showReloginDialog, (show) => {
     color: var(--text-secondary);
     margin-bottom: var(--spacing-lg);
     font-size: var(--font-size-base);
+  }
+
+  .qr-status {
+    margin: var(--spacing-md) 0;
+    text-align: center;
+
+    .qr-status-text {
+      margin: 0;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+      transition: all 0.3s ease;
+
+      &.status-info {
+        background: rgba(64, 158, 255, 0.1);
+        color: #409eff;
+        border: 1px solid rgba(64, 158, 255, 0.2);
+      }
+
+      &.status-success {
+        background: rgba(103, 194, 58, 0.1);
+        color: #67c23a;
+        border: 1px solid rgba(103, 194, 58, 0.2);
+      }
+
+      &.status-warning {
+        background: rgba(230, 162, 60, 0.1);
+        color: #e6a23c;
+        border: 1px solid rgba(230, 162, 60, 0.2);
+      }
+
+      &.status-error {
+        background: rgba(245, 108, 108, 0.1);
+        color: #f56c6c;
+        border: 1px solid rgba(245, 108, 108, 0.2);
+      }
+    }
   }
 }
 

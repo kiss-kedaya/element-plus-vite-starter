@@ -9,6 +9,7 @@ import {
   Picture,
   Position,
   Refresh,
+  RefreshRight,
   Search,
   Select,
   User,
@@ -33,6 +34,14 @@ const messageInput = ref('')
 const messagesContainer = ref<HTMLElement>()
 const fileInputRef = ref<HTMLInputElement>()
 const searchKeyword = ref('')
+
+// 右键菜单相关
+const contextMenu = ref({
+  visible: false,
+  x: 0,
+  y: 0,
+  message: null as any
+})
 
 // 计算属性
 const filteredSessions = computed(() => {
@@ -69,7 +78,7 @@ async function loadFriendsAsSessions() {
     }))
 
     chatStore.setSessions(sessions)
-    ElMessage.success(`已加载 ${sessions.length} 个好友会话`)
+    // 好友会话加载完成，不显示提示
   }
   catch (error) {
     ElMessage.error('加载好友列表失败')
@@ -165,10 +174,71 @@ async function clearCurrentMessages() {
     })
 
     chatStore.clearMessages(chatStore.currentSession.id)
-    ElMessage.success('消息已清空')
+    // 消息清空完成，不显示提示
   }
   catch {
     // 用户取消
+  }
+}
+
+// 重试发送消息
+async function retryMessage(message: any) {
+  if (!props.account || !chatStore.currentSession) return
+
+  try {
+    await chatStore.retryMessage(
+      props.account.wxid,
+      chatStore.currentSession.id,
+      message.id
+    )
+  } catch (error) {
+    ElMessage.error('重试发送失败')
+    console.error('重试发送失败:', error)
+  }
+}
+
+// 显示右键菜单
+function showContextMenu(event: MouseEvent, message: any) {
+  event.preventDefault()
+
+  // 只有自己发送的消息才能撤回
+  if (!message.fromMe || message.type === 'system') return
+
+  contextMenu.value = {
+    visible: true,
+    x: event.clientX,
+    y: event.clientY,
+    message
+  }
+}
+
+// 隐藏右键菜单
+function hideContextMenu() {
+  contextMenu.value.visible = false
+  contextMenu.value.message = null
+}
+
+// 撤回消息
+async function recallMessage() {
+  if (!props.account || !chatStore.currentSession || !contextMenu.value.message) return
+
+  try {
+    await ElMessageBox.confirm('确定要撤回这条消息吗？', '撤回消息', {
+      type: 'warning'
+    })
+
+    await chatStore.recallMessage(
+      props.account.wxid,
+      chatStore.currentSession.id,
+      contextMenu.value.message.id
+    )
+
+    hideContextMenu()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('撤回消息失败')
+      console.error('撤回消息失败:', error)
+    }
   }
 }
 
@@ -268,12 +338,18 @@ onMounted(async () => {
       // 不显示错误消息，因为这在开发环境中是正常的
     }
   }
+
+  // 添加全局点击事件监听器来隐藏右键菜单
+  document.addEventListener('click', hideContextMenu)
 })
 
 onUnmounted(() => {
   if (props.account?.wxid) {
     closeWebSocketConnection(props.account.wxid)
   }
+
+  // 移除全局点击事件监听器
+  document.removeEventListener('click', hideContextMenu)
 })
 </script>
 
@@ -366,11 +442,16 @@ onUnmounted(() => {
             </div>
 
             <div v-for="message in chatStore.currentMessages" :key="message.id" class="message-item">
-              <div v-if="showMessageTime(message)" class="message-time">
+              <!-- 时间显示 - 居中 -->
+              <div v-if="showMessageTime(message)" class="message-time-center">
                 {{ formatMessageTime(message.timestamp) }}
               </div>
 
-              <div class="message-content" :class="{ 'from-me': message.fromMe }">
+              <div
+                class="message-content"
+                :class="{ 'from-me': message.fromMe }"
+                @contextmenu="showContextMenu($event, message)"
+              >
                 <div class="message-bubble">
                   <div v-if="message.type === 'text'" class="message-text">
                     {{ message.content }}
@@ -380,20 +461,37 @@ onUnmounted(() => {
                     <img :src="message.imageData" alt="图片">
                   </div>
 
-                  <div v-if="message.fromMe" class="message-status">
-                    <el-icon v-if="message.status === 'sending'" class="is-loading" color="#999">
-                      <Loading />
-                    </el-icon>
-                    <el-icon v-else-if="message.status === 'sent'" color="#67c23a">
-                      <Select />
-                    </el-icon>
-                    <el-icon v-else-if="message.status === 'failed'" color="#f56c6c">
-                      <Close />
-                    </el-icon>
+                  <div v-else-if="message.type === 'system'" class="message-system">
+                    {{ message.content }}
+                  </div>
+
+                  <!-- 失败重试按钮 -->
+                  <div v-if="message.status === 'failed' && message.canRetry" class="message-retry">
+                    <el-button
+                      type="danger"
+                      size="small"
+                      :icon="RefreshRight"
+                      circle
+                      @click="retryMessage(message)"
+                      title="重新发送"
+                    />
                   </div>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- 右键菜单 -->
+        <div
+          v-if="contextMenu.visible"
+          class="context-menu"
+          :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
+          @click.stop
+        >
+          <div class="context-menu-item" @click="recallMessage">
+            <el-icon><Delete /></el-icon>
+            撤回消息
           </div>
         </div>
 
@@ -758,17 +856,17 @@ onUnmounted(() => {
   animation: messageSlideIn 0.3s ease-out;
 }
 
-.message-time {
+// 居中时间显示样式
+.message-time-center {
   text-align: center;
   font-size: 12px;
-  color: rgba(0, 0, 0, 0.4);
-  margin-bottom: 8px;
-  padding: 4px 8px;
-  background: rgba(255, 255, 255, 0.6);
+  color: rgba(0, 0, 0, 0.5);
+  margin: 16px auto 8px;
+  padding: 4px 12px;
+  background: rgba(0, 0, 0, 0.05);
   border-radius: 12px;
-  display: inline-block;
-  margin: 0 auto 8px;
-  backdrop-filter: blur(10px);
+  display: block;
+  width: fit-content;
 }
 
 .message-content {
@@ -822,12 +920,7 @@ onUnmounted(() => {
   transition: all 0.2s ease;
   backdrop-filter: blur(10px);
 
-  .sender-name {
-    font-size: 12px;
-    color: #666;
-    margin-bottom: 4px;
-    opacity: 0.8;
-  }
+  // 移除sender-name样式，不再需要
 
   .message-text {
     word-wrap: break-word;
@@ -850,20 +943,68 @@ onUnmounted(() => {
   }
 }
 
-.message-status {
-  margin-top: 6px;
-  text-align: right;
-  opacity: 0.8;
+// 系统消息样式
+.message-system {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.5);
+  text-align: center;
+  font-style: italic;
+  padding: 8px 12px;
+}
 
-  .el-icon {
-    font-size: 14px;
-    transition: all 0.2s ease;
+// 重试按钮样式
+.message-retry {
+  position: absolute;
+  right: -40px;
+  top: 50%;
+  transform: translateY(-50%);
 
-    &.is-loading {
-      animation: spin 1s linear infinite;
+  .el-button {
+    width: 24px;
+    height: 24px;
+    min-height: 24px;
+
+    &:hover {
+      background-color: #f56c6c;
+      border-color: #f56c6c;
     }
   }
 }
+
+// 右键菜单样式
+.context-menu {
+  position: fixed;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(10px);
+  z-index: 9999;
+  min-width: 120px;
+  overflow: hidden;
+
+  .context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #333;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    .el-icon {
+      font-size: 16px;
+      color: #f56c6c;
+    }
+  }
+}
+
+// 移除消息状态样式，不再需要
 
 @keyframes messageSlideIn {
   from {
@@ -876,14 +1017,7 @@ onUnmounted(() => {
   }
 }
 
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
+// 移除spin动画，不再需要
 
 .input-area {
   border-top: 1px solid rgba(255, 255, 255, 0.2);

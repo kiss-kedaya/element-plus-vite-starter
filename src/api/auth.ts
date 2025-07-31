@@ -1,29 +1,29 @@
-import { api } from './index'
 import type {
-  ProxyConfig,
-  SetProxyRequest,
-  QRCodeLoginRequest,
-  Data62LoginRequest,
   A16LoginRequest,
+  Data62LoginRequest,
   LoginResponse,
-  QRCodeResponse
+  ProxyConfig,
+  QRCodeLoginRequest,
+  QRCodeResponse,
+  SetProxyRequest,
 } from '@/types/auth'
+import { api } from './index'
 
 export const loginApi = {
   // 获取二维码登录
   getQRCode: (deviceType: string, params: QRCodeLoginRequest): Promise<QRCodeResponse> => {
     const endpoints: Record<string, string> = {
-      'iPad': '/Login/LoginGetQR',
-      'iPadX': '/Login/LoginGetQRx',
-      'Windows': '/Login/LoginGetQRWin',
-      'WindowsUwp': '/Login/LoginGetQRWinUwp',
-      'WindowsUnified': '/Login/LoginGetQRWinUnified',
-      'Mac': '/Login/LoginGetQRMac',
-      'AndroidPad': '/Login/LoginGetQRPad',
-      'AndroidPadX': '/Login/LoginGetQRPadx'
+      iPad: '/Login/LoginGetQR',
+      iPadX: '/Login/LoginGetQRx',
+      Windows: '/Login/LoginGetQRWin',
+      WindowsUwp: '/Login/LoginGetQRWinUwp',
+      WindowsUnified: '/Login/LoginGetQRWinUnified',
+      Mac: '/Login/LoginGetQRMac',
+      AndroidPad: '/Login/LoginGetQRPad',
+      AndroidPadX: '/Login/LoginGetQRPadx',
     }
 
-    const endpoint = endpoints[deviceType] || endpoints['iPad']
+    const endpoint = endpoints[deviceType] || endpoints.iPad
     return api.post(endpoint, params)
   },
 
@@ -65,5 +65,10 @@ export const loginApi = {
   // 设置代理
   setProxy: (params: SetProxyRequest): Promise<LoginResponse> => {
     return api.post('/Tools/setproxy', params)
-  }
+  },
+
+  // 设备复用登录 - 生成二维码
+  getQRCodeForDeviceReuse: (params: QRCodeLoginRequest): Promise<QRCodeResponse> => {
+    return api.post('/Login/LoginGetQRCar', params)
+  },
 }

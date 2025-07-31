@@ -22,6 +22,11 @@ export interface ChatMessage {
     size: number
     url: string
   }
+  // 新增字段用于重试和撤回功能
+  originalContent?: string  // 原始内容，用于重试
+  canRetry?: boolean       // 是否可以重试
+  canRecall?: boolean      // 是否可以撤回
+  retryCount?: number      // 重试次数
 }
 
 export interface SendTextMessageRequest {
