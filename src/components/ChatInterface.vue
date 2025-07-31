@@ -370,17 +370,16 @@ watch(() => props.account?.wxid, async (newWxid, oldWxid) => {
   // 只有当wxid真正改变时才重新连接
   if (oldWxid && oldWxid !== newWxid) {
     console.log(`账号从 ${oldWxid} 切换到 ${newWxid}`)
-    // 注意：不要断开WebSocket，让WebSocketService自己管理连接切换
   }
 
   if (newWxid && newWxid !== oldWxid) {
-    // 清空之前的数据（只有在真正切换账号时）
-    if (oldWxid) {
-      chatStore.clearAllData()
-    }
+    // 使用新的账号切换功能，自动保存旧账号数据并加载新账号缓存
+    chatStore.switchAccount(newWxid, oldWxid)
 
-    // 加载新账号的好友作为会话
-    await loadFriendsAsSessions()
+    // 加载新账号的好友作为会话（如果缓存中没有会话）
+    if (chatStore.sessions.length === 0) {
+      await loadFriendsAsSessions()
+    }
 
     // 尝试建立 WebSocket 连接（静默失败）
     try {
@@ -419,7 +418,13 @@ watch(() => props.account?.wxid, async (newWxid, oldWxid) => {
 
 onMounted(async () => {
   if (props.account?.wxid) {
-    await loadFriendsAsSessions()
+    // 首先加载缓存数据
+    chatStore.loadCachedData(props.account.wxid)
+
+    // 如果缓存中没有会话，则从好友列表加载
+    if (chatStore.sessions.length === 0) {
+      await loadFriendsAsSessions()
+    }
 
     // 尝试建立 WebSocket 连接（静默失败）
     try {
@@ -485,8 +490,10 @@ onUnmounted(() => {
         <div v-for="session in filteredSessions" :key="session.id" class="session-item"
           :class="{ active: chatStore.currentSession?.id === session.id }" @click="selectSession(session)">
           <div class="session-avatar">
-            <el-avatar :src="session.avatar" :size="40">
-              <span class="avatar-text">{{ session.name.charAt(0) }}</span>
+            <el-avatar :src="session.avatar || ''" :size="40">
+              <template #default>
+                <span class="avatar-text">{{ session.name?.charAt(0) || '?' }}</span>
+              </template>
             </el-avatar>
           </div>
           <div class="session-content">

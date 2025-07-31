@@ -1,59 +1,9 @@
-<template>
-  <div class="message-item" :class="messageClass" @contextmenu="handleContextMenu">
-    <!-- 时间显示 -->
-    <div v-if="showTime" class="message-time">
-      {{ formatTime(message.timestamp) }}
-    </div>
-
-    <div class="message-wrapper">
-      <!-- 消息内容 -->
-      <div class="message-content-wrapper">
-        <div class="message-content" :class="contentClass">
-          <!-- 文本消息 -->
-          <div v-if="message.type === 'text'" class="message-text">
-            {{ message.content }}
-          </div>
-
-          <!-- 图片消息 -->
-          <div v-else-if="message.type === 'image'" class="message-image">
-            <el-image :src="message.imageData" fit="cover" :preview-src-list="[message.imageData]"
-              class="image-content" />
-          </div>
-
-          <!-- 文件消息 -->
-          <div v-else-if="message.type === 'file'" class="message-file">
-            <div class="file-icon">
-              <el-icon>
-                <Document />
-              </el-icon>
-            </div>
-            <div class="file-info">
-              <div class="file-name">{{ message.fileData?.name }}</div>
-              <div class="file-size">{{ formatFileSize(message.fileData?.size) }}</div>
-            </div>
-          </div>
-
-          <!-- 系统消息 -->
-          <div v-else-if="message.type === 'system'" class="message-system">
-            {{ message.content }}
-          </div>
-        </div>
-
-        <!-- 重试按钮 -->
-        <div v-if="message.status === 'failed' && message.canRetry" class="message-retry">
-          <el-button type="danger" size="small" :icon="RefreshRight" circle @click="handleRetry" title="重新发送" />
-        </div>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Document, RefreshRight } from '@element-plus/icons-vue'
 // 暂时注释掉 LazyImage 导入
 // import LazyImage from '@/components/common/LazyImage.vue'
 import type { ChatMessage } from '@/types/chat'
+import { Document, Picture, RefreshRight } from '@element-plus/icons-vue'
+import { computed } from 'vue'
 
 interface Props {
   message: ChatMessage
@@ -74,7 +24,7 @@ const props = withDefaults(defineProps<Props>(), {
   avatar: '',
   avatarText: '',
   myAvatar: '',
-  myAvatarText: '我'
+  myAvatarText: '我',
 })
 
 const emit = defineEmits<Emits>()
@@ -84,7 +34,8 @@ const messageClass = computed(() => {
 
   if (props.message.fromMe) {
     classes.push('message-from-me')
-  } else {
+  }
+  else {
     classes.push('message-from-other')
   }
 
@@ -100,7 +51,8 @@ const contentClass = computed(() => {
 
   if (props.message.fromMe) {
     classes.push('content-from-me')
-  } else {
+  }
+  else {
     classes.push('content-from-other')
   }
 
@@ -111,15 +63,30 @@ const contentClass = computed(() => {
   return classes.join(' ')
 })
 
-const formatTime = (timestamp: Date) => {
-  return new Intl.DateTimeFormat('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(timestamp)
+function formatTime(timestamp: Date) {
+  try {
+    // 确保timestamp是有效的Date对象
+    const date = timestamp instanceof Date ? timestamp : new Date(timestamp)
+
+    // 检查日期是否有效
+    if (isNaN(date.getTime())) {
+      return '时间无效'
+    }
+
+    return new Intl.DateTimeFormat('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(date)
+  }
+  catch (error) {
+    console.error('格式化时间失败:', error, timestamp)
+    return '时间错误'
+  }
 }
 
-const formatFileSize = (size?: number) => {
-  if (!size) return '未知大小'
+function formatFileSize(size?: number) {
+  if (!size)
+    return '未知大小'
 
   const units = ['B', 'KB', 'MB', 'GB']
   let index = 0
@@ -133,13 +100,26 @@ const formatFileSize = (size?: number) => {
   return `${fileSize.toFixed(1)} ${units[index]}`
 }
 
-const handleRetry = () => {
+function handleRetry() {
   emit('retry', props.message)
 }
 
-const handleContextMenu = (event: MouseEvent) => {
+function handleContextMenu(event: MouseEvent) {
   event.preventDefault()
   emit('contextmenu', event, props.message)
+}
+
+// 获取发送者显示名称
+function getSenderDisplayName() {
+  if (props.message.isGroupMessage && props.message.actualSenderName) {
+    // 如果有实际发送者名称，使用它
+    return props.message.actualSenderName
+  }
+  if (props.message.actualSender) {
+    // 否则使用actualSender（通常是wxid）
+    return props.message.actualSender
+  }
+  return '未知用户'
 }
 
 // 暂时注释掉图片预览方法
@@ -149,6 +129,118 @@ const handleContextMenu = (event: MouseEvent) => {
 //   console.log('预览图片:', src)
 // }
 </script>
+
+<template>
+  <div class="message-item" :class="messageClass" @contextmenu="handleContextMenu">
+    <!-- 时间显示 -->
+    <div v-if="showTime" class="message-time">
+      {{ formatTime(message.timestamp) }}
+    </div>
+
+    <div class="message-wrapper">
+      <!-- 群聊消息发送者信息 -->
+      <div v-if="message.isGroupMessage && !message.fromMe" class="sender-info">
+        <div class="sender-name">
+          {{ getSenderDisplayName() }}
+        </div>
+      </div>
+
+      <!-- 消息内容 -->
+      <div class="message-content-wrapper">
+        <div class="message-content" :class="contentClass">
+          <!-- 文本消息 -->
+          <div v-if="message.type === 'text'" class="message-text">
+            {{ message.content }}
+          </div>
+
+          <!-- 图片消息 -->
+          <div v-else-if="message.type === 'image'" class="message-image">
+            <div v-if="!message.imageData" class="image-placeholder">
+              <el-icon class="image-placeholder-icon">
+                <Picture />
+              </el-icon>
+              <span class="image-placeholder-text">图片加载中...</span>
+            </div>
+            <el-image
+              v-else
+              :src="message.imageData"
+              fit="cover"
+              :preview-src-list="[message.imageData]"
+              class="image-content"
+              :hide-on-click-modal="true"
+            >
+              <template #error>
+                <div class="image-error">
+                  <el-icon class="image-error-icon">
+                    <Picture />
+                  </el-icon>
+                  <span class="image-error-text">图片加载失败</span>
+                </div>
+              </template>
+            </el-image>
+          </div>
+
+          <!-- 文件消息 -->
+          <div v-else-if="message.type === 'file'" class="message-file">
+            <div class="file-icon">
+              <el-icon>
+                <Document />
+              </el-icon>
+            </div>
+            <div class="file-info">
+              <div class="file-name">
+                {{ message.fileData?.name }}
+              </div>
+              <div class="file-size">
+                {{ formatFileSize(message.fileData?.size) }}
+              </div>
+            </div>
+          </div>
+
+          <!-- 表情消息 -->
+          <div v-else-if="message.type === 'emoji'" class="message-emoji">
+            <!-- 如果有表情URL，显示表情图片 -->
+            <div v-if="message.emojiUrl || message.emojiThumbUrl" class="emoji-image">
+              <el-image
+                :src="message.emojiThumbUrl || message.emojiUrl"
+                fit="contain"
+                class="emoji-content"
+                :preview-src-list="[message.emojiUrl || message.emojiThumbUrl]"
+                :hide-on-click-modal="true"
+              >
+                <template #error>
+                  <div class="emoji-error">
+                    <el-icon class="emoji-error-icon">
+                      <Picture />
+                    </el-icon>
+                    <span class="emoji-error-text">{{ message.content }}</span>
+                  </div>
+                </template>
+              </el-image>
+            </div>
+            <!-- 如果没有URL，显示占位符 -->
+            <div v-else class="emoji-placeholder">
+              <el-icon class="emoji-icon">
+                <Picture />
+              </el-icon>
+              <span class="emoji-text">{{ message.content }}</span>
+            </div>
+          </div>
+
+          <!-- 系统消息 -->
+          <div v-else-if="message.type === 'system'" class="message-system">
+            {{ message.content }}
+          </div>
+        </div>
+
+        <!-- 重试按钮 -->
+        <div v-if="message.status === 'failed' && message.canRetry" class="message-retry">
+          <el-button type="danger" size="small" :icon="RefreshRight" circle title="重新发送" @click="handleRetry" />
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
 
 <style lang="scss" scoped>
 .message-item {
@@ -172,8 +264,20 @@ const handleContextMenu = (event: MouseEvent) => {
 
 .message-wrapper {
   display: flex;
-  align-items: flex-end;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.sender-info {
+  margin-left: 8px;
+  margin-bottom: 2px;
+
+  .sender-name {
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+    font-weight: 500;
+  }
 }
 
 .message-from-me .message-wrapper {
@@ -224,6 +328,41 @@ const handleContextMenu = (event: MouseEvent) => {
     max-height: 200px;
     border-radius: 4px;
   }
+
+  .image-placeholder,
+  .image-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 200px;
+    height: 120px;
+    background: var(--el-color-info-light-9);
+    border: 1px dashed var(--el-color-info-light-5);
+    border-radius: 4px;
+    color: var(--el-text-color-secondary);
+
+    .image-placeholder-icon,
+    .image-error-icon {
+      font-size: 32px;
+      margin-bottom: 8px;
+      color: var(--el-color-info);
+    }
+
+    .image-placeholder-text,
+    .image-error-text {
+      font-size: 12px;
+    }
+  }
+
+  .image-error {
+    background: var(--el-color-danger-light-9);
+    border-color: var(--el-color-danger-light-5);
+
+    .image-error-icon {
+      color: var(--el-color-danger);
+    }
+  }
 }
 
 .message-file {
@@ -252,6 +391,62 @@ const handleContextMenu = (event: MouseEvent) => {
   }
 }
 
+.message-emoji {
+  .emoji-image {
+    .emoji-content {
+      max-width: 120px;
+      max-height: 120px;
+      border-radius: 4px;
+    }
+
+    .emoji-error {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 120px;
+      height: 80px;
+      background: var(--el-color-warning-light-9);
+      border: 1px dashed var(--el-color-warning-light-5);
+      border-radius: 4px;
+      color: var(--el-text-color-secondary);
+
+      .emoji-error-icon {
+        font-size: 24px;
+        margin-bottom: 4px;
+        color: var(--el-color-warning);
+      }
+
+      .emoji-error-text {
+        font-size: 12px;
+      }
+    }
+  }
+
+  .emoji-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 120px;
+    height: 80px;
+    background: var(--el-color-warning-light-9);
+    border: 1px dashed var(--el-color-warning-light-5);
+    border-radius: 4px;
+    color: var(--el-text-color-secondary);
+
+    .emoji-icon {
+      font-size: 24px;
+      margin-bottom: 4px;
+      color: var(--el-color-warning);
+    }
+
+    .emoji-text {
+      font-size: 12px;
+    }
+  }
+}
+
 .message-system {
   background: var(--el-color-info-light-8);
   color: var(--el-text-color-secondary);
@@ -259,8 +454,6 @@ const handleContextMenu = (event: MouseEvent) => {
   padding: 4px 8px;
   border-radius: 4px;
 }
-
-
 
 .message-retry {
   .el-button {

@@ -34,24 +34,24 @@
             </el-empty>
           </div>
 
-          <div v-for="account in authStore.accounts" :key="account.wxid"
+          <div v-for="account in authStore.accounts" :key="account?.wxid || 'unknown'"
                class="account-item"
-               :class="{ active: authStore.currentAccount?.wxid === account.wxid }"
+               :class="{ active: authStore.currentAccount?.wxid === account?.wxid }"
                @click="selectAccount(account)">
-            <el-avatar :src="account.headUrl || account.avatar" :size="40">
-              {{ account.nickname.charAt(0) }}
+            <el-avatar :src="account?.headUrl || account?.avatar" :size="40">
+              {{ account?.nickname?.charAt(0) || '?' }}
             </el-avatar>
             <div class="account-info">
               <div class="nickname">
-                {{ account.nickname }}
-                <span v-if="account.alias" class="alias-inline">[{{ account.alias }}]</span>
+                {{ account?.nickname || '未知账号' }}
+                <span v-if="account?.alias" class="alias-inline">[{{ account.alias }}]</span>
               </div>
               <div class="account-details">
-                <div class="account-wxid">{{ account.wxid }}</div>
+                <div class="account-wxid">{{ account?.wxid || '' }}</div>
               </div>
               <div class="status">
-                <el-tag :type="account.status === 'online' ? 'primary' : 'danger'" size="small" effect="light">
-                  {{ account.status === 'online' ? '在线' : '离线' }}
+                <el-tag :type="account?.status === 'online' ? 'primary' : 'danger'" size="small" effect="light">
+                  {{ account?.status === 'online' ? '在线' : '离线' }}
                 </el-tag>
               </div>
             </div>
@@ -90,12 +90,6 @@
             <el-tab-pane label="聊天功能" name="chat">
               <ChatInterface :account="authStore.currentAccount" />
             </el-tab-pane>
-            <el-tab-pane label="群组管理" name="groups">
-              <GroupManagement :account="authStore.currentAccount" />
-            </el-tab-pane>
-            <el-tab-pane label="自动回复" name="auto-reply">
-              <AutoReply :account="authStore.currentAccount" />
-            </el-tab-pane>
           </el-tabs>
         </div>
       </el-main>
@@ -131,8 +125,6 @@ import { useRoute, useRouter } from 'vue-router'
 import LoginForm from '@/components/LoginForm.vue'
 import FriendManagement from '@/components/FriendManagement.vue'
 import ChatInterface from '@/components/ChatInterface.vue'
-import GroupManagement from '@/components/GroupManagement.vue'
-import AutoReply from '@/components/AutoReply.vue'
 import AccountManager from '@/components/AccountManager.vue'
 import AccountManagementModal from '@/components/AccountManagementModal.vue'
 
@@ -155,13 +147,23 @@ const onlineAccountsCount = computed(() => {
 
 // 方法
 const selectAccount = (account) => {
-  const previousAccount = authStore.currentAccount
-  authStore.setCurrentAccount(account.wxid)
+  if (!account || !account.wxid) {
+    console.error('无效的账号数据:', account)
+    return
+  }
 
-  if (previousAccount && previousAccount.wxid !== account.wxid) {
-    ElMessage.success(`已切换到账号：${account.nickname}，相关数据已重置`)
-  } else {
-    ElMessage.success(`已切换到账号：${account.nickname}`)
+  try {
+    const previousAccount = authStore.currentAccount
+    authStore.setCurrentAccount(account.wxid)
+
+    if (previousAccount && previousAccount.wxid !== account.wxid) {
+      ElMessage.success(`已切换到账号：${account.nickname}，相关数据已重置`)
+    } else {
+      ElMessage.success(`已切换到账号：${account.nickname}`)
+    }
+  } catch (error) {
+    console.error('切换账号时发生错误:', error)
+    ElMessage.error('切换账号失败')
   }
 }
 

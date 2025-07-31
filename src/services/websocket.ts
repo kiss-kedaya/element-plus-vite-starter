@@ -175,24 +175,117 @@ export class WebSocketService {
       return
     }
 
-    console.log(`收到 ${data.count || data.messages.length} 条微信消息`, data)
-
     data.messages.forEach((msg: any) => {
-      // 转换为标准聊天消息格式
-      const chatMessage = {
-        id: msg.id || `msg_${Date.now()}_${Math.random()}`,
-        content: msg.content || '',
-        timestamp: msg.timestamp ? new Date(msg.timestamp * 1000) : new Date(),
-        fromMe: msg.isSelf || false,
-        type: this.getMsgType(msg.msgType),
-        status: 'received',
-        sessionId: msg.isSelf ? msg.toUser : msg.fromUser,
+      // 判断是否为群聊消息
+      const isGroupMessage = msg.isGroupMessage || msg.fromUser?.includes('@chatroom') || msg.toUser?.includes('@chatroom')
+
+      // 判断是否为自己发送的消息
+      let fromMe = false
+      if (isGroupMessage) {
+        // 群聊消息：比较actualSender和当前wxid
+        fromMe = msg.actualSender === data.wxid
+      }
+      else {
+        // 个人消息：使用原有逻辑
+        fromMe = msg.isSelf || false
       }
 
-      console.log('准备发送聊天消息事件:', chatMessage)
+      // 确定会话ID
+      let sessionId
+      if (isGroupMessage) {
+        // 群聊消息：会话ID是群聊ID（可能在fromUser或toUser中）
+        sessionId = msg.fromUser?.includes('@chatroom') ? msg.fromUser : msg.toUser
+      }
+      else {
+        // 个人消息：会话ID是对方的wxid
+        sessionId = fromMe ? msg.toUser : msg.fromUser
+      }
+
+      // 转换为标准聊天消息格式
+      const chatMessage: any = {
+        id: msg.msgId?.toString() || `msg_${Date.now()}_${Math.random()}`,
+        content: msg.content || '',
+        timestamp: msg.createTime ? new Date(msg.createTime * 1000) : new Date(),
+        fromMe,
+        type: this.getMsgType(msg.msgType),
+        status: 'received',
+        sessionId,
+        isGroupMessage,
+      }
+
+      // 处理群聊消息的特殊字段
+      if (isGroupMessage) {
+        chatMessage.actualSender = msg.actualSender // 实际发送者wxid
+        chatMessage.actualSenderName = msg.actualSenderName // 实际发送者名称
+        chatMessage.groupId = msg.toUser // 群聊ID
+      }
+
+      // 处理图片消息
+      if (msg.msgType === 3) {
+        chatMessage.content = '[图片]'
+        // 检查是否有图片数据
+        if (msg.content) {
+          // 如果content是文件路径，需要转换为可访问的URL
+          if (msg.content.startsWith('/') || msg.content.includes('\\')) {
+            // 这是一个文件路径，需要通过API获取图片
+            chatMessage.imageData = null // 暂时设为null，后续可以通过API获取
+            chatMessage.imagePath = msg.content
+          }
+          else if (msg.content.startsWith('data:image/') || msg.content.startsWith('http')) {
+            // 这是base64数据或HTTP URL，可以直接使用
+            chatMessage.imageData = msg.content
+          }
+          else {
+            // 其他情况，尝试作为图片数据使用
+            chatMessage.imageData = msg.content
+          }
+        }
+
+        // 检查其他可能的图片字段
+        if (msg.imageUrl) {
+          chatMessage.imageData = msg.imageUrl
+        }
+        if (msg.imageBase64) {
+          chatMessage.imageData = msg.imageBase64
+        }
+      }
+
+      // 处理文件消息
+      if (msg.msgType === 6 && msg.content) {
+        chatMessage.fileData = {
+          name: msg.fileName || '未知文件',
+          size: msg.fileSize || 0,
+          path: msg.content,
+        }
+        chatMessage.content = '[文件]'
+      }
+
+      // 处理表情消息
+      if (msg.msgType === 47) {
+        chatMessage.content = '[表情]'
+        // 解析表情信息
+        if (msg.originalContent) {
+          chatMessage.emojiData = msg.originalContent
+
+          // 尝试从originalContent中提取CDN URL
+          const cdnUrlMatch = msg.originalContent.match(/cdnurl\s*=\s*"([^"]+)"/)
+          if (cdnUrlMatch) {
+            // 解码HTML实体
+            const cdnUrl = cdnUrlMatch[1].replace(/&amp;/g, '&')
+            chatMessage.emojiUrl = cdnUrl
+          }
+
+          // 尝试提取缩略图URL
+          const thumbUrlMatch = msg.originalContent.match(/thumburl\s*=\s*"([^"]+)"/)
+          if (thumbUrlMatch) {
+            const thumbUrl = thumbUrlMatch[1].replace(/&amp;/g, '&')
+            chatMessage.emojiThumbUrl = thumbUrl
+          }
+        }
+      }
+
       // 发送聊天消息事件
       this.emit('chat_message', chatMessage)
-      console.log('聊天消息事件已发送')
     })
   }
 
@@ -205,6 +298,8 @@ export class WebSocketService {
         return 'image'
       case 6: // 文件消息
         return 'file'
+      case 47: // 表情消息
+        return 'emoji'
       default:
         return 'text'
     }
