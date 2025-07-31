@@ -16,10 +16,11 @@
     <div v-else-if="imageUrl" class="image-success">
       <el-image
         :src="imageUrl"
-        fit="cover"
+        fit="contain"
         :preview-src-list="[imageUrl]"
         class="image-content"
         :hide-on-click-modal="true"
+        :lazy="false"
         @load="handleImageLoad"
         @error="handleImageError"
       >
@@ -47,6 +48,9 @@ import { ref, onMounted, computed } from 'vue'
 import { Loading, Picture } from '@element-plus/icons-vue'
 import { downloadImage } from '@/api/chat'
 import { useChatStore } from '@/stores/chat'
+
+// 图片缓存
+const imageCache = new Map<string, string>()
 
 interface Props {
   msgId?: number
@@ -84,6 +88,11 @@ onMounted(() => {
   }
 })
 
+// 生成缓存键
+const getCacheKey = computed(() => {
+  return `${props.wxid}_${props.toWxid}_${props.msgId}`
+})
+
 // 加载图片
 const loadImage = async () => {
   console.log('loadImage 调用，参数检查:', {
@@ -101,6 +110,14 @@ const loadImage = async () => {
       toWxid: props.toWxid
     })
     error.value = true
+    return
+  }
+
+  // 检查缓存
+  const cacheKey = getCacheKey.value
+  if (imageCache.has(cacheKey)) {
+    console.log('从缓存加载图片:', cacheKey)
+    imageUrl.value = imageCache.get(cacheKey)!
     return
   }
 
@@ -159,15 +176,21 @@ const loadImage = async () => {
     }
 
     if (base64Data && base64Data.length > 0) {
+      let finalImageUrl = ''
       // 检查是否已经是完整的data URL
       if (base64Data.startsWith('data:image/')) {
-        imageUrl.value = base64Data
+        finalImageUrl = base64Data
       } else {
         // 假设API返回base64编码的图片数据
         const mimeType = detectImageMimeType(base64Data)
-        imageUrl.value = `data:${mimeType};base64,${base64Data}`
+        finalImageUrl = `data:${mimeType};base64,${base64Data}`
       }
-      console.log('图片URL设置成功:', imageUrl.value.substring(0, 50) + '...')
+
+      // 设置图片URL并添加到缓存
+      imageUrl.value = finalImageUrl
+      imageCache.set(getCacheKey.value, finalImageUrl)
+
+      console.log('图片URL设置成功并已缓存:', finalImageUrl.substring(0, 50) + '...')
     } else {
       throw new Error('API返回空数据')
     }
@@ -205,6 +228,7 @@ const handleImageError = () => {
   display: inline-block;
   max-width: 300px;
   min-width: 100px;
+  width: auto;
 }
 
 .image-loading {
@@ -261,15 +285,25 @@ const handleImageError = () => {
 .image-success {
   border-radius: 8px;
   overflow: hidden;
+  width: auto;
+  height: auto;
 }
 
 .image-content {
   max-width: 300px;
   max-height: 300px;
+  width: auto;
+  height: auto;
   border-radius: 8px;
+  display: block;
 }
 
 .image-content :deep(.el-image__inner) {
   border-radius: 8px;
+  width: auto !important;
+  height: auto !important;
+  max-width: 300px;
+  max-height: 300px;
+  object-fit: contain;
 }
 </style>
