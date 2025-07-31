@@ -250,6 +250,9 @@ export const useChatStore = defineStore('chat', () => {
       canRetry: false,
       canRecall: false,
       retryCount: 0,
+      sessionId: toUserName,
+      isGroupMessage: toUserName.includes('@chatroom'),
+      actualSender: wxid,
     }
     addMessage(toUserName, message)
 
@@ -301,6 +304,9 @@ export const useChatStore = defineStore('chat', () => {
           type: 'image',
           imageData,
           status: 'sent',
+          sessionId: toUserName,
+          isGroupMessage: toUserName.includes('@chatroom'),
+          actualSender: wxid,
         }
         addMessage(toUserName, message)
       }
@@ -500,6 +506,8 @@ export const useChatStore = defineStore('chat', () => {
   const handleChatMessage = async (data: any) => {
     console.log('处理聊天消息:', data)
 
+    const sessionId = data.sessionId || (data.fromMe ? data.toUser : data.fromUser)
+    
     const chatMessage: ChatMessage = {
       id: data.id || Date.now().toString(),
       content: data.content || '',
@@ -507,9 +515,11 @@ export const useChatStore = defineStore('chat', () => {
       fromMe: data.fromMe || false,
       type: data.type || 'text',
       status: 'received',
+      sessionId: sessionId,
+      isGroupMessage: sessionId?.includes('@chatroom') || false,
+      actualSender: data.actualSender || data.fromUser,
+      actualSenderName: data.actualSenderName || data.senderName,
     }
-
-    const sessionId = data.sessionId || (data.fromMe ? data.toUser : data.fromUser)
     console.log('消息会话ID:', sessionId, '消息内容:', chatMessage.content)
 
     if (sessionId) {

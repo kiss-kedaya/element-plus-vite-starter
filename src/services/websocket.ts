@@ -284,6 +284,20 @@ export class WebSocketService {
         }
       }
 
+      // 处理系统消息
+      if (msg.msgType === 10000) {
+        // 使用originalContent作为系统消息内容，如果没有则使用content
+        chatMessage.content = msg.originalContent || msg.content || '[系统消息]'
+        
+        // 系统消息不属于任何人发送
+        chatMessage.fromMe = false
+        
+        // 保存额外数据
+        if (msg.extraData) {
+          chatMessage.extraData = msg.extraData
+        }
+      }
+
       // 发送聊天消息事件
       this.emit('chat_message', chatMessage)
     })
@@ -300,6 +314,8 @@ export class WebSocketService {
         return 'file'
       case 47: // 表情消息
         return 'emoji'
+      case 10000: // 系统消息
+        return 'system'
       default:
         return 'text'
     }

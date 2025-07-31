@@ -69,7 +69,7 @@ function formatTime(timestamp: Date) {
     const date = timestamp instanceof Date ? timestamp : new Date(timestamp)
 
     // 检查日期是否有效
-    if (isNaN(date.getTime())) {
+    if (Number.isNaN(date.getTime())) {
       return '时间无效'
     }
 
@@ -121,13 +121,6 @@ function getSenderDisplayName() {
   }
   return '未知用户'
 }
-
-// 暂时注释掉图片预览方法
-// const handleImagePreview = (src: string) => {
-//   // 图片预览逻辑，可以使用 Element Plus 的图片预览
-//   // 或者自定义预览组件
-//   console.log('预览图片:', src)
-// }
 </script>
 
 <template>
@@ -137,16 +130,34 @@ function getSenderDisplayName() {
       {{ formatTime(message.timestamp) }}
     </div>
 
-    <div class="message-wrapper">
-      <!-- 群聊消息发送者信息 -->
-      <div v-if="message.isGroupMessage && !message.fromMe" class="sender-info">
-        <div class="sender-name">
-          {{ getSenderDisplayName() }}
+    <!-- 系统消息布局 -->
+    <div v-if="message.type === 'system'" class="message-wrapper message-system-wrapper">
+      <div class="message-content message-system-content">
+        <div class="message-system">
+          {{ message.content }}
         </div>
       </div>
+    </div>
 
-      <!-- 消息内容 -->
-      <div class="message-content-wrapper">
+    <!-- 对方消息布局 -->
+    <div v-else-if="!message.fromMe" class="message-wrapper message-from-other">
+      <!-- 左侧头像 -->
+      <div class="message-avatar">
+        <el-avatar :src="avatar" :size="32">
+          {{ avatarText || getSenderDisplayName().charAt(0) }}
+        </el-avatar>
+      </div>
+
+      <!-- 消息内容区域 -->
+      <div class="message-content-area">
+        <!-- 群聊消息发送者信息 -->
+        <div v-if="message.isGroupMessage" class="sender-info">
+          <div class="sender-name">
+            {{ getSenderDisplayName() }}
+          </div>
+        </div>
+
+        <!-- 消息内容 -->
         <div class="message-content" :class="contentClass">
           <!-- 文本消息 -->
           <div v-if="message.type === 'text'" class="message-text">
@@ -162,12 +173,8 @@ function getSenderDisplayName() {
               <span class="image-placeholder-text">图片加载中...</span>
             </div>
             <el-image
-              v-else
-              :src="message.imageData"
-              fit="cover"
-              :preview-src-list="[message.imageData]"
-              class="image-content"
-              :hide-on-click-modal="true"
+              v-else :src="message.imageData" fit="cover" :preview-src-list="message.imageData ? [message.imageData] : []"
+              class="image-content" :hide-on-click-modal="true"
             >
               <template #error>
                 <div class="image-error">
@@ -202,10 +209,8 @@ function getSenderDisplayName() {
             <!-- 如果有表情URL，显示表情图片 -->
             <div v-if="message.emojiUrl || message.emojiThumbUrl" class="emoji-image">
               <el-image
-                :src="message.emojiThumbUrl || message.emojiUrl"
-                fit="contain"
-                class="emoji-content"
-                :preview-src-list="[message.emojiUrl || message.emojiThumbUrl]"
+                :src="message.emojiThumbUrl || message.emojiUrl || ''" fit="contain" class="emoji-content"
+                :preview-src-list="(message.emojiUrl || message.emojiThumbUrl) ? [message.emojiUrl || message.emojiThumbUrl].filter(Boolean) : []"
                 :hide-on-click-modal="true"
               >
                 <template #error>
@@ -226,10 +231,92 @@ function getSenderDisplayName() {
               <span class="emoji-text">{{ message.content }}</span>
             </div>
           </div>
+        </div>
 
-          <!-- 系统消息 -->
-          <div v-else-if="message.type === 'system'" class="message-system">
+        <!-- 重试按钮 -->
+        <div v-if="message.status === 'failed' && message.canRetry" class="message-retry">
+          <el-button type="danger" size="small" :icon="RefreshRight" circle title="重新发送" @click="handleRetry" />
+        </div>
+      </div>
+    </div>
+
+    <!-- 自己消息布局 -->
+    <div v-else class="message-wrapper message-from-me">
+      <!-- 消息内容区域 -->
+      <div class="message-content-area">
+        <!-- 消息内容 -->
+        <div class="message-content" :class="contentClass">
+          <!-- 文本消息 -->
+          <div v-if="message.type === 'text'" class="message-text">
             {{ message.content }}
+          </div>
+
+          <!-- 图片消息 -->
+          <div v-else-if="message.type === 'image'" class="message-image">
+            <div v-if="!message.imageData" class="image-placeholder">
+              <el-icon class="image-placeholder-icon">
+                <Picture />
+              </el-icon>
+              <span class="image-placeholder-text">图片加载中...</span>
+            </div>
+            <el-image
+              v-else :src="message.imageData" fit="cover" :preview-src-list="message.imageData ? [message.imageData] : []"
+              class="image-content" :hide-on-click-modal="true"
+            >
+              <template #error>
+                <div class="image-error">
+                  <el-icon class="image-error-icon">
+                    <Picture />
+                  </el-icon>
+                  <span class="image-error-text">图片加载失败</span>
+                </div>
+              </template>
+            </el-image>
+          </div>
+
+          <!-- 文件消息 -->
+          <div v-else-if="message.type === 'file'" class="message-file">
+            <div class="file-icon">
+              <el-icon>
+                <Document />
+              </el-icon>
+            </div>
+            <div class="file-info">
+              <div class="file-name">
+                {{ message.fileData?.name }}
+              </div>
+              <div class="file-size">
+                {{ formatFileSize(message.fileData?.size) }}
+              </div>
+            </div>
+          </div>
+
+          <!-- 表情消息 -->
+          <div v-else-if="message.type === 'emoji'" class="message-emoji">
+            <!-- 如果有表情URL，显示表情图片 -->
+            <div v-if="message.emojiUrl || message.emojiThumbUrl" class="emoji-image">
+              <el-image
+                :src="message.emojiThumbUrl || message.emojiUrl || ''" fit="contain" class="emoji-content"
+                :preview-src-list="(message.emojiUrl || message.emojiThumbUrl) ? [message.emojiUrl || message.emojiThumbUrl].filter(Boolean) : []"
+                :hide-on-click-modal="true"
+              >
+                <template #error>
+                  <div class="emoji-error">
+                    <el-icon class="emoji-error-icon">
+                      <Picture />
+                    </el-icon>
+                    <span class="emoji-error-text">{{ message.content }}</span>
+                  </div>
+                </template>
+              </el-image>
+            </div>
+            <!-- 如果没有URL，显示占位符 -->
+            <div v-else class="emoji-placeholder">
+              <el-icon class="emoji-icon">
+                <Picture />
+              </el-icon>
+              <span class="emoji-text">{{ message.content }}</span>
+            </div>
           </div>
         </div>
 
@@ -237,6 +324,13 @@ function getSenderDisplayName() {
         <div v-if="message.status === 'failed' && message.canRetry" class="message-retry">
           <el-button type="danger" size="small" :icon="RefreshRight" circle title="重新发送" @click="handleRetry" />
         </div>
+      </div>
+
+      <!-- 右侧头像 -->
+      <div class="message-avatar">
+        <el-avatar :size="32" :src="myAvatar">
+          {{ myAvatarText }}
+        </el-avatar>
       </div>
     </div>
   </div>
@@ -248,9 +342,28 @@ function getSenderDisplayName() {
 
   &.message-system-type {
     text-align: center;
+    margin: 8px 0;
 
     .message-wrapper {
       justify-content: center;
+    }
+
+    .message-system-content {
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      padding: 4px 8px;
+      max-width: 80%;
+      backdrop-filter: none;
+    }
+
+    .message-system {
+      background: transparent;
+      color: #999999;
+      font-size: 12px;
+      padding: 0;
+      text-align: center;
+      line-height: 1.4;
     }
   }
 }
@@ -264,14 +377,26 @@ function getSenderDisplayName() {
 
 .message-wrapper {
   display: flex;
-  flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: 8px;
+  width: 100%;
+}
+
+.message-from-me {
+  justify-content: flex-end;
+}
+
+.message-from-other {
+  justify-content: flex-start;
+}
+
+.message-system-wrapper {
+  justify-content: center;
 }
 
 .sender-info {
-  margin-left: 8px;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
+  padding-left: 8px;
 
   .sender-name {
     font-size: 12px;
@@ -280,23 +405,46 @@ function getSenderDisplayName() {
   }
 }
 
-.message-from-me .message-wrapper {
-  justify-content: flex-end;
-}
-
-.message-from-other .message-wrapper {
-  justify-content: flex-start;
+.message-from-me .sender-info {
+  padding-left: 0;
+  padding-right: 8px;
+  text-align: right;
 }
 
 .message-avatar {
   flex-shrink: 0;
 }
 
-.message-content-wrapper {
+.message-content-area {
   display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.message-from-me .message-content-area {
   align-items: flex-end;
-  gap: 4px;
-  max-width: 70%;
+}
+
+.message-from-other .message-content-area {
+  align-items: flex-start;
+}
+
+/* 修复row-reverse导致的间距和对齐问题 */
+.message-from-me .message-wrapper {
+  gap: 8px;
+}
+
+.message-from-me .message-wrapper .message-content-area {
+  margin-left: 8px;
+  margin-right: 0;
+}
+
+/* 修复row-reverse导致的发送者信息对齐问题 */
+.message-from-me .sender-info {
+  text-align: right;
+  padding-left: 0;
+  padding-right: 8px;
 }
 
 .message-content {
@@ -304,11 +452,16 @@ function getSenderDisplayName() {
   padding: 12px 16px;
   border-radius: 12px;
   word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
   background: rgba(255, 255, 255, 0.9);
   color: var(--el-text-color-primary);
   border: 1px solid rgba(0, 0, 0, 0.06);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   backdrop-filter: blur(10px);
+  max-width: 70%;
+  min-width: 0; /* 确保可以收缩 */
+  box-sizing: border-box; /* 确保padding不会导致溢出 */
 
   &.content-failed {
     opacity: 0.8;
@@ -320,6 +473,12 @@ function getSenderDisplayName() {
 .message-text {
   line-height: 1.4;
   font-size: 14px;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap; /* 保持换行符 */
+  max-width: 100%;
+  overflow: hidden; /* 防止内容溢出 */
 }
 
 .message-image {
@@ -448,11 +607,12 @@ function getSenderDisplayName() {
 }
 
 .message-system {
-  background: var(--el-color-info-light-8);
-  color: var(--el-text-color-secondary);
+  background: transparent;
+  color: #999999;
   font-size: 12px;
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 0;
+  text-align: center;
+  line-height: 1.4;
 }
 
 .message-retry {
