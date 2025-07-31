@@ -109,9 +109,7 @@ export const useAuthStore = defineStore('auth', () => {
     isLoading.value = true
     try {
       const response = await loginApi.getLoggedAccounts()
-      console.log('获取已登录账号响应:', response)
-      console.log('响应数据类型:', typeof response)
-      console.log('响应数据结构:', JSON.stringify(response, null, 2))
+      // 成功获取账号数据
 
       // 处理响应数据 - 由于axios拦截器已经提取了response.data，所以response就是实际的数据
       let accountsData = []
@@ -119,20 +117,16 @@ export const useAuthStore = defineStore('auth', () => {
       // 检查响应结构 - response已经是后端返回的JSON数据
       if (response && Array.isArray(response.Data)) {
         accountsData = response.Data
-        console.log('使用 response.Data，数据长度:', response.Data.length)
+        // 使用 response.Data 数据
       } else if (Array.isArray(response)) {
         accountsData = response
-        console.log('使用 response，数据长度:', response.length)
+        // 使用 response 数据
       } else {
-        console.log('未识别的响应格式，response:', response)
+        console.error('未识别的响应格式，response:', response)
       }
-
-      console.log('提取的账号原始数据:', accountsData)
-      console.log('账号数据长度:', accountsData.length)
 
       // 转换为前端需要的格式
       accounts.value = accountsData.map((account: any) => {
-        console.log('处理单个账号:', account)
         const processedAccount = {
           wxid: account.wxid || '',
           nickname: account.nickname || '',
@@ -154,7 +148,6 @@ export const useAuthStore = defineStore('auth', () => {
           romModel: account.romModel || '',
           softType: account.softType || ''
         }
-        console.log('处理后的单个账号:', processedAccount)
         return processedAccount
       })
 
@@ -163,9 +156,6 @@ export const useAuthStore = defineStore('auth', () => {
         const onlineAccount = accounts.value.find(acc => acc.status === 'online')
         currentAccount.value = onlineAccount || accounts.value[0]
       }
-
-      console.log('处理后的账号数据:', accounts.value)
-      console.log('处理后的账号数据长度:', accounts.value.length)
       return accounts.value
     } catch (error) {
       console.error('获取已登录账号失败:', error)

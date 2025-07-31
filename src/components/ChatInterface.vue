@@ -1,407 +1,271 @@
-<template>
-  <div class="chat-interface">
-    <!-- 聊天会话列表 -->
-    <div class="chat-sessions">
-      <div class="sessions-header">
-        <h3>聊天会话</h3>
-        <el-button type="primary" size="small" @click="refreshSessions">
-          <el-icon>
-            <Refresh />
-          </el-icon>
-        </el-button>
-      </div>
-
-      <div class="sessions-list">
-        <div v-if="sessions.length === 0" class="empty-sessions">
-          <el-empty description="暂无聊天会话" :image-size="80" />
-        </div>
-
-        <div v-for="session in sessions" :key="session.id" class="session-item"
-          :class="{ active: currentSession?.id === session.id }" @click="selectSession(session)">
-          <el-avatar :src="session.avatar" :size="40">
-            {{ session.name.charAt(0) }}
-          </el-avatar>
-          <div class="session-info">
-            <div class="session-name">{{ session.name }}</div>
-            <div class="last-message">{{ session.lastMessage || '暂无消息' }}</div>
-          </div>
-          <div class="session-meta">
-            <div class="time">{{ formatTime(session.lastTime) }}</div>
-            <el-badge v-if="session.unreadCount > 0" :value="session.unreadCount" class="unread-badge" />
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 聊天区域 -->
-    <div class="chat-area">
-      <div v-if="!currentSession" class="no-session">
-        <el-result icon="info" title="请选择一个聊天会话">
-          <template #sub-title>
-            <p>从左侧选择一个会话开始聊天，或者从好友列表发起新的聊天</p>
-          </template>
-        </el-result>
-      </div>
-
-      <div v-else class="chat-content">
-        <!-- 聊天头部 -->
-        <div class="chat-header">
-          <div class="chat-info">
-            <el-avatar :src="currentSession.avatar" :size="32">
-              {{ currentSession.name.charAt(0) }}
-            </el-avatar>
-            <div class="chat-title">
-              <div class="name">{{ currentSession.name }}</div>
-              <div class="status">{{ currentSession.type === 'group' ? '群聊' : '私聊' }}</div>
-            </div>
-          </div>
-          <div class="chat-actions">
-            <el-button type="text" @click="clearMessages">
-              <el-icon>
-                <Delete />
-              </el-icon>
-              清空消息
-            </el-button>
-          </div>
-        </div>
-
-        <!-- 消息列表 -->
-        <div class="messages-container" ref="messagesContainer">
-          <div class="messages-list">
-            <div v-for="message in currentMessages" :key="message.id" class="message-item">
-              <div class="message-time" v-if="showMessageTime(message)">
-                {{ formatMessageTime(message.timestamp) }}
-              </div>
-
-              <div class="message-content" :class="{ 'is-self': message.isSelf }">
-                <el-avatar v-if="!message.isSelf" :src="message.avatar" :size="32">
-                  {{ message.sender.charAt(0) }}
-                </el-avatar>
-
-                <div class="message-bubble">
-                  <div class="sender-name" v-if="!message.isSelf && currentSession.type === 'group'">
-                    {{ message.sender }}
-                  </div>
-
-                  <div class="message-text" v-if="message.type === 'text'">
-                    {{ message.content }}
-                  </div>
-
-                  <div class="message-image" v-else-if="message.type === 'image'">
-                    <el-image :src="message.content" fit="cover" style="max-width: 200px; max-height: 200px;" />
-                  </div>
-
-                  <div class="message-status" v-if="message.isSelf">
-                    <el-icon v-if="message.status === 'sending'" class="is-loading">
-                      <Loading />
-                    </el-icon>
-                    <el-icon v-else-if="message.status === 'sent'" color="#67c23a"><Select /></el-icon>
-                    <el-icon v-else-if="message.status === 'failed'" color="#f56c6c">
-                      <Close />
-                    </el-icon>
-                  </div>
-                </div>
-
-                <el-avatar v-if="message.isSelf" :src="account.avatar" :size="32">
-                  {{ account.nickname.charAt(0) }}
-                </el-avatar>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 输入区域 -->
-        <div class="input-area">
-          <div class="input-toolbar">
-            <el-button link @click="$refs.imageInput.click()">
-              <el-icon>
-                <Picture />
-              </el-icon>
-              图片
-            </el-button>
-            <el-button link @click="pasteImage">
-              <el-icon>
-                <DocumentCopy />
-              </el-icon>
-              粘贴
-            </el-button>
-          </div>
-
-          <div class="input-container">
-            <el-input v-model="messageInput" type="textarea" :rows="3" placeholder="输入消息内容..."
-              @keydown.ctrl.enter="sendMessage" @paste="handlePaste" />
-            <div class="input-actions">
-              <span class="input-tip">Ctrl+Enter 发送</span>
-              <el-button type="primary" :loading="sendLoading" @click="sendMessage">
-                发送
-              </el-button>
-            </div>
-          </div>
-
-          <input ref="imageInput" type="file" accept="image/*" style="display: none" @change="handleImageSelect" />
-        </div>
-      </div>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import type { ChatSession } from '@/types/chat'
+import {
+  ChatDotRound,
+  Close,
+  Delete,
+  Document,
+  Loading,
+  Picture,
+  Position,
+  Refresh,
+  Search,
+  Select,
+  User,
+} from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, Delete, Loading, Select, Close, Picture, DocumentCopy } from '@element-plus/icons-vue'
-import { chatApi } from '@/api/chat'
-import { createWebSocketConnection, closeWebSocketConnection, getWebSocketStatus } from '@/utils/websocket'
-import type { SendTextMessageRequest, SendImageMessageRequest } from '@/types/chat'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useChatStore } from '@/stores/chat'
+import { useFriendStore } from '@/stores/friend'
+import { closeWebSocketConnection, createWebSocketConnection } from '@/utils/websocket'
 
 // Props
 const props = defineProps<{
   account: any
 }>()
 
+// Stores
+const chatStore = useChatStore()
+const friendStore = useFriendStore()
+
 // 响应式数据
-const currentSession = ref(null)
 const messageInput = ref('')
-const sendLoading = ref(false)
-const messagesContainer = ref(null)
-
-// 会话数据
-const sessions = ref([])
-
-// 消息数据
-const messages = ref({})
+const messagesContainer = ref<HTMLElement>()
+const fileInputRef = ref<HTMLInputElement>()
+const searchKeyword = ref('')
 
 // 计算属性
-const currentMessages = computed(() => {
-  if (!currentSession.value) return []
-  return messages.value[currentSession.value.id] || []
+const filteredSessions = computed(() => {
+  if (!searchKeyword.value)
+    return chatStore.sessions
+  return chatStore.sessions.filter(session =>
+    session.name.toLowerCase().includes(searchKeyword.value.toLowerCase()),
+  )
 })
 
 // 方法
-const selectSession = (session) => {
-  currentSession.value = session
-  session.unreadCount = 0
-  nextTick(() => {
-    scrollToBottom()
-  })
+function selectSession(session: ChatSession) {
+  chatStore.setCurrentSession(session.id)
+  scrollToBottom()
 }
 
-const refreshSessions = async () => {
+async function loadFriendsAsSessions() {
+  if (!props.account?.wxid)
+    return
+
   try {
-    // 模拟刷新会话列表
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    ElMessage.success('会话列表已刷新')
-  } catch (error) {
-    ElMessage.error('刷新失败')
+    await friendStore.loadFriends(props.account.wxid)
+    const friends = friendStore.currentFriends(props.account.wxid)
+
+    const sessions: ChatSession[] = friends.map(friend => ({
+      id: friend.wxid,
+      name: friend.remark || friend.nickname,
+      avatar: friend.avatar,
+      type: 'friend',
+      lastMessage: '',
+      lastMessageTime: new Date(),
+      unreadCount: 0,
+      isOnline: friend.isOnline,
+    }))
+
+    chatStore.setSessions(sessions)
+    ElMessage.success(`已加载 ${sessions.length} 个好友会话`)
+  }
+  catch (error) {
+    ElMessage.error('加载好友列表失败')
+    console.error('加载好友失败:', error)
   }
 }
 
-const sendMessage = async () => {
-  if (!messageInput.value.trim() || !currentSession.value) return
-
-  const message = {
-    id: `msg_${Date.now()}`,
-    sender: props.account?.nickname || '我',
-    content: messageInput.value.trim(),
-    type: 'text',
-    timestamp: new Date(),
-    isSelf: true,
-    status: 'sending'
+async function sendMessage() {
+  if (!messageInput.value.trim() || !props.account || !chatStore.currentSession) {
+    return
   }
 
-  // 添加到消息列表
-  if (!messages.value[currentSession.value.id]) {
-    messages.value[currentSession.value.id] = []
-  }
-  messages.value[currentSession.value.id].push(message)
-
-  // 更新会话最后消息
-  currentSession.value.lastMessage = message.content
-  currentSession.value.lastTime = message.timestamp
-
+  const content = messageInput.value.trim()
   messageInput.value = ''
-  sendLoading.value = true
-
-  nextTick(() => {
-    scrollToBottom()
-  })
 
   try {
-    const params: SendTextMessageRequest = {
-      Wxid: props.account.wxid,
-      ToWxid: currentSession.value.id,
-      Content: message.content,
-      Type: 1,
-      At: ''
-    }
-
-    const response = await chatApi.sendTextMessage(params)
-
-    if (response.Success) {
-      message.status = 'sent'
-      ElMessage.success('消息发送成功')
-    } else {
-      throw new Error(response.Message || '发送失败')
-    }
-  } catch (error: any) {
-    message.status = 'failed'
-    ElMessage.error(error.message || '消息发送失败')
+    await chatStore.sendTextMessage(
+      props.account.wxid,
+      chatStore.currentSession.id,
+      content,
+    )
+    scrollToBottom()
+  }
+  catch (error) {
+    ElMessage.error('发送消息失败')
     console.error('发送消息失败:', error)
-  } finally {
-    sendLoading.value = false
   }
 }
 
-const handleImageSelect = (event) => {
-  const file = event.target.files[0]
-  if (file) {
-    sendImageMessage(file)
-  }
-}
-
-const handlePaste = (event) => {
+async function handlePaste(event: ClipboardEvent) {
   const items = event.clipboardData?.items
-  if (items) {
-    for (let item of items) {
-      if (item.type.indexOf('image') !== -1) {
-        const file = item.getAsFile()
-        if (file) {
-          event.preventDefault()
-          sendImageMessage(file)
-        }
+  if (!items)
+    return
+
+  for (const item of items) {
+    if (item.type.includes('image')) {
+      const file = item.getAsFile()
+      if (file) {
+        await sendImage(file)
       }
     }
   }
 }
 
-const pasteImage = async () => {
+async function sendImage(file: File) {
+  if (!props.account || !chatStore.currentSession) {
+    return
+  }
+
   try {
-    const clipboardItems = await navigator.clipboard.read()
-    for (const clipboardItem of clipboardItems) {
-      for (const type of clipboardItem.types) {
-        if (type.startsWith('image/')) {
-          const blob = await clipboardItem.getType(type)
-          sendImageMessage(blob)
-          return
-        }
-      }
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      const imageData = e.target?.result as string
+      await chatStore.sendImageMessage(
+        props.account!.wxid,
+        chatStore.currentSession!.id,
+        imageData,
+      )
+      scrollToBottom()
     }
-    ElMessage.warning('剪贴板中没有图片')
-  } catch (error) {
-    ElMessage.error('读取剪贴板失败')
+    reader.readAsDataURL(file)
+  }
+  catch (error) {
+    ElMessage.error('发送图片失败')
+    console.error('发送图片失败:', error)
   }
 }
 
-const sendImageMessage = async (file) => {
-  if (!currentSession.value) return
+function selectFile() {
+  fileInputRef.value?.click()
+}
 
-  // 创建图片URL
-  const imageUrl = URL.createObjectURL(file)
-
-  const message = {
-    id: `img_${Date.now()}`,
-    sender: props.account?.nickname || '我',
-    content: imageUrl,
-    type: 'image',
-    timestamp: new Date(),
-    isSelf: true,
-    status: 'sending'
-  }
-
-  if (!messages.value[currentSession.value.id]) {
-    messages.value[currentSession.value.id] = []
-  }
-  messages.value[currentSession.value.id].push(message)
-
-  currentSession.value.lastMessage = '[图片]'
-  currentSession.value.lastTime = message.timestamp
-
-  nextTick(() => {
-    scrollToBottom()
-  })
-
-  try {
-    // 模拟上传图片
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    message.status = 'sent'
-    ElMessage.success('图片发送成功')
-  } catch (error) {
-    message.status = 'failed'
-    ElMessage.error('图片发送失败')
+function handleFileSelect(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (file) {
+    if (file.type.startsWith('image/')) {
+      sendImage(file)
+    }
+    else {
+      ElMessage.info('暂不支持该文件类型')
+    }
   }
 }
 
-const clearMessages = async () => {
-  if (!currentSession.value) return
+async function clearCurrentMessages() {
+  if (!chatStore.currentSession)
+    return
 
   try {
     await ElMessageBox.confirm('确定要清空当前会话的所有消息吗？', '确认清空', {
-      type: 'warning'
+      type: 'warning',
     })
 
-    messages.value[currentSession.value.id] = []
-    currentSession.value.lastMessage = ''
+    chatStore.clearMessages(chatStore.currentSession.id)
     ElMessage.success('消息已清空')
-  } catch {
+  }
+  catch {
     // 用户取消
   }
 }
 
-const scrollToBottom = () => {
-  if (messagesContainer.value) {
-    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+function scrollToBottom() {
+  nextTick(() => {
+    if (messagesContainer.value) {
+      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+    }
+  })
+}
+
+function formatTime(date: Date) {
+  const now = new Date()
+  const diff = now.getTime() - date.getTime()
+
+  if (diff < 1000 * 60)
+    return '刚刚'
+  if (diff < 1000 * 60 * 60)
+    return `${Math.floor(diff / (1000 * 60))}分钟前`
+  if (diff < 1000 * 60 * 60 * 24)
+    return `${Math.floor(diff / (1000 * 60 * 60))}小时前`
+
+  return date.toLocaleDateString()
+}
+
+function formatMessageTime(time: Date) {
+  return time.toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function formatSessionTime(timestamp: Date | string): string {
+  const date = timestamp instanceof Date ? timestamp : new Date(timestamp)
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterday = new Date(today.getTime() - 86400000)
+  const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+
+  if (messageDate.getTime() === today.getTime()) {
+    // 今天，显示时间
+    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  } else if (messageDate.getTime() === yesterday.getTime()) {
+    // 昨天
+    return '昨天'
+  } else if (now.getTime() - date.getTime() < 7 * 86400000) {
+    // 一周内，显示星期
+    const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+    return weekdays[date.getDay()]
+  } else {
+    // 更早，显示日期
+    return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
   }
 }
 
-const formatTime = (time) => {
-  const now = new Date()
-  const diff = now.getTime() - time.getTime()
-
-  if (diff < 1000 * 60) return '刚刚'
-  if (diff < 1000 * 60 * 60) return `${Math.floor(diff / (1000 * 60))}分钟前`
-  if (diff < 1000 * 60 * 60 * 24) return `${Math.floor(diff / (1000 * 60 * 60))}小时前`
-
-  return time.toLocaleDateString()
-}
-
-const formatMessageTime = (time) => {
-  return time.toLocaleString()
-}
-
-const showMessageTime = (message) => {
+function showMessageTime(message: any) {
   // 简化：每条消息都显示时间
   return true
 }
 
-onMounted(async () => {
-  if (sessions.value.length > 0) {
-    selectSession(sessions.value[0])
-  }
-
-  // 建立 WebSocket 连接
-  if (props.account?.wxid) {
-    try {
-      await createWebSocketConnection(props.account.wxid)
-      console.log('WebSocket连接成功')
-    } catch (error) {
-      console.error('WebSocket连接失败:', error)
-      ElMessage.warning('实时消息连接失败，将无法接收新消息')
-    }
-  }
-})
-
-// 监听账号变化，重新建立连接
+// 监听账号变化
 watch(() => props.account?.wxid, async (newWxid, oldWxid) => {
   if (oldWxid) {
     closeWebSocketConnection(oldWxid)
   }
 
   if (newWxid) {
+    // 清空之前的数据
+    chatStore.clearAllData()
+
+    // 加载新账号的好友作为会话
+    await loadFriendsAsSessions()
+
+    // 尝试建立 WebSocket 连接（静默失败）
     try {
       await createWebSocketConnection(newWxid)
       console.log('WebSocket连接成功')
-    } catch (error) {
-      console.error('WebSocket连接失败:', error)
-      ElMessage.warning('实时消息连接失败，将无法接收新消息')
+    }
+    catch (error) {
+      console.warn('WebSocket连接失败，将在模拟模式下运行')
+      // 不显示错误消息，因为这在开发环境中是正常的
+    }
+  }
+})
+
+onMounted(async () => {
+  if (props.account?.wxid) {
+    await loadFriendsAsSessions()
+
+    // 尝试建立 WebSocket 连接（静默失败）
+    try {
+      await createWebSocketConnection(props.account.wxid)
+      console.log('WebSocket连接成功')
+    }
+    catch (error) {
+      console.warn('WebSocket连接失败，将在模拟模式下运行')
+      // 不显示错误消息，因为这在开发环境中是正常的
     }
   }
 })
@@ -413,33 +277,232 @@ onUnmounted(() => {
 })
 </script>
 
+<template>
+  <div class="chat-interface">
+    <!-- 聊天会话列表 -->
+    <div class="chat-sessions">
+      <div class="sessions-header">
+        <div class="search-container">
+          <el-input v-model="searchKeyword" placeholder="搜索" size="small" class="search-input">
+            <template #prefix>
+              <el-icon class="search-icon">
+                <Search />
+              </el-icon>
+            </template>
+          </el-input>
+        </div>
+      </div>
+
+      <div class="sessions-list">
+        <div v-if="filteredSessions.length === 0" class="empty-sessions">
+          <div class="empty-content">
+            <el-icon class="empty-icon"><User /></el-icon>
+            <p>暂无聊天记录</p>
+            <el-button link @click="loadFriendsAsSessions">从好友列表加载</el-button>
+          </div>
+        </div>
+
+        <div v-for="session in filteredSessions" :key="session.id" class="session-item"
+          :class="{ active: chatStore.currentSession?.id === session.id }" @click="selectSession(session)">
+          <div class="session-avatar">
+            <el-avatar :src="session.avatar" :size="40">
+              <span class="avatar-text">{{ session.name.charAt(0) }}</span>
+            </el-avatar>
+          </div>
+          <div class="session-content">
+            <div class="session-top">
+              <div class="session-name">{{ session.name }}</div>
+              <div class="session-time">{{ formatSessionTime(session.lastMessageTime) }}</div>
+            </div>
+            <div class="session-bottom">
+              <div class="session-last-message">{{ session.lastMessage || '暂无消息' }}</div>
+              <div v-if="session.unreadCount" class="unread-badge">
+                {{ session.unreadCount > 99 ? '99+' : session.unreadCount }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 聊天区域 -->
+    <div class="chat-area">
+      <div v-if="!chatStore.currentSession" class="no-session">
+        <el-result icon="info" title="请选择一个聊天会话">
+          <template #sub-title>
+            <p>从左侧选择一个会话开始聊天，或者从好友列表发起新的聊天</p>
+          </template>
+        </el-result>
+      </div>
+
+      <div v-else class="chat-content">
+        <!-- 聊天头部 -->
+        <div class="chat-header">
+          <div class="chat-info">
+            <el-avatar :src="chatStore.currentSession.avatar" :size="32" class="chat-avatar">
+              <span class="avatar-text">{{ chatStore.currentSession.name.charAt(0) }}</span>
+            </el-avatar>
+            <div class="chat-title">
+              <div class="chat-name">{{ chatStore.currentSession.name }}</div>
+            </div>
+          </div>
+          <div class="chat-actions">
+            <el-button link class="action-btn" @click="clearCurrentMessages">
+              清空消息
+            </el-button>
+          </div>
+        </div>
+
+        <!-- 消息列表 -->
+        <div ref="messagesContainer" class="messages-container">
+          <div class="messages-list">
+            <!-- 空消息状态 -->
+            <div v-if="chatStore.currentMessages.length === 0" class="empty-messages">
+              <div class="empty-messages-content">
+                <el-icon class="empty-messages-icon"><ChatDotRound /></el-icon>
+                <p>暂无聊天记录</p>
+                <span>发送一条消息开始聊天吧</span>
+              </div>
+            </div>
+
+            <div v-for="message in chatStore.currentMessages" :key="message.id" class="message-item">
+              <div v-if="showMessageTime(message)" class="message-time">
+                {{ formatMessageTime(message.timestamp) }}
+              </div>
+
+              <div class="message-content" :class="{ 'from-me': message.fromMe }">
+                <div class="message-bubble">
+                  <div v-if="message.type === 'text'" class="message-text">
+                    {{ message.content }}
+                  </div>
+
+                  <div v-else-if="message.type === 'image'" class="message-image">
+                    <img :src="message.imageData" alt="图片">
+                  </div>
+
+                  <div v-if="message.fromMe" class="message-status">
+                    <el-icon v-if="message.status === 'sending'" class="is-loading" color="#999">
+                      <Loading />
+                    </el-icon>
+                    <el-icon v-else-if="message.status === 'sent'" color="#67c23a">
+                      <Select />
+                    </el-icon>
+                    <el-icon v-else-if="message.status === 'failed'" color="#f56c6c">
+                      <Close />
+                    </el-icon>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 输入区域 -->
+        <div class="input-area">
+          <div class="input-toolbar">
+            <el-button link class="toolbar-btn" @click="selectFile">
+              <el-icon><Picture /></el-icon>
+              图片
+            </el-button>
+            <el-button link class="toolbar-btn">
+              <el-icon><Document /></el-icon>
+              文件
+            </el-button>
+          </div>
+
+          <div class="input-container">
+            <div class="input-wrapper">
+              <el-input
+                v-model="messageInput"
+                type="textarea"
+                :rows="3"
+                placeholder="输入消息内容，支持粘贴图片..."
+                class="message-input"
+                @keydown.ctrl.enter="sendMessage"
+                @paste="handlePaste"
+              />
+            </div>
+            <div class="input-actions">
+              <span class="input-tip">Ctrl+Enter 发送</span>
+              <el-button
+                type="primary"
+                :loading="chatStore.isSending"
+                @click="sendMessage"
+                class="send-btn"
+              >
+                发送
+              </el-button>
+            </div>
+          </div>
+
+          <input ref="fileInputRef" type="file" accept="image/*,*/*" style="display: none" @change="handleFileSelect">
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
 <style scoped lang="scss">
 .chat-interface {
   height: 100%;
   display: flex;
-  background: white;
-  border-radius: 8px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  border-radius: 12px;
   overflow: hidden;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
 }
 
 .chat-sessions {
   width: 300px;
-  border-right: 1px solid #e9ecef;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
   display: flex;
   flex-direction: column;
 }
 
 .sessions-header {
-  padding: 16px;
-  border-bottom: 1px solid #e9ecef;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+}
 
-  h3 {
-    margin: 0;
-    color: #333;
+.search-container {
+  position: relative;
+}
+
+.search-input {
+  width: 100%;
+
+  :deep(.el-input__wrapper) {
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    backdrop-filter: blur(10px);
+
+    &:hover, &.is-focus {
+      background: rgba(255, 255, 255, 0.8);
+      border-color: rgba(255, 255, 255, 0.5);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    }
   }
+
+  :deep(.el-input__inner) {
+    color: #333;
+    font-size: 14px;
+
+    &::placeholder {
+      color: rgba(0, 0, 0, 0.4);
+    }
+  }
+}
+
+.search-icon {
+  color: rgba(0, 0, 0, 0.4);
+  font-size: 14px;
 }
 
 .sessions-list {
@@ -448,8 +511,26 @@ onUnmounted(() => {
 }
 
 .empty-sessions {
-  padding: 40px 20px;
+  padding: 60px 20px;
   text-align: center;
+}
+
+.empty-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.empty-icon {
+  font-size: 48px;
+  color: rgba(0, 0, 0, 0.2);
+}
+
+.empty-content p {
+  margin: 0;
+  color: rgba(0, 0, 0, 0.4);
+  font-size: 14px;
 }
 
 .session-item {
@@ -457,64 +538,113 @@ onUnmounted(() => {
   align-items: center;
   padding: 12px 16px;
   cursor: pointer;
-  transition: background-color 0.3s;
-  border-bottom: 1px solid #f5f5f5;
+  transition: all 0.3s ease;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(10px);
 
   &:hover {
-    background: #f8f9fa;
+    background: rgba(255, 255, 255, 0.8);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   }
 
   &.active {
-    background: #e3f2fd;
-    border-right: 3px solid #409eff;
+    background: rgba(255, 255, 255, 0.9);
+    border-left: 3px solid #409eff;
+    box-shadow: 0 2px 12px rgba(64, 158, 255, 0.2);
   }
 }
 
-.session-info {
+.session-avatar {
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.avatar-text {
+  font-size: 16px;
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.session-content {
   flex: 1;
-  margin-left: 12px;
   min-width: 0;
-
-  .session-name {
-    font-weight: 500;
-    margin-bottom: 4px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .last-message {
-    font-size: 12px;
-    color: #666;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
 }
 
-.session-meta {
+.session-top {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-
-  .time {
-    font-size: 11px;
-    color: #999;
-  }
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
 }
+
+.session-name {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.session-time {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.4);
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.session-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.session-last-message {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.unread-badge {
+  background: linear-gradient(135deg, #409eff, #67c23a);
+  color: white;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+}
+
+
 
 .chat-area {
   flex: 1;
   display: flex;
   flex-direction: column;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20px);
 }
 
 .no-session {
-  height: 100%;
+  flex: 1;
+  min-height: 500px;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(10px);
 }
 
 .chat-content {
@@ -524,28 +654,52 @@ onUnmounted(() => {
 }
 
 .chat-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid #e9ecef;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.04);
 }
 
 .chat-info {
   display: flex;
   align-items: center;
   gap: 12px;
+}
 
-  .chat-title {
-    .name {
-      font-weight: 500;
-      margin-bottom: 2px;
-    }
+.chat-avatar {
+  flex-shrink: 0;
+}
 
-    .status {
-      font-size: 12px;
-      color: #666;
-    }
+.chat-title {
+  flex: 1;
+}
+
+.chat-name {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 2px;
+}
+
+
+
+.chat-actions {
+  display: flex;
+  align-items: center;
+}
+
+.action-btn {
+  color: #409eff;
+  font-size: 14px;
+  transition: all 0.3s ease;
+
+  &:hover {
+    color: #66b1ff;
+    transform: translateY(-1px);
   }
 }
 
@@ -553,17 +707,68 @@ onUnmounted(() => {
   flex: 1;
   overflow-y: auto;
   padding: 16px 20px;
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+}
+
+.messages-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.empty-messages {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+}
+
+.empty-messages-content {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 40px;
+}
+
+.empty-messages-icon {
+  font-size: 64px;
+  color: rgba(0, 0, 0, 0.2);
+}
+
+.empty-messages-content p {
+  margin: 0;
+  font-size: 16px;
+  color: rgba(0, 0, 0, 0.6);
+  font-weight: 500;
+}
+
+.empty-messages-content span {
+  font-size: 14px;
+  color: rgba(0, 0, 0, 0.4);
 }
 
 .message-item {
   margin-bottom: 16px;
+  animation: messageSlideIn 0.3s ease-out;
 }
 
 .message-time {
   text-align: center;
   font-size: 12px;
-  color: #999;
+  color: rgba(0, 0, 0, 0.4);
   margin-bottom: 8px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 12px;
+  display: inline-block;
+  margin: 0 auto 8px;
+  backdrop-filter: blur(10px);
 }
 
 .message-content {
@@ -571,77 +776,203 @@ onUnmounted(() => {
   align-items: flex-end;
   gap: 8px;
 
-  &.is-self {
-    flex-direction: row-reverse;
+  &.from-me {
+    justify-content: flex-end;
 
     .message-bubble {
-      background: #409eff;
-      color: white;
+      background: rgba(255, 255, 255, 0.9);
+      color: #333;
+      margin-left: 60px;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-bottom-right-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 
-      .sender-name {
-        color: rgba(255, 255, 255, 0.8);
+      &:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+    }
+  }
+
+  &:not(.from-me) {
+    justify-content: flex-start;
+
+    .message-bubble {
+      background: rgba(255, 255, 255, 0.9);
+      color: #333;
+      margin-right: 60px;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-bottom-left-radius: 6px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+
+      &:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
       }
     }
   }
 }
 
 .message-bubble {
-  max-width: 60%;
-  padding: 8px 12px;
-  background: #f5f5f5;
-  border-radius: 8px;
+  max-width: 70%;
+  padding: 12px 16px;
+  border-radius: 18px;
   position: relative;
+  word-wrap: break-word;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
 
   .sender-name {
     font-size: 12px;
     color: #666;
     margin-bottom: 4px;
+    opacity: 0.8;
   }
 
   .message-text {
     word-wrap: break-word;
-    line-height: 1.4;
+    line-height: 1.5;
+    font-size: 14px;
   }
 
   .message-image {
     padding: 0;
 
-    :deep(.el-image) {
-      border-radius: 4px;
+    img {
+      max-width: 200px;
+      border-radius: 8px;
+      transition: transform 0.2s ease;
+
+      &:hover {
+        transform: scale(1.02);
+      }
     }
   }
 }
 
 .message-status {
-  margin-left: 4px;
-  display: flex;
-  align-items: center;
+  margin-top: 6px;
+  text-align: right;
+  opacity: 0.8;
+
+  .el-icon {
+    font-size: 14px;
+    transition: all 0.2s ease;
+
+    &.is-loading {
+      animation: spin 1s linear infinite;
+    }
+  }
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .input-area {
-  border-top: 1px solid #e9ecef;
-  padding: 16px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px);
+  padding: 12px 20px;
 }
 
 .input-toolbar {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   display: flex;
-  gap: 8px;
+  gap: 16px;
+}
+
+.toolbar-btn {
+  color: #409eff;
+  font-size: 14px;
+  padding: 4px 8px;
+  transition: all 0.3s ease;
+  border-radius: 6px;
+
+  &:hover {
+    color: #66b1ff;
+    background: rgba(255, 255, 255, 0.8);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
+  }
 }
 
 .input-container {
   position: relative;
+}
 
-  .input-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 8px;
+.input-wrapper {
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
 
-    .input-tip {
-      font-size: 12px;
-      color: #999;
+  &:hover {
+    border-color: rgba(255, 255, 255, 0.5);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  }
+
+  :deep(.el-textarea) {
+    .el-textarea__inner {
+      border: none;
+      background: transparent;
+      resize: none;
+      font-size: 14px;
+      line-height: 1.4;
+      padding: 12px;
+
+      &:focus {
+        box-shadow: none;
+      }
+
+      &::placeholder {
+        color: rgba(0, 0, 0, 0.4);
+      }
     }
+  }
+}
+
+.input-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.input-tip {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.4);
+}
+
+.send-btn {
+  background: linear-gradient(135deg, #409eff, #67c23a);
+  border: none;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+
+  &:hover {
+    background: linear-gradient(135deg, #66b1ff, #85ce61);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(64, 158, 255, 0.4);
   }
 }
 </style>

@@ -58,11 +58,7 @@ const routes = [
     name: 'Login',
     component: () => import('./pages/login.vue')
   },
-  {
-    path: '/chat',
-    name: 'Chat',
-    component: () => import('./pages/chat.vue')
-  },
+
   {
     path: '/friends',
     name: 'Friends',

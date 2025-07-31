@@ -205,14 +205,35 @@ const deleteFriend = async (friend: Friend) => {
   }
 }
 
-const sendMessage = (friend: Friend) => {
-  // 跳转到聊天页面并选择该好友
-  router.push('/chat')
-  // 这里可以通过路由参数或store来指定选中的聊天对象
+const sendMessage = async (friend: Friend) => {
+  if (!authStore.currentAccount) {
+    ElMessage.error('请先选择账号')
+    return
+  }
+
+  try {
+    // 导入聊天store
+    const { useChatStore } = await import('@/stores/chat')
+    const chatStore = useChatStore()
+
+    // 创建或获取聊天会话
+    const session = chatStore.createOrGetSession(friend)
+
+    // 设置当前会话
+    chatStore.setCurrentSession(session.id)
+
+    // 跳转到dashboard页面的聊天功能标签
+    await router.push('/dashboard?tab=chat')
+
+    ElMessage.success(`已开始与 ${friend.nickname} 的聊天`)
+  } catch (error) {
+    console.error('开始聊天失败:', error)
+    ElMessage.error('开始聊天失败，请重试')
+  }
 }
 
 const goBack = () => {
-  router.push('/chat')
+  router.push('/dashboard')
 }
 
 const selectAccount = async (account: any) => {
@@ -311,7 +332,7 @@ const getDisplayValue = (value: any): string => {
       </div>
       
       <div class="sidebar-footer">
-        <el-button @click="goBack" type="text">
+        <el-button @click="goBack" link>
           返回聊天
         </el-button>
       </div>

@@ -119,10 +119,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { User, Plus, MoreFilled } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
+import { useRoute, useRouter } from 'vue-router'
 
 // 组件导入
 import LoginForm from '@/components/LoginForm.vue'
@@ -135,6 +136,8 @@ import AccountManagementModal from '@/components/AccountManagementModal.vue'
 
 // Store
 const authStore = useAuthStore()
+const route = useRoute()
+const router = useRouter()
 
 // 响应式数据
 const showLoginDialog = ref(false)
@@ -209,12 +212,36 @@ const handleAccountAction = async (command) => {
   }
 }
 
+// 监听路由变化，处理tab参数
+watch(() => route.query.tab, (newTab) => {
+  if (newTab && typeof newTab === 'string') {
+    activeTab.value = newTab
+  }
+}, { immediate: true })
+
+// 监听activeTab变化，同步更新URL
+watch(activeTab, (newTab) => {
+  // 只有当URL中的tab参数与当前activeTab不一致时才更新
+  if (route.query.tab !== newTab) {
+    router.push({
+      path: route.path,
+      query: {
+        ...route.query,
+        tab: newTab
+      }
+    })
+  }
+})
+
 onMounted(async () => {
+  // 检查URL参数，如果有tab参数则切换到对应标签
+  if (route.query.tab) {
+    activeTab.value = route.query.tab as string
+  }
+
   // 获取已登录的账号
   try {
-    console.log('开始获取已登录账号...')
     const accounts = await authStore.fetchLoggedAccounts()
-    console.log('获取到的账号数据:', accounts)
 
     if (accounts && accounts.length > 0) {
       ElMessage.success(`成功获取 ${accounts.length} 个已登录账号`)
@@ -231,7 +258,7 @@ onMounted(async () => {
 <style scoped lang="scss">
 .dashboard-container {
   height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
   font-family: var(--font-family);
   position: relative;
 
@@ -242,9 +269,9 @@ onMounted(async () => {
     left: 0;
     right: 0;
     bottom: 0;
-    background: radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 40% 40%, rgba(120, 219, 255, 0.1) 0%, transparent 50%);
+    background: radial-gradient(circle at 20% 80%, rgba(0, 122, 255, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(52, 199, 89, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(255, 149, 0, 0.05) 0%, transparent 50%);
     pointer-events: none;
   }
 }

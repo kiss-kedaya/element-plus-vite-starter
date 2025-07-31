@@ -1,5 +1,6 @@
 import { ElMessage } from 'element-plus'
 import type { ChatMessage } from '@/types/chat'
+import { WEBSOCKET_CONFIG } from '@/config/websocket'
 
 // 事件类型定义
 export interface WebSocketEvents {
@@ -11,14 +12,23 @@ export interface WebSocketEvents {
 export class WebSocketService {
   private ws: WebSocket | null = null
   private reconnectAttempts = 0
-  private maxReconnectAttempts = 5
-  private reconnectInterval = 3000
+  private maxReconnectAttempts = WEBSOCKET_CONFIG.RECONNECT.MAX_ATTEMPTS
+  private reconnectInterval = WEBSOCKET_CONFIG.RECONNECT.INTERVAL
   private heartbeatInterval: number | null = null
   private isConnecting = false
   private eventListeners: Map<string, Function[]> = new Map()
   private currentWxid: string | undefined = undefined
+  private static instance: WebSocketService | null = null
 
-  constructor() {
+  // 单例模式
+  static getInstance(): WebSocketService {
+    if (!WebSocketService.instance) {
+      WebSocketService.instance = new WebSocketService()
+    }
+    return WebSocketService.instance
+  }
+
+  private constructor() {
     // 初始化事件监听器映射
   }
 
@@ -55,9 +65,15 @@ export class WebSocketService {
         return
       }
 
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      // 如果已经连接到相同的wxid，直接返回成功
+      if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentWxid === wxid) {
         resolve(true)
         return
+      }
+
+      // 如果连接到不同的wxid，先断开当前连接
+      if (this.ws && this.currentWxid !== wxid) {
+        this.disconnect()
       }
 
       this.isConnecting = true
@@ -65,9 +81,7 @@ export class WebSocketService {
 
       try {
         // WebSocket服务器地址，包含wxid参数
-        const wsUrl = wxid
-          ? `ws://127.0.0.1:8088/ws?wxid=${wxid}`
-          : 'ws://127.0.0.1:8088/ws'
+        const wsUrl = WEBSOCKET_CONFIG.getUrl(wxid)
         this.ws = new WebSocket(wsUrl)
 
         this.ws.onopen = () => {
@@ -78,7 +92,6 @@ export class WebSocketService {
 
           // 触发连接状态事件
           this.emit('connection_status', true)
-          ElMessage.success('WebSocket连接成功')
           resolve(true)
         }
 
@@ -100,9 +113,8 @@ export class WebSocketService {
         }
 
         this.ws.onerror = (error) => {
-          console.error('WebSocket连接错误:', error)
+          console.warn('WebSocket连接失败，将在模拟模式下运行')
           this.isConnecting = false
-          ElMessage.error('WebSocket连接失败')
           reject(error)
         }
 
@@ -131,10 +143,14 @@ export class WebSocketService {
   private handleMessage(data: string) {
     try {
       const message = JSON.parse(data)
-      
+
       switch (message.type) {
         case 'chat_message':
           this.emit('chat_message', message.data)
+          break
+        case 'wechat_message':
+          // 处理微信消息格式
+          this.handleWeChatMessage(message)
           break
         case 'system_message':
           this.emit('system_message', message.data)
@@ -150,6 +166,45 @@ export class WebSocketService {
     }
   }
 
+  // 处理微信消息
+  private handleWeChatMessage(data: any) {
+    if (!data.messages || data.messages.length === 0) {
+      return
+    }
+
+    console.log(`收到 ${data.count || data.messages.length} 条微信消息`)
+
+    data.messages.forEach((msg: any) => {
+      // 转换为标准聊天消息格式
+      const chatMessage = {
+        id: msg.id || `msg_${Date.now()}_${Math.random()}`,
+        content: msg.content || '',
+        timestamp: msg.timestamp ? new Date(msg.timestamp * 1000) : new Date(),
+        fromMe: msg.isSelf || false,
+        type: this.getMsgType(msg.msgType),
+        status: 'received',
+        sessionId: msg.isSelf ? msg.toUser : msg.fromUser
+      }
+
+      // 发送聊天消息事件
+      this.emit('chat_message', chatMessage)
+    })
+  }
+
+  // 根据消息类型转换
+  private getMsgType(msgType: number): string {
+    switch (msgType) {
+      case 1: // 文本消息
+        return 'text'
+      case 3: // 图片消息
+        return 'image'
+      case 6: // 文件消息
+        return 'file'
+      default:
+        return 'text'
+    }
+  }
+
 
 
   // 开始心跳
@@ -162,7 +217,7 @@ export class WebSocketService {
         }
         this.ws.send(JSON.stringify(heartbeat))
       }
-    }, 30000) // 每30秒发送一次心跳
+    }, WEBSOCKET_CONFIG.HEARTBEAT.INTERVAL)
   }
 
   // 停止心跳
@@ -200,5 +255,5 @@ export class WebSocketService {
   }
 }
 
-// 创建全局WebSocket实例
-export const webSocketService = new WebSocketService()
+// 导出WebSocket服务单例
+export const webSocketService = WebSocketService.getInstance()

@@ -810,8 +810,12 @@ const startChatWithFriend = async (friend: Friend) => {
       console.warn('消息历史同步失败:', error)
     }
 
-    // 4. 跳转到聊天页面
-    await router.push('/chat')
+    // 4. 跳转到聊天功能标签
+    // 确保跳转到聊天页面，即使当前已经在聊天页面
+    const currentRoute = router.currentRoute.value
+    if (currentRoute.query.tab !== 'chat') {
+      await router.push('/dashboard?tab=chat')
+    }
 
     // 5. 设置当前会话
     chatStore.setCurrentSession(session.id)

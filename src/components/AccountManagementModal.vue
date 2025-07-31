@@ -178,16 +178,16 @@
         </template>
         
         <div class="action-buttons">
-          <el-button 
-            v-if="account.status === 'offline'" 
-            type="primary" 
+          <el-button
+            v-if="account.status === 'offline'"
+            type="primary"
             @click="showReloginDialog = true"
             :loading="reloginLoading"
           >
             <el-icon><Refresh /></el-icon>
             设备复用重新登录
           </el-button>
-          
+
           <el-button
             v-else
             type="default"
@@ -197,6 +197,17 @@
           >
             <el-icon><SwitchButton /></el-icon>
             断开连接
+          </el-button>
+
+          <el-button
+            v-if="account.status === 'online'"
+            type="success"
+            @click="enableHeartbeat"
+            :loading="heartbeatLoading"
+            plain
+          >
+            <el-icon><Timer /></el-icon>
+            开启心跳
           </el-button>
 
           <el-button
@@ -244,7 +255,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, SwitchButton, Delete } from '@element-plus/icons-vue'
+import { Refresh, SwitchButton, Delete, Timer } from '@element-plus/icons-vue'
 import type { LoginAccount, ProxyConfig } from '@/types/auth'
 import { loginApi } from '@/api/auth'
 import { useAuthStore } from '@/stores/auth'
@@ -275,6 +286,7 @@ const proxyLoading = ref(false)
 const reloginLoading = ref(false)
 const disconnectLoading = ref(false)
 const removeLoading = ref(false)
+const heartbeatLoading = ref(false)
 const showReloginDialog = ref(false)
 const qrCodeUrl = ref('')
 const qrLoading = ref(false)
@@ -415,16 +427,16 @@ const clearProxy = async () => {
 
 const generateQRCode = async () => {
   if (!props.account) return
-  
+
   qrLoading.value = true
   try {
     // 使用设备复用生成二维码
-    const response = await loginApi.loginGetQR({
+    const response = await loginApi.getQRCode(props.account.deviceType || 'iPad', {
       DeviceID: props.account.deviceId || props.account.imei || '',
       DeviceName: props.account.deviceName,
       Proxy: props.account.proxy
     })
-    
+
     if (response.Success && response.Data?.QRCodeUrl) {
       qrCodeUrl.value = response.Data.QRCodeUrl
     } else {
@@ -440,6 +452,43 @@ const generateQRCode = async () => {
 
 const refreshQRCode = () => {
   generateQRCode()
+}
+
+// 开启心跳
+const enableHeartbeat = async () => {
+  if (!props.account) return
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要为账号 ${props.account.nickname} 开启心跳吗？`,
+      '确认开启心跳',
+      { type: 'info' }
+    )
+
+    heartbeatLoading.value = true
+
+    // 发送心跳请求
+    const response = await fetch(`http://localhost:8059/api/Login/AutoHeartBeat?wxid=${props.account.wxid}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (response.ok) {
+      const result = await response.text()
+      ElMessage.success(`心跳开启成功: ${result}`)
+    } else {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+  } catch (error: any) {
+    if (error.message !== 'cancel') {
+      console.error('开启心跳失败:', error)
+      ElMessage.error(`开启心跳失败: ${error.message}`)
+    }
+  } finally {
+    heartbeatLoading.value = false
+  }
 }
 
 const disconnectAccount = async () => {
@@ -638,6 +687,21 @@ watch(showReloginDialog, (show) => {
         background: rgba(255, 77, 79, 0.05) !important;
         border-color: #ff7875 !important;
         color: #ff7875 !important;
+      }
+    }
+
+    .el-button--success.is-plain {
+      border-color: #67c23a !important;
+      color: #67c23a !important;
+
+      &:hover {
+        background: rgba(103, 194, 58, 0.05) !important;
+        border-color: #85ce61 !important;
+        color: #85ce61 !important;
+      }
+
+      .el-icon {
+        margin-right: 6px;
       }
     }
   }

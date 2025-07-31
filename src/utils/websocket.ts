@@ -2,6 +2,7 @@ import { ref, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useChatStore } from '@/stores/chat'
 import type { ChatMessage } from '@/types/chat'
+import { WEBSOCKET_CONFIG } from '@/config/websocket'
 
 // WebSocket 连接状态
 export const wsConnections = reactive<Record<string, WebSocket>>({})
@@ -24,56 +25,28 @@ interface WeChatMessage {
   }>
 }
 
-// 创建 WebSocket 连接
-export const createWebSocketConnection = (wxid: string): Promise<WebSocket> => {
-  return new Promise((resolve, reject) => {
-    if (wsConnections[wxid] && wsConnections[wxid].readyState === WebSocket.OPEN) {
-      resolve(wsConnections[wxid])
-      return
+// 创建 WebSocket 连接（使用统一的WebSocket服务）
+export const createWebSocketConnection = async (wxid: string): Promise<WebSocket> => {
+  const { webSocketService } = await import('@/services/websocket')
+
+  try {
+    const connected = await webSocketService.connect(wxid)
+    if (connected) {
+      // 创建一个虚拟的WebSocket对象来保持兼容性
+      return {
+        readyState: WebSocket.OPEN,
+        close: () => webSocketService.disconnect(),
+        send: (data: string) => webSocketService.send(JSON.parse(data))
+      } as WebSocket
+    } else {
+      throw new Error('WebSocket连接失败')
     }
-
-    const wsUrl = `ws://localhost:8059/ws?wxid=${wxid}`
-    const ws = new WebSocket(wsUrl)
-    
-    wsStatus[wxid] = 'connecting'
-
-    ws.onopen = () => {
-      console.log(`WebSocket连接已建立 (wxid: ${wxid})`)
-      wsStatus[wxid] = 'connected'
-      wsConnections[wxid] = ws
-      resolve(ws)
-    }
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data)
-        handleWebSocketMessage(wxid, data)
-      } catch (error) {
-        console.error('解析WebSocket消息失败:', error)
-      }
-    }
-
-    ws.onclose = () => {
-      console.log(`WebSocket连接已关闭 (wxid: ${wxid})`)
-      wsStatus[wxid] = 'disconnected'
-      delete wsConnections[wxid]
-    }
-
-    ws.onerror = (error) => {
-      console.error(`WebSocket连接错误 (wxid: ${wxid}):`, error)
-      wsStatus[wxid] = 'disconnected'
-      reject(error)
-    }
-
-    // 设置连接超时
-    setTimeout(() => {
-      if (ws.readyState === WebSocket.CONNECTING) {
-        ws.close()
-        reject(new Error('WebSocket连接超时'))
-      }
-    }, 10000)
-  })
+  } catch (error) {
+    throw error
+  }
 }
+
+// 旧的WebSocket连接逻辑已被统一的WebSocket服务替代
 
 // 处理 WebSocket 消息
 const handleWebSocketMessage = (wxid: string, data: any) => {
@@ -89,7 +62,7 @@ const handleWebSocketMessage = (wxid: string, data: any) => {
 // 处理微信消息
 const handleWeChatMessage = (wxid: string, data: WeChatMessage) => {
   const chatStore = useChatStore()
-  
+
   if (!data.messages || data.messages.length === 0) {
     return
   }
@@ -109,7 +82,7 @@ const handleWeChatMessage = (wxid: string, data: WeChatMessage) => {
 
     // 确定会话ID（发送者或接收者）
     const sessionId = msg.isSelf ? msg.toUser : msg.fromUser
-    
+
     // 添加消息到聊天存储
     chatStore.addMessage(sessionId, chatMessage)
   })
@@ -129,13 +102,11 @@ const getMsgType = (msgType: number): ChatMessage['type'] => {
   }
 }
 
-// 关闭 WebSocket 连接
-export const closeWebSocketConnection = (wxid: string) => {
-  if (wsConnections[wxid]) {
-    wsConnections[wxid].close()
-    delete wsConnections[wxid]
-    wsStatus[wxid] = 'disconnected'
-  }
+// 关闭 WebSocket 连接（使用统一的WebSocket服务）
+export const closeWebSocketConnection = async (wxid: string) => {
+  const { webSocketService } = await import('@/services/websocket')
+  webSocketService.disconnect()
+  wsStatus[wxid] = 'disconnected'
 }
 
 // 获取连接状态

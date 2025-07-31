@@ -105,7 +105,7 @@ const loginWithPassword = async () => {
     await new Promise(resolve => setTimeout(resolve, 2000))
 
     ElMessage.success('登录成功（演示模式）')
-    router.push('/chat')
+    router.push('/dashboard')
   } catch (error) {
     console.error('登录失败:', error)
     ElMessage.error('登录失败，请检查账号密码')
@@ -128,7 +128,7 @@ const startLoginStatusCheck = () => {
       if (statusCheckTimer) {
         clearInterval(statusCheckTimer)
         ElMessage.success('扫码登录成功（演示模式）')
-        router.push('/chat')
+        router.push('/dashboard')
       }
     }, 10000)
   }, 1000)

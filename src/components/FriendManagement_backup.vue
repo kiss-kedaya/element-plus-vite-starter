@@ -56,7 +56,7 @@
             </div>
           </div>
           <div class="chat-actions">
-            <el-button type="text" @click="clearMessages">
+            <el-button link @click="clearMessages">
               <el-icon>
                 <Delete />
               </el-icon>

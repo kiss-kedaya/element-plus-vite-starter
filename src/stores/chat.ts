@@ -42,8 +42,22 @@ export const useChatStore = defineStore('chat', () => {
     if (!messages.value[sessionId]) {
       messages.value[sessionId] = []
     }
+
+    // 检查消息是否已存在（避免重复）
+    const existingMessage = messages.value[sessionId].find(m => m.id === message.id)
+    if (existingMessage) {
+      return
+    }
+
     messages.value[sessionId].push(message)
-    
+
+    // 按时间戳排序消息
+    messages.value[sessionId].sort((a, b) => {
+      const timeA = a.timestamp instanceof Date ? a.timestamp.getTime() : new Date(a.timestamp).getTime()
+      const timeB = b.timestamp instanceof Date ? b.timestamp.getTime() : new Date(b.timestamp).getTime()
+      return timeA - timeB
+    })
+
     // 更新会话的最后消息
     const session = sessions.value.find(s => s.id === sessionId)
     if (session) {
@@ -158,33 +172,50 @@ export const useChatStore = defineStore('chat', () => {
   // WebSocket连接管理
   const connectWebSocket = async (wxid: string): Promise<boolean> => {
     try {
+      // 清除之前的事件监听器
+      webSocketService.off('chat_message', handleChatMessage)
+      webSocketService.off('system_message', handleSystemMessage)
+
       // 设置事件监听器
-      webSocketService.on('chat_message', (data: any) => {
-        const chatMessage: ChatMessage = {
-          id: data.id || Date.now().toString(),
-          content: data.content || '',
-          timestamp: new Date(data.timestamp || Date.now()),
-          fromMe: data.fromMe || false,
-          type: data.type || 'text',
-          status: 'received'
-        }
-
-        if (data.sessionId) {
-          addMessage(data.sessionId, chatMessage)
-        }
-      })
-
-      webSocketService.on('system_message', (data: any) => {
-        if (data.message) {
-          // 这里可以处理系统消息，比如显示通知
-          console.log('系统消息:', data.message)
-        }
-      })
+      webSocketService.on('chat_message', handleChatMessage)
+      webSocketService.on('system_message', handleSystemMessage)
 
       return await webSocketService.connect(wxid)
     } catch (error) {
       console.error('WebSocket连接失败:', error)
       return false
+    }
+  }
+
+  // 处理聊天消息
+  const handleChatMessage = (data: any) => {
+    const chatMessage: ChatMessage = {
+      id: data.id || Date.now().toString(),
+      content: data.content || '',
+      timestamp: data.timestamp instanceof Date ? data.timestamp : new Date(data.timestamp || Date.now()),
+      fromMe: data.fromMe || false,
+      type: data.type || 'text',
+      status: 'received'
+    }
+
+    const sessionId = data.sessionId || (data.fromMe ? data.toUser : data.fromUser)
+    if (sessionId) {
+      addMessage(sessionId, chatMessage)
+
+      // 如果当前没有选中会话，自动选中这个会话
+      if (!currentSession.value) {
+        const session = sessions.value.find(s => s.id === sessionId)
+        if (session) {
+          setCurrentSession(sessionId)
+        }
+      }
+    }
+  }
+
+  // 处理系统消息
+  const handleSystemMessage = (data: any) => {
+    if (data.message) {
+      console.log('系统消息:', data.message)
     }
   }
 

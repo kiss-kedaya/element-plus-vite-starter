@@ -22,7 +22,7 @@ const goToLogin = () => {
 }
 
 const goToChat = () => {
-  router.push('/chat')
+  router.push('/dashboard')
 }
 </script>
 
