@@ -186,8 +186,8 @@ export class WebSocketService {
         fromMe = msg.actualSender === data.wxid
       }
       else {
-        // 个人消息：使用原有逻辑
-        fromMe = msg.isSelf || false
+        // 个人消息：比较fromUser和当前wxid，或者使用actualSender
+        fromMe = msg.fromUser === data.wxid || msg.actualSender === data.wxid
       }
 
       // 确定会话ID
@@ -223,7 +223,35 @@ export class WebSocketService {
       // 处理图片消息
       if (msg.msgType === 3) {
         chatMessage.content = '[图片]'
-        // 检查是否有图片数据
+
+        // 解析XML数据获取图片信息
+        if (msg.originalContent) {
+          // 提取AES密钥
+          const aesKeyMatch = msg.originalContent.match(/aeskey\s*=\s*"([^"]+)"/)
+          if (aesKeyMatch) {
+            chatMessage.imageAesKey = aesKeyMatch[1]
+          }
+
+          // 提取MD5
+          const md5Match = msg.originalContent.match(/md5\s*=\s*"([^"]+)"/)
+          if (md5Match) {
+            chatMessage.imageMd5 = md5Match[1]
+          }
+
+          // 提取数据长度
+          const lengthMatch = msg.originalContent.match(/length\s*=\s*"([^"]+)"/)
+          if (lengthMatch) {
+            chatMessage.imageDataLen = parseInt(lengthMatch[1])
+          }
+
+          // 提取压缩类型（如果有）
+          const compressMatch = msg.originalContent.match(/compresstype\s*=\s*"([^"]+)"/)
+          if (compressMatch) {
+            chatMessage.imageCompressType = parseInt(compressMatch[1])
+          }
+        }
+
+        // 检查是否有直接的图片数据
         if (msg.content) {
           // 如果content是文件路径，需要转换为可访问的URL
           if (msg.content.startsWith('/') || msg.content.includes('\\')) {
@@ -267,7 +295,7 @@ export class WebSocketService {
         if (msg.originalContent) {
           chatMessage.emojiData = msg.originalContent
 
-          // 尝试从originalContent中提取CDN URL
+          // 尝试从originalContent中提取CDN URL（主要表情图片）
           const cdnUrlMatch = msg.originalContent.match(/cdnurl\s*=\s*"([^"]+)"/)
           if (cdnUrlMatch) {
             // 解码HTML实体
@@ -275,12 +303,60 @@ export class WebSocketService {
             chatMessage.emojiUrl = cdnUrl
           }
 
-          // 尝试提取缩略图URL
-          const thumbUrlMatch = msg.originalContent.match(/thumburl\s*=\s*"([^"]+)"/)
-          if (thumbUrlMatch) {
+          // 尝试提取缩略图URL（用于快速预览）
+          const thumbUrlMatch = msg.originalContent.match(/thumburl\s*=\s*"([^"]*)"/)
+          if (thumbUrlMatch && thumbUrlMatch[1] && thumbUrlMatch[1].trim()) {
             const thumbUrl = thumbUrlMatch[1].replace(/&amp;/g, '&')
             chatMessage.emojiThumbUrl = thumbUrl
           }
+
+          // 尝试提取加密URL（备用）
+          const encryptUrlMatch = msg.originalContent.match(/encrypturl\s*=\s*"([^"]+)"/)
+          if (encryptUrlMatch && encryptUrlMatch[1]) {
+            const encryptUrl = encryptUrlMatch[1].replace(/&amp;/g, '&')
+            // 如果没有缩略图URL，使用加密URL作为备用
+            if (!chatMessage.emojiThumbUrl) {
+              chatMessage.emojiThumbUrl = encryptUrl
+            }
+          }
+
+          // 尝试提取外部URL（可能更容易访问）
+          const externUrlMatch = msg.originalContent.match(/externurl\s*=\s*"([^"]+)"/)
+          if (externUrlMatch && externUrlMatch[1]) {
+            const externUrl = externUrlMatch[1].replace(/&amp;/g, '&')
+            // 如果仍然没有缩略图URL，使用外部URL
+            if (!chatMessage.emojiThumbUrl) {
+              chatMessage.emojiThumbUrl = externUrl
+            }
+            // 将外部URL存储为额外字段
+            chatMessage.emojiExternUrl = externUrl
+          }
+
+          // 提取表情尺寸信息
+          const widthMatch = msg.originalContent.match(/width\s*=\s*"([^"]+)"/)
+          const heightMatch = msg.originalContent.match(/height\s*=\s*"([^"]+)"/)
+          if (widthMatch && heightMatch) {
+            chatMessage.emojiWidth = parseInt(widthMatch[1])
+            chatMessage.emojiHeight = parseInt(heightMatch[1])
+          }
+
+          // 提取AES密钥和MD5（用于CDN下载API）
+          const aesKeyMatch = msg.originalContent.match(/aeskey\s*=\s*"([^"]+)"/)
+          const md5Match = msg.originalContent.match(/md5\s*=\s*"([^"]+)"/)
+          if (aesKeyMatch && md5Match) {
+            chatMessage.emojiAesKey = aesKeyMatch[1]
+            chatMessage.emojiMd5 = md5Match[1]
+          }
+
+          console.log('WebSocket服务解析表情消息:', {
+            cdnUrl: chatMessage.emojiUrl,
+            thumbUrl: chatMessage.emojiThumbUrl,
+            width: chatMessage.emojiWidth,
+            height: chatMessage.emojiHeight,
+            aesKey: chatMessage.emojiAesKey,
+            md5: chatMessage.emojiMd5,
+            originalContent: msg.originalContent.substring(0, 200) + '...' // 显示部分原始内容用于调试
+          })
         }
       }
 

@@ -198,12 +198,19 @@ export const useChatStore = defineStore('chat', () => {
     })
 
     // 更新会话的最后消息
-    const session = sessions.value.find(s => s.id === sessionId)
-    if (session) {
+    const sessionIndex = sessions.value.findIndex(s => s.id === sessionId)
+    if (sessionIndex !== -1) {
+      const session = sessions.value[sessionIndex]
       session.lastMessage = message.content
       session.lastMessageTime = message.timestamp
       if (message.fromMe === false) {
         session.unreadCount++
+      }
+
+      // 将有新消息的会话移到列表顶部
+      if (sessionIndex > 0) {
+        sessions.value.splice(sessionIndex, 1) // 从原位置移除
+        sessions.value.unshift(session) // 添加到顶部
       }
     }
 
@@ -580,8 +587,26 @@ export const useChatStore = defineStore('chat', () => {
       isGroupMessage: sessionId?.includes('@chatroom') || false,
       actualSender: data.actualSender || data.fromUser,
       actualSenderName: data.actualSenderName || data.senderName,
+      // 表情相关字段
+      emojiUrl: data.emojiUrl,
+      emojiThumbUrl: data.emojiThumbUrl,
+      emojiExternUrl: data.emojiExternUrl,
+      emojiWidth: data.emojiWidth,
+      emojiHeight: data.emojiHeight,
+      emojiData: data.emojiData,
+      emojiAesKey: data.emojiAesKey,
+      emojiMd5: data.emojiMd5,
+      // 图片相关字段
+      imageData: data.imageData,
+      imagePath: data.imagePath,
+      // 文件相关字段
+      fileData: data.fileData,
+      // 其他字段
+      extraData: data.extraData,
     }
     console.log('消息会话ID:', sessionId, '消息内容:', chatMessage.content)
+
+
 
     if (sessionId) {
       // 确保会话存在

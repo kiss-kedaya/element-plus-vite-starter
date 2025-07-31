@@ -17,6 +17,11 @@ export interface ChatMessage {
   type: 'text' | 'image' | 'file' | 'system' | 'emoji'
   status?: 'sending' | 'sent' | 'failed'
   imageData?: string
+  imagePath?: string         // 图片文件路径
+  imageAesKey?: string       // 图片AES密钥
+  imageMd5?: string          // 图片MD5
+  imageDataLen?: number      // 图片数据长度
+  imageCompressType?: number // 图片压缩类型
   fileData?: {
     name: string
     size: number
@@ -30,6 +35,12 @@ export interface ChatMessage {
   // 表情相关字段
   emojiUrl?: string          // 表情图片URL
   emojiThumbUrl?: string     // 表情缩略图URL
+  emojiExternUrl?: string    // 表情外部URL
+  emojiWidth?: number        // 表情宽度
+  emojiHeight?: number       // 表情高度
+  emojiData?: string         // 表情原始数据
+  emojiAesKey?: string       // 表情AES密钥
+  emojiMd5?: string          // 表情MD5
   // 新增字段用于重试和撤回功能
   originalContent?: string  // 原始内容，用于重试
   canRetry?: boolean       // 是否可以重试

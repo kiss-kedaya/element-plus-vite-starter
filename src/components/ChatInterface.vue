@@ -458,124 +458,6 @@ function getContactAvatarText(message: any) {
   return '?'
 }
 
-// 添加测试消息
-function addTestMessages() {
-  if (!chatStore.currentSession)
-    return
-
-  // 先清空当前消息
-  chatStore.clearMessages(chatStore.currentSession.id)
-
-  const sessionId = chatStore.currentSession.id
-  const isGroup = sessionId.includes('@chatroom')
-
-  // 创建适合个人聊天的测试消息数据
-  const testMessages = [
-    {
-      id: `test_${Date.now()}_1`,
-      content: '你好！这是一条测试消息',
-      timestamp: new Date(Date.now() - 300000), // 5分钟前
-      fromMe: false,
-      type: 'text' as const,
-      status: 'sent' as const,
-      sessionId,
-      isGroupMessage: isGroup,
-      actualSender: sessionId, // 个人聊天中，actualSender就是对方的wxid
-      // 个人聊天不需要actualSenderName，因为不显示发送者名称
-    },
-    {
-      id: `test_${Date.now()}_2`,
-      content: '收到，我这边没问题',
-      timestamp: new Date(Date.now() - 240000), // 4分钟前
-      fromMe: true,
-      type: 'text' as const,
-      status: 'sent' as const,
-      sessionId,
-      isGroupMessage: isGroup,
-      actualSender: props.account?.wxid || 'me',
-      canRecall: true, // 添加可撤回标志
-      clientMsgId: Date.now() + 1,
-      createTime: Math.floor((Date.now() - 240000) / 1000),
-      newMsgId: Date.now() + 1,
-    },
-    {
-      id: `test_${Date.now()}_3`,
-      content: '好的，那我们开始吧',
-      timestamp: new Date(Date.now() - 180000), // 3分钟前
-      fromMe: false,
-      type: 'text' as const,
-      status: 'sent' as const,
-      sessionId,
-      isGroupMessage: isGroup,
-      actualSender: sessionId,
-    },
-    {
-      id: `test_${Date.now()}_4`,
-      content: '这是一条很长的测试消息，用来测试消息气泡的换行效果和布局是否正常。我们需要确保头像能够正确显示在消息的左右两侧。',
-      timestamp: new Date(Date.now() - 120000), // 2分钟前
-      fromMe: false,
-      type: 'text' as const,
-      status: 'sent' as const,
-      sessionId,
-      isGroupMessage: isGroup,
-      actualSender: sessionId,
-    },
-    {
-      id: `test_${Date.now()}_5`,
-      content: '明白了，看起来效果不错！',
-      timestamp: new Date(Date.now() - 60000), // 1分钟前
-      fromMe: true,
-      type: 'text' as const,
-      status: 'sent' as const,
-      sessionId,
-      isGroupMessage: isGroup,
-      actualSender: props.account?.wxid || 'me',
-      canRecall: true, // 添加可撤回标志
-      clientMsgId: Date.now(),
-      createTime: Math.floor(Date.now() / 1000),
-      newMsgId: Date.now(),
-    },
-  ]
-
-  // 添加测试消息到store
-  testMessages.forEach((message) => {
-    chatStore.addMessage(sessionId, message)
-  })
-
-  // 滚动到底部
-  scrollToBottom()
-}
-
-// 添加系统消息测试
-function addSystemMessage() {
-  if (!chatStore.currentSession)
-    return
-
-  const sessionId = chatStore.currentSession.id
-
-  // 模拟你提供的WeChat系统消息
-  const systemMessage = {
-    id: `system_${Date.now()}`,
-    content: '"0xze"邀请你加入了群聊，群聊参与人还有：智谱清言小助手@智谱AI、言言@智谱清言、智谱清言小助手、智谱清言@阿新@智谱AI、智谱清言@智谱AI、言言@智谱清言@智谱AI、AI应用开发、文强 johnny、大张张、小新、hope、冰河洗剑、简单、广告开户-百科-SEO-开发-数据维护、FXB-ROAD、粽子、唐糖、不过是个小耳钉、E、传递幸福、康养云、南乔几经秋、刘洋志、玥含@北京安软立信科技有限公司、阿笙、一炉香、鱼鱼鱼、小号李陵、文质斌斌、李颜安、人生不是赛场，理想不容退场、益益、Aliya、满天星、CN_seN、郭志文、愚翁、HR、❤️、犀牛君、洪康梅大家谈、守静、戲曲℡、摘星星、歲鈅侞戨、木可、省团+支付宝碰一碰、飞扬、张峰、盐水是言和水、qwt、💫浅时光🎀、ㅤㅤ、耶不耶、why、魔芋、天赐鸿运、L、李小龙、祖亮、(havingMid)chieftwitanyway张思琳、左轮🎨、马超业、正念、壹壹、李雪-财务🎀、楚漫CMAJ、AL、屿雨、黎明之光、天涯海角、老米、金海鑫刻章+广告设计+家政+老区、补丁、lcy、蘑菇🍄无毒（AI教学）、德哥🎯、null、0.0、渴望自由、苑、ঞ萱灵ૡ、徐建军、且听风吟、青竹、小星星、飘歌、灬沧海灬、刘成轩｜AI捜索｜AI 人工智能、得成书苑、玄黓、NANA、.、玄奇、程程、墨玉、T、邹长江、枫歌ᯤ⁶ᴳ、张邵为、建余、张教主、郭晨凯、自己和我俩个人、副老湿、Peter 谢一鹏、吃瓜群众、點點、史豪、风雨无阻、也不、小熊摊手、徐汉涛、Ai平台、宽  鹏达手机大卖场、无限、探啦、Sooo🐾、💧Ⅸ Ⅴ Ⅱ Ⅶ💦²⁰²⁵、旺仔小乔、拼搏人生、砥砺前行、Levi、欯、Cathy、owo、Orangeღ、子羲老中医里的智慧、奔跑的小明、大兵、Mr.杨、  、荷包蛋.🍊、谨旸、强尼、肚皮、恰巧遇见你、A.亮少🐯、李阳、孙岩、墨玉言、阿原、羽佳月禾、A',
-    timestamp: new Date(),
-    fromMe: false,
-    type: 'system' as const,
-    status: 'received' as const,
-    sessionId,
-    isGroupMessage: sessionId.includes('@chatroom'),
-    extraData: {
-      originalContent: '"0xze"邀请你加入了群聊，群聊参与人还有：智谱清言小助手@智谱AI、言言@智谱清言、智谱清言小助手、智谱清言@阿新@智谱AI、智谱清言@智谱AI、言言@智谱清言@智谱AI、AI应用开发、文强 johnny、大张张、小新、hope、冰河洗剑、简单、广告开户-百科-SEO-开发-数据维护、FXB-ROAD、粽子、唐糖、不过是个小耳钉、E、传递幸福、康养云、南乔几经秋、刘洋志、玥含@北京安软立信科技有限公司、阿笙、一炉香、鱼鱼鱼、小号李陵、文质斌斌、李颜安、人生不是赛场，理想不容退场、益益、Aliya、满天星、CN_seN、郭志文、愚翁、HR、❤️、犀牛君、洪康梅大家谈、守静、戲曲℡、摘星星、歲鈅侞戨、木可、省团+支付宝碰一碰、飞扬、张峰、盐水是言和水、qwt、💫浅时光🎀、ㅤㅤ、耶不耶、why、魔芋、天赐鸿运、L、李小龙、祖亮、(havingMid)chieftwitanyway张思琳、左轮🎨、马超业、正念、壹壹、李雪-财务🎀、楚漫CMAJ、AL、屿雨、黎明之光、天涯海角、老米、金海鑫刻章+广告设计+家政+老区、补丁、lcy、蘑菇🍄无毒（AI教学）、德哥🎯、null、0.0、渴望自由、苑、ঞ萱灵ૡ、徐建军、且听风吟、青竹、小星星、飘歌、灬沧海灬、刘成轩｜AI捜索｜AI 人工智能、得成书苑、玄黓、NANA、.、玄奇、程程、墨玉、T、邹长江、枫歌ᯤ⁶ᴳ、张邵为、建余、张教主、郭晨凯、自己和我俩个人、副老湿、Peter 谢一鹏、吃瓜群众、點點、史豪、风雨无阻、也不、小熊摊手、徐汉涛、Ai平台、宽  鹏达手机大卖场、无限、探啦、Sooo🐾、💧Ⅸ Ⅴ Ⅱ Ⅶ💦²⁰²⁵、旺仔小乔、拼搏人生、砥砺前行、Levi、欯、Cathy、owo、Orangeღ、子羲老中医里的智慧、奔跑的小明、大兵、Mr.杨、  、荷包蛋.🍊、谨旸、强尼、肚皮、恰巧遇见你、A.亮少🐯、李阳、孙岩、墨玉言、阿原、羽佳月禾、A',
-      subType: 'unknown',
-    },
-  }
-
-  // 添加系统消息到store
-  chatStore.addMessage(sessionId, systemMessage)
-
-  // 滚动到底部
-  scrollToBottom()
-}
-
 // 刷新联系人信息
 const isRefreshingContact = ref(false)
 
@@ -861,12 +743,7 @@ onUnmounted(() => {
               </el-icon>
               刷新信息
             </el-button>
-            <el-button link class="action-btn" @click="addTestMessages">
-              添加测试消息
-            </el-button>
-            <el-button link class="action-btn" @click="addSystemMessage">
-              测试系统消息
-            </el-button>
+
             <el-button link class="action-btn" @click="clearCurrentMessages">
               清空消息
             </el-button>

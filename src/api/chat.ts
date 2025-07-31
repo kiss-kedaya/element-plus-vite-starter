@@ -76,5 +76,38 @@ export const chatApi = {
     NewMsgId: number;
   }): Promise<MessageResponse> => {
     return api.post('/Msg/Revoke', params)
+  },
+
+  // CDN下载图片
+  downloadCdnImage: (params: {
+    Wxid: string;
+    FileAesKey: string;
+    FileNo: string;
+  }): Promise<any> => {
+    return api.post('/Tools/CdnDownloadImage', params)
   }
+}
+
+// 单独导出CDN下载函数
+export const downloadCdnImage = (params: {
+  Wxid: string;
+  FileAesKey: string;
+  FileNo: string;
+}): Promise<any> => {
+  return api.post('/Tools/CdnDownloadImage', params)
+}
+
+// 下载普通图片
+export const downloadImage = (params: {
+  Wxid: string;
+  ToWxid: string;
+  MsgId: number;
+  DataLen: number;
+  CompressType?: number;
+  Section?: {
+    StartPos: number;
+    DataLen: number;
+  };
+}): Promise<any> => {
+  return api.post('/Tools/DownloadImg', params)
 }

@@ -2,8 +2,11 @@
 // 暂时注释掉 LazyImage 导入
 // import LazyImage from '@/components/common/LazyImage.vue'
 import type { ChatMessage } from '@/types/chat'
-import { Document, Picture, RefreshRight } from '@element-plus/icons-vue'
+import { Document, Picture, RefreshRight, Loading } from '@element-plus/icons-vue'
+import EmojiImage from '@/components/common/EmojiImage.vue'
+import ImageMessage from '@/components/common/ImageMessage.vue'
 import { computed } from 'vue'
+import { useChatStore } from '@/stores/chat'
 
 interface Props {
   message: ChatMessage
@@ -25,6 +28,21 @@ const props = withDefaults(defineProps<Props>(), {
   avatarText: '',
   myAvatar: '',
   myAvatarText: '我',
+})
+
+const chatStore = useChatStore()
+
+// 安全地解析消息ID为数字
+const getMsgId = computed(() => {
+  const id = props.message.id
+  if (!id) return 0
+
+  // 如果已经是数字，直接返回
+  if (typeof id === 'number') return id
+
+  // 如果是字符串，尝试解析
+  const parsed = parseInt(id.toString(), 10)
+  return isNaN(parsed) ? 0 : parsed
 })
 
 const emit = defineEmits<Emits>()
@@ -121,6 +139,8 @@ function getSenderDisplayName() {
   }
   return '未知用户'
 }
+
+
 </script>
 
 <template>
@@ -166,25 +186,24 @@ function getSenderDisplayName() {
 
           <!-- 图片消息 -->
           <div v-else-if="message.type === 'image'" class="message-image">
-            <div v-if="!message.imageData" class="image-placeholder">
+            <ImageMessage
+              v-if="chatStore.currentSession"
+              :msg-id="getMsgId"
+              :wxid="chatStore.currentSession.sessionId"
+              :to-wxid="message.fromMe ? message.sessionId : chatStore.currentSession.sessionId"
+              :aes-key="message.imageAesKey"
+              :md5="message.imageMd5"
+              :data-len="message.imageDataLen"
+              :compress-type="message.imageCompressType"
+              :image-data="message.imageData"
+              :image-path="message.imagePath"
+            />
+            <div v-else class="image-placeholder">
               <el-icon class="image-placeholder-icon">
                 <Picture />
               </el-icon>
-              <span class="image-placeholder-text">图片加载中...</span>
+              <span class="image-placeholder-text">图片</span>
             </div>
-            <el-image
-              v-else :src="message.imageData" fit="cover" :preview-src-list="message.imageData ? [message.imageData] : []"
-              class="image-content" :hide-on-click-modal="true"
-            >
-              <template #error>
-                <div class="image-error">
-                  <el-icon class="image-error-icon">
-                    <Picture />
-                  </el-icon>
-                  <span class="image-error-text">图片加载失败</span>
-                </div>
-              </template>
-            </el-image>
           </div>
 
           <!-- 文件消息 -->
@@ -207,22 +226,16 @@ function getSenderDisplayName() {
           <!-- 表情消息 -->
           <div v-else-if="message.type === 'emoji'" class="message-emoji">
             <!-- 如果有表情URL，显示表情图片 -->
-            <div v-if="message.emojiUrl || message.emojiThumbUrl" class="emoji-image">
-              <el-image
-                :src="message.emojiThumbUrl || message.emojiUrl || ''" fit="contain" class="emoji-content"
-                :preview-src-list="(message.emojiUrl || message.emojiThumbUrl) ? [message.emojiUrl || message.emojiThumbUrl].filter(Boolean) : []"
-                :hide-on-click-modal="true"
-              >
-                <template #error>
-                  <div class="emoji-error">
-                    <el-icon class="emoji-error-icon">
-                      <Picture />
-                    </el-icon>
-                    <span class="emoji-error-text">{{ message.content }}</span>
-                  </div>
-                </template>
-              </el-image>
-            </div>
+            <EmojiImage
+              v-if="message.emojiUrl || message.emojiThumbUrl"
+              :emoji-url="message.emojiUrl"
+              :emoji-thumb-url="message.emojiThumbUrl"
+              :emoji-extern-url="message.emojiExternUrl"
+              :emoji-aes-key="message.emojiAesKey"
+              :emoji-md5="message.emojiMd5"
+              :emoji-width="message.emojiWidth"
+              :emoji-height="message.emojiHeight"
+            />
             <!-- 如果没有URL，显示占位符 -->
             <div v-else class="emoji-placeholder">
               <el-icon class="emoji-icon">
@@ -253,25 +266,24 @@ function getSenderDisplayName() {
 
           <!-- 图片消息 -->
           <div v-else-if="message.type === 'image'" class="message-image">
-            <div v-if="!message.imageData" class="image-placeholder">
+            <ImageMessage
+              v-if="chatStore.currentSession"
+              :msg-id="getMsgId"
+              :wxid="chatStore.currentSession.sessionId"
+              :to-wxid="message.fromMe ? message.sessionId : chatStore.currentSession.sessionId"
+              :aes-key="message.imageAesKey"
+              :md5="message.imageMd5"
+              :data-len="message.imageDataLen"
+              :compress-type="message.imageCompressType"
+              :image-data="message.imageData"
+              :image-path="message.imagePath"
+            />
+            <div v-else class="image-placeholder">
               <el-icon class="image-placeholder-icon">
                 <Picture />
               </el-icon>
-              <span class="image-placeholder-text">图片加载中...</span>
+              <span class="image-placeholder-text">图片</span>
             </div>
-            <el-image
-              v-else :src="message.imageData" fit="cover" :preview-src-list="message.imageData ? [message.imageData] : []"
-              class="image-content" :hide-on-click-modal="true"
-            >
-              <template #error>
-                <div class="image-error">
-                  <el-icon class="image-error-icon">
-                    <Picture />
-                  </el-icon>
-                  <span class="image-error-text">图片加载失败</span>
-                </div>
-              </template>
-            </el-image>
           </div>
 
           <!-- 文件消息 -->
@@ -294,22 +306,16 @@ function getSenderDisplayName() {
           <!-- 表情消息 -->
           <div v-else-if="message.type === 'emoji'" class="message-emoji">
             <!-- 如果有表情URL，显示表情图片 -->
-            <div v-if="message.emojiUrl || message.emojiThumbUrl" class="emoji-image">
-              <el-image
-                :src="message.emojiThumbUrl || message.emojiUrl || ''" fit="contain" class="emoji-content"
-                :preview-src-list="(message.emojiUrl || message.emojiThumbUrl) ? [message.emojiUrl || message.emojiThumbUrl].filter(Boolean) : []"
-                :hide-on-click-modal="true"
-              >
-                <template #error>
-                  <div class="emoji-error">
-                    <el-icon class="emoji-error-icon">
-                      <Picture />
-                    </el-icon>
-                    <span class="emoji-error-text">{{ message.content }}</span>
-                  </div>
-                </template>
-              </el-image>
-            </div>
+            <EmojiImage
+              v-if="message.emojiUrl || message.emojiThumbUrl"
+              :emoji-url="message.emojiUrl"
+              :emoji-thumb-url="message.emojiThumbUrl"
+              :emoji-extern-url="message.emojiExternUrl"
+              :emoji-aes-key="message.emojiAesKey"
+              :emoji-md5="message.emojiMd5"
+              :emoji-width="message.emojiWidth"
+              :emoji-height="message.emojiHeight"
+            />
             <!-- 如果没有URL，显示占位符 -->
             <div v-else class="emoji-placeholder">
               <el-icon class="emoji-icon">
@@ -553,9 +559,24 @@ function getSenderDisplayName() {
 .message-emoji {
   .emoji-image {
     .emoji-content {
-      max-width: 120px;
-      max-height: 120px;
       border-radius: 4px;
+      background: transparent;
+    }
+
+    .emoji-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 120px;
+      height: 120px;
+      background: var(--el-color-info-light-9);
+      border-radius: 4px;
+      color: var(--el-color-info);
+
+      .is-loading {
+        font-size: 24px;
+        animation: rotating 2s linear infinite;
+      }
     }
 
     .emoji-error {
@@ -618,6 +639,15 @@ function getSenderDisplayName() {
 .message-retry {
   .el-button {
     --el-button-size: 20px;
+  }
+}
+
+@keyframes rotating {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
   }
 }
 </style>
