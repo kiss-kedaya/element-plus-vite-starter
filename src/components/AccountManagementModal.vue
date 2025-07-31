@@ -1,11 +1,6 @@
 <template>
-  <BaseModal
-    v-model="visible"
-    :title="`管理账号 - ${account?.nickname || ''}`"
-    width="800px"
-    custom-class="account-management-modal"
-    @close="handleClose"
-  >
+  <BaseModal v-model="visible" :title="`管理账号 - ${account?.nickname || ''}`" width="800px"
+    custom-class="account-management-modal" @close="handleClose">
     <div v-if="account" class="account-management">
       <!-- 账号基本信息 -->
       <el-card class="account-info-card" shadow="never">
@@ -17,14 +12,14 @@
             </el-tag>
           </div>
         </template>
-        
+
         <div class="account-details">
           <div class="avatar-section">
             <el-avatar :src="account.headUrl || account.avatar" :size="80">
               {{ account.nickname.charAt(0) }}
             </el-avatar>
           </div>
-          
+
           <div class="info-section">
             <div class="info-grid">
               <div class="info-item">
@@ -85,11 +80,7 @@
         <template #header>
           <div class="card-header">
             <span>代理设置</span>
-            <el-switch
-              v-model="proxyEnabled"
-              @change="handleProxyToggle"
-              :loading="proxyLoading"
-            />
+            <el-switch v-model="proxyEnabled" @change="handleProxyToggle" :loading="proxyLoading" />
           </div>
         </template>
 
@@ -98,13 +89,8 @@
           <div class="proxy-presets">
             <div class="preset-label">快速设置</div>
             <div class="preset-buttons">
-              <el-button
-                v-for="preset in proxyPresets"
-                :key="preset.name"
-                size="small"
-                @click="applyPreset(preset)"
-                plain
-              >
+              <el-button v-for="preset in proxyPresets" :key="preset.name" size="small" @click="applyPreset(preset)"
+                plain>
                 {{ preset.name }}
               </el-button>
             </div>
@@ -121,39 +107,20 @@
             </div>
 
             <div class="proxy-address">
-              <el-input
-                v-model="proxyForm.Host"
-                placeholder="如: 127.0.0.1"
-                size="large"
-              />
+              <el-input v-model="proxyForm.Host" placeholder="如: 127.0.0.1" size="large" />
             </div>
 
             <div class="proxy-port">
-              <el-input-number
-                v-model="proxyForm.Port"
-                :min="1"
-                :max="65535"
-                placeholder="端口"
-                size="large"
-                controls-position="right"
-              />
+              <el-input-number v-model="proxyForm.Port" :min="1" :max="65535" placeholder="端口" size="large"
+                controls-position="right" />
             </div>
           </div>
 
           <!-- 认证信息 -->
           <div class="proxy-auth" v-if="needAuth">
-            <el-input
-              v-model="proxyForm.ProxyUser"
-              placeholder="用户名 (可选)"
-              size="large"
-            />
-            <el-input
-              v-model="proxyForm.ProxyPassword"
-              type="password"
-              placeholder="密码 (可选)"
-              size="large"
-              show-password
-            />
+            <el-input v-model="proxyForm.ProxyUser" placeholder="用户名 (可选)" size="large" />
+            <el-input v-model="proxyForm.ProxyPassword" type="password" placeholder="密码 (可选)" size="large"
+              show-password />
           </div>
 
           <!-- 操作按钮 -->
@@ -177,47 +144,36 @@
         <template #header>
           <span>账号操作</span>
         </template>
-        
+
         <div class="action-buttons">
-          <el-button
-            v-if="account.status === 'offline'"
-            type="primary"
-            @click="showReloginDialog = true"
-            :loading="reloginLoading"
-          >
-            <el-icon><Refresh /></el-icon>
+          <el-button v-if="account.status === 'offline'" type="primary" @click="showReloginDialog = true"
+            :loading="reloginLoading">
+            <el-icon>
+              <Refresh />
+            </el-icon>
             设备复用重新登录
           </el-button>
 
-          <el-button
-            v-else
-            type="default"
-            @click="disconnectAccount"
-            :loading="disconnectLoading"
-            class="warning-button"
-          >
-            <el-icon><SwitchButton /></el-icon>
+          <el-button v-else type="default" @click="disconnectAccount" :loading="disconnectLoading"
+            class="warning-button">
+            <el-icon>
+              <SwitchButton />
+            </el-icon>
             断开连接
           </el-button>
 
-          <el-button
-            v-if="account.status === 'online'"
-            type="success"
-            @click="enableHeartbeat"
-            :loading="heartbeatLoading"
-            plain
-          >
-            <el-icon><Timer /></el-icon>
+          <el-button v-if="account.status === 'online'" type="success" @click="enableHeartbeat"
+            :loading="heartbeatLoading" plain>
+            <el-icon>
+              <Timer />
+            </el-icon>
             开启心跳
           </el-button>
 
-          <el-button
-            type="default"
-            @click="removeAccount"
-            :loading="removeLoading"
-            class="danger-button"
-          >
-            <el-icon><Delete /></el-icon>
+          <el-button type="default" @click="removeAccount" :loading="removeLoading" class="danger-button">
+            <el-icon>
+              <Delete />
+            </el-icon>
             删除账号
           </el-button>
         </div>
@@ -226,12 +182,7 @@
   </BaseModal>
 
   <!-- 重新登录对话框 - 移到外层避免嵌套 -->
-  <BaseModal
-    v-model="showReloginDialog"
-    title="设备复用重新登录"
-    width="400px"
-    append-to-body
-  >
+  <BaseModal v-model="showReloginDialog" title="设备复用重新登录" width="400px" append-to-body>
     <div v-if="qrCodeUrl" class="qr-login">
       <div class="qr-container">
         <img :src="qrCodeUrl" alt="登录二维码" class="qr-image" />
@@ -369,14 +320,14 @@ const handleProxyToggle = (enabled: boolean) => {
 
 const saveProxy = async () => {
   if (!props.account) return
-  
+
   proxyLoading.value = true
   try {
     const response = await loginApi.setProxy({
       Wxid: props.account.wxid,
       Proxy: proxyForm.value
     })
-    
+
     if (response.Success) {
       ElMessage.success('代理设置保存成功')
       // 更新本地账号数据
@@ -397,14 +348,14 @@ const saveProxy = async () => {
 
 const clearProxy = async () => {
   if (!props.account) return
-  
+
   proxyLoading.value = true
   try {
     const response = await loginApi.setProxy({
       Wxid: props.account.wxid,
       Proxy: {}
     })
-    
+
     if (response.Success) {
       ElMessage.success('代理设置已清除')
       proxyEnabled.value = false
@@ -679,14 +630,14 @@ const enableHeartbeat = async () => {
 
 const disconnectAccount = async () => {
   if (!props.account) return
-  
+
   try {
     await ElMessageBox.confirm(
       `确定要断开账号 ${props.account.nickname} 的连接吗？`,
       '确认断开',
       { type: 'warning' }
     )
-    
+
     disconnectLoading.value = true
     // 这里应该调用断开连接的API
     // 暂时模拟断开
@@ -702,14 +653,14 @@ const disconnectAccount = async () => {
 
 const removeAccount = async () => {
   if (!props.account) return
-  
+
   try {
     await ElMessageBox.confirm(
       `确定要删除账号 ${props.account.nickname} 吗？此操作不可恢复！`,
       '确认删除',
       { type: 'error' }
     )
-    
+
     removeLoading.value = true
     authStore.removeAccount(props.account.wxid)
     ElMessage.success('账号已删除')

@@ -59,9 +59,14 @@ async function removeAccount(account) {
 <template>
   <div class="account-manager">
     <el-table :data="authStore.accounts" style="width: 100%">
-      <el-table-column prop="nickname" label="昵称" width="120" />
-      <el-table-column prop="wxid" label="微信号" width="150" />
-      <el-table-column prop="deviceType" label="设备类型" width="100" />
+      <el-table-column label="账号信息" width="250">
+        <template #default="scope">
+          <div class="account-info">
+            <span class="nickname">{{ scope.row.nickname }}</span>
+            <span class="wxid">[{{ scope.row.wxid }}]</span>
+          </div>
+        </template>
+      </el-table-column>
       <el-table-column prop="status" label="状态" width="80">
         <template #default="scope">
           <el-tag :type="scope.row.status === 'online' ? 'success' : 'danger'">
