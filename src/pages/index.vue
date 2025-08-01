@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 // import { useAuthStore } from '@/stores/auth'
 import { ElMessage } from 'element-plus'
-import { User, ChatDotRound, UserFilled } from '@element-plus/icons-vue'
+import { User, ChatDotRound, UserFilled, Setting } from '@element-plus/icons-vue'
 
 const router = useRouter()
 // const authStore = useAuthStore()
@@ -23,6 +23,10 @@ const goToLogin = () => {
 
 const goToChat = () => {
   router.push('/dashboard')
+}
+
+const goToProxyTest = () => {
+  router.push('/proxy-test')
 }
 </script>
 
@@ -77,6 +81,15 @@ const goToChat = () => {
             @click="goToChat"
           >
             进入聊天
+          </el-button>
+
+          <el-button
+            type="warning"
+            size="large"
+            @click="goToProxyTest"
+          >
+            <el-icon><Setting /></el-icon>
+            代理管理
           </el-button>
         </div>
       </div>

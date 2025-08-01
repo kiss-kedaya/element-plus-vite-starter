@@ -21,6 +21,7 @@ export const loginApi = {
       Mac: '/Login/LoginGetQRMac',
       AndroidPad: '/Login/LoginGetQRPad',
       AndroidPadX: '/Login/LoginGetQRPadx',
+      Car: '/Login/LoginGetQRCar',
     }
 
     const endpoint = endpoints[deviceType] || endpoints.iPad
@@ -30,75 +31,83 @@ export const loginApi = {
       Success: response.success,
       Message: response.message,
       Data: response.data
-    }
+    } as QRCodeResponse
   },
 
   // 62数据登录
   loginWithData62: async (params: Data62LoginRequest): Promise<LoginResponse> => {
-    const response = await request.post<LoginResponse>('/Login/Data62Login', params)
+    const response = await request.post<any>('/Login/Data62Login', params)
     return {
       Code: response.code,
       Success: response.success,
       Message: response.message,
       Data: response.data
-    }
+    } as LoginResponse
   },
 
   // A16登录
   loginWithA16: async (params: A16LoginRequest): Promise<LoginResponse> => {
-    const response = await request.post<LoginResponse>('/Login/A16Data', params)
+    const response = await request.post<any>('/Login/A16Data', params)
     return {
       Code: response.code,
       Success: response.success,
       Message: response.message,
       Data: response.data
-    }
+    } as LoginResponse
   },
 
   // 检查二维码状态
   checkQRCodeStatus: async (params: { Uuid: string }): Promise<LoginResponse> => {
-    const response = await request.post<LoginResponse>('/Login/LoginCheckQR', params)
+    const response = await request.post<any>(`/Login/LoginCheckQR?uuid=${encodeURIComponent(params.Uuid)}`)
     return {
       Code: response.code,
       Success: response.success,
       Message: response.message,
       Data: response.data
-    }
+    } as LoginResponse
   },
 
   // 退出登录
   logout: async (wxid: string): Promise<LoginResponse> => {
-    const response = await request.post<LoginResponse>('/Login/Logout', { Wxid: wxid })
+    const response = await request.post<any>('/Login/Logout', { Wxid: wxid })
     return {
       Code: response.code,
       Success: response.success,
       Message: response.message,
       Data: response.data
-    }
+    } as LoginResponse
   },
 
   // 获取已登录账号列表
-  getLoggedAccounts: async (): Promise<any> => {
+  getLoggedAccounts: async (): Promise<LoginResponse> => {
     const response = await request.get<any>('/Login/GetLoggedAccounts', { api_key: 'api_kedaya' })
-    return response
+    return {
+      Code: response.code,
+      Success: response.success,
+      Message: response.message,
+      Data: response.data
+    } as LoginResponse
   },
 
   // 设置代理
   setProxy: async (params: SetProxyRequest): Promise<LoginResponse> => {
-    const response = await request.post<LoginResponse>('/Tools/setproxy', params)
+    const response = await request.post<any>('/Tools/setproxy', params)
     return {
       Code: response.code,
       Success: response.success,
       Message: response.message,
       Data: response.data
-    }
+    } as LoginResponse
   },
 
   // 设备复用登录 - 生成二维码
   getQRCodeForDeviceReuse: async (params: QRCodeLoginRequest): Promise<QRCodeResponse> => {
     const response = await request.post<any>('/Login/LoginGetQRCar', params)
-
-    // 直接返回原始响应，因为API返回的字段就是大写的
-    return response
+    return {
+      Code: response.code,
+      Success: response.success,
+      Message: response.message,
+      Data: response.data
+    } as QRCodeResponse
   },
 }

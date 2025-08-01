@@ -3,10 +3,11 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 // import { useAuthStore } from '@/stores/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Picture, User, Setting, Monitor } from '@element-plus/icons-vue'
+import { Picture, User, Setting, Monitor, Refresh } from '@element-plus/icons-vue'
 import QRCode from 'qrcode'
 import type { ProxyConfig, LoginAccount } from '@/types/auth'
 import { proxyApi, type ProxyInfo, getProxyDisplayName } from '@/api/proxy'
+import ProxyManagement from '@/components/business/ProxyManagement.vue'
 
 const router = useRouter()
 // const authStore = useAuthStore()
@@ -232,6 +233,40 @@ const refreshProxyList = () => {
   loadAvailableProxies()
 }
 
+// 处理二维码登录代理模式变化
+const handleQrProxyModeChange = () => {
+  if (qrProxyMode.value === 'none') {
+    // 清空代理配置
+    Object.assign(qrForm.proxy, {
+      ProxyIp: '',
+      ProxyUser: '',
+      ProxyPassword: '',
+      Host: '',
+      Port: 0,
+      Type: 'socks5'
+    })
+  }
+  selectedProxyId.value = null
+  selectedProxy.value = null
+}
+
+// 处理密码登录代理模式变化
+const handlePasswordProxyModeChange = () => {
+  if (passwordProxyMode.value === 'none') {
+    // 清空代理配置
+    Object.assign(passwordForm.proxy, {
+      ProxyIp: '',
+      ProxyUser: '',
+      ProxyPassword: '',
+      Host: '',
+      Port: 0,
+      Type: 'socks5'
+    })
+  }
+  selectedProxyId.value = null
+  selectedProxy.value = null
+}
+
 // 组件挂载时加载代理列表
 onMounted(() => {
   loadAvailableProxies()
@@ -406,18 +441,78 @@ onMounted(() => {
               
               <el-collapse>
                 <el-collapse-item title="代理设置（可选）" name="proxy">
-                  <el-form-item label="代理IP">
-                    <el-input v-model="passwordForm.proxy.ProxyIp" placeholder="代理服务器IP" />
+                  <!-- 代理选择方式 -->
+                  <el-form-item label="代理配置">
+                    <el-radio-group v-model="passwordProxyMode" @change="handlePasswordProxyModeChange">
+                      <el-radio value="none">不使用代理</el-radio>
+                      <el-radio value="preset">选择已有代理</el-radio>
+                      <el-radio value="manual">手动配置</el-radio>
+                    </el-radio-group>
                   </el-form-item>
-                  <el-form-item label="代理端口">
-                    <el-input-number v-model="passwordForm.proxy.Port" placeholder="代理端口" />
-                  </el-form-item>
-                  <el-form-item label="用户名">
-                    <el-input v-model="passwordForm.proxy.ProxyUser" placeholder="代理用户名（可选）" />
-                  </el-form-item>
-                  <el-form-item label="密码">
-                    <el-input v-model="passwordForm.proxy.ProxyPassword" type="password" placeholder="代理密码（可选）" />
-                  </el-form-item>
+
+                  <!-- 选择已有代理 -->
+                  <template v-if="passwordProxyMode === 'preset'">
+                    <el-form-item label="地区筛选">
+                      <el-select v-model="selectedCountry" placeholder="选择地区" clearable @change="filterProxiesByCountry">
+                        <el-option label="全部地区" value="" />
+                        <el-option v-for="country in availableCountries" :key="country" :label="country" :value="country" />
+                      </el-select>
+                    </el-form-item>
+
+                    <el-form-item label="选择代理">
+                      <el-select
+                        v-model="selectedProxyId"
+                        placeholder="选择一个可用的代理"
+                        filterable
+                        @change="handleProxySelect"
+                        style="width: 100%"
+                      >
+                        <el-option
+                          v-for="proxy in filteredProxies"
+                          :key="proxy.id"
+                          :label="getProxyDisplayName(proxy)"
+                          :value="proxy.id"
+                          :disabled="proxy.status !== 'active'"
+                        />
+                      </el-select>
+                    </el-form-item>
+
+                    <el-form-item v-if="selectedProxy">
+                      <el-alert
+                        :title="`已选择代理: ${selectedProxy.ip}:${selectedProxy.port} [${selectedProxy.country || '未知地区'}]`"
+                        type="success"
+                        :closable="false"
+                        show-icon
+                      />
+                    </el-form-item>
+
+                    <div class="proxy-actions">
+                      <el-button size="small" @click="refreshProxyList">
+                        <el-icon><Refresh /></el-icon>
+                        刷新列表
+                      </el-button>
+                      <el-button size="small" type="primary" @click="showProxyManagement = true">
+                        <el-icon><Setting /></el-icon>
+                        管理代理
+                      </el-button>
+                    </div>
+                  </template>
+
+                  <!-- 手动配置代理 -->
+                  <template v-if="passwordProxyMode === 'manual'">
+                    <el-form-item label="代理IP">
+                      <el-input v-model="passwordForm.proxy.ProxyIp" placeholder="代理服务器IP" />
+                    </el-form-item>
+                    <el-form-item label="代理端口">
+                      <el-input-number v-model="passwordForm.proxy.Port" placeholder="代理端口" />
+                    </el-form-item>
+                    <el-form-item label="用户名">
+                      <el-input v-model="passwordForm.proxy.ProxyUser" placeholder="代理用户名（可选）" />
+                    </el-form-item>
+                    <el-form-item label="密码">
+                      <el-input v-model="passwordForm.proxy.ProxyPassword" type="password" placeholder="代理密码（可选）" />
+                    </el-form-item>
+                  </template>
                 </el-collapse-item>
               </el-collapse>
             </el-form>
@@ -439,6 +534,11 @@ onMounted(() => {
         <el-button @click="goBack">返回首页</el-button>
       </div>
     </div>
+
+    <!-- 代理管理对话框 -->
+    <el-dialog v-model="showProxyManagement" title="代理管理" width="80%" top="5vh">
+      <ProxyManagement @proxy-updated="refreshProxyList" />
+    </el-dialog>
   </div>
 </template>
 
@@ -516,6 +616,35 @@ onMounted(() => {
 
 .el-collapse {
   margin: 1rem 0;
+}
+
+.proxy-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.proxy-actions .el-button {
+  flex: 1;
+}
+
+:deep(.el-collapse-item__header) {
+  font-weight: 500;
+}
+
+:deep(.el-radio-group) {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+:deep(.el-radio) {
+  margin-right: 0;
+  margin-bottom: 8px;
+}
+
+:deep(.el-alert) {
+  margin-top: 8px;
 }
 
 @media (max-width: 768px) {

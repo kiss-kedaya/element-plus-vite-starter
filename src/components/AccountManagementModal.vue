@@ -247,6 +247,7 @@ const qrCodeUrl = ref('')
 const qrLoading = ref(false)
 const qrStatus = ref('等待获取二维码')
 const qrCheckTimer = ref<NodeJS.Timeout | null>(null)
+const qrTimeoutTimer = ref<NodeJS.Timeout | null>(null)
 const currentUuid = ref('')
 
 // 代理预设配置
@@ -386,11 +387,8 @@ const clearProxy = async () => {
 const generateQRCode = async () => {
   if (!props.account) return
 
-  // 清除之前的检查定时器
-  if (qrCheckTimer.value) {
-    clearInterval(qrCheckTimer.value)
-    qrCheckTimer.value = null
-  }
+  // 清除之前的所有定时器
+  clearQRTimer()
 
   qrLoading.value = true
   qrStatus.value = '正在获取二维码...'
@@ -452,6 +450,12 @@ const startQRCodeCheck = () => {
     qrCheckTimer.value = null
   }
 
+  // 清除之前的超时定时器
+  if (qrTimeoutTimer.value) {
+    clearTimeout(qrTimeoutTimer.value)
+    qrTimeoutTimer.value = null
+  }
+
   // 每2秒检查一次二维码状态
   qrCheckTimer.value = setInterval(async () => {
     try {
@@ -462,12 +466,16 @@ const startQRCodeCheck = () => {
   }, 2000)
 
   // 设置5分钟超时
-  setTimeout(() => {
+  qrTimeoutTimer.value = setTimeout(() => {
     if (qrCheckTimer.value) {
       clearInterval(qrCheckTimer.value)
       qrCheckTimer.value = null
-      qrStatus.value = '二维码已过期，请刷新'
     }
+    if (qrTimeoutTimer.value) {
+      clearTimeout(qrTimeoutTimer.value)
+      qrTimeoutTimer.value = null
+    }
+    qrStatus.value = '二维码已过期，请刷新'
   }, 300000) // 5分钟
 }
 
@@ -476,29 +484,18 @@ const checkQRCodeStatus = async () => {
   if (!currentUuid.value) return
 
   try {
-    const response = await fetch('http://localhost:8059/api/Login/LoginCheckQR', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: `uuid=${encodeURIComponent(currentUuid.value)}`
-    })
+    const response = await loginApi.checkQRCodeStatus({ Uuid: currentUuid.value })
 
-    const result = await response.json()
-
-    if (result.Success && result.Message === "登录成功") {
+    if (response.Success && response.Message === "登录成功") {
       // 登录成功
-      if (qrCheckTimer.value) {
-        clearInterval(qrCheckTimer.value)
-        qrCheckTimer.value = null
-      }
+      clearQRTimer()
 
       qrStatus.value = '登录成功！正在初始化...'
       ElMessage.success('扫码登录成功！')
 
       // 执行二次登录
-      if (result.Data && result.Data.wxid) {
-        await performSecondAuth(result.Data.wxid)
+      if (response.Data && response.Data.wxid) {
+        await performSecondAuth(response.Data.wxid)
       }
 
       // 关闭模态框并刷新
@@ -507,16 +504,13 @@ const checkQRCodeStatus = async () => {
         emit('refresh')
       }, 2000)
 
-    } else if (result.Success && result.Data) {
+    } else if (response.Success && response.Data) {
       // API调用成功，根据Data中的状态判断
-      const data = result.Data
+      const data = response.Data
 
       if (data.expiredTime <= 0) {
         // 二维码已过期
-        if (qrCheckTimer.value) {
-          clearInterval(qrCheckTimer.value)
-          qrCheckTimer.value = null
-        }
+        clearQRTimer()
         qrStatus.value = '二维码已过期，请刷新'
 
       } else if (data.status === 0) {
@@ -529,10 +523,7 @@ const checkQRCodeStatus = async () => {
 
       } else if (data.status === 4) {
         // 用户取消登录
-        if (qrCheckTimer.value) {
-          clearInterval(qrCheckTimer.value)
-          qrCheckTimer.value = null
-        }
+        clearQRTimer()
         qrStatus.value = '用户取消登录'
 
       } else {
@@ -542,8 +533,8 @@ const checkQRCodeStatus = async () => {
 
     } else {
       // API调用失败
-      console.error('二维码检测失败:', result)
-      qrStatus.value = `检测失败: ${result.Message || '未知错误'}`
+      console.error('二维码检测失败:', response)
+      qrStatus.value = `检测失败: ${response.Message || '未知错误'}`
     }
   } catch (error: any) {
     console.error('检测二维码状态失败:', error)
@@ -593,6 +584,10 @@ const clearQRTimer = () => {
   if (qrCheckTimer.value) {
     clearInterval(qrCheckTimer.value)
     qrCheckTimer.value = null
+  }
+  if (qrTimeoutTimer.value) {
+    clearTimeout(qrTimeoutTimer.value)
+    qrTimeoutTimer.value = null
   }
 }
 
@@ -688,6 +683,16 @@ watch(showReloginDialog, (show) => {
     qrCodeUrl.value = ''
     currentUuid.value = ''
     qrStatus.value = '等待获取二维码'
+  }
+})
+
+// 监听主模态框关闭，确保清理所有定时器
+watch(visible, (show) => {
+  if (!show) {
+    // 主模态框关闭时清理所有定时器
+    clearQRTimer()
+    // 同时关闭重新登录对话框
+    showReloginDialog.value = false
   }
 })
 

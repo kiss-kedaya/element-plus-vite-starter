@@ -199,7 +199,7 @@ const downloadCdnFile = async () => {
   try {
     const downloadParams = {
       Wxid: props.wxid,
-      AppID: props.appId
+      AppID: props.appId,
       AttachId: props.attachId,
       UserName: props.userName,
       DataLen: props.fileSize,
