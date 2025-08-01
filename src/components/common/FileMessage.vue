@@ -199,7 +199,7 @@ const downloadCdnFile = async () => {
   try {
     const downloadParams = {
       Wxid: props.wxid,
-      AppID: props.appId || 'wx6618f1cfc6c132f8', // 默认AppID
+      AppID: props.appId
       AttachId: props.attachId,
       UserName: props.userName,
       DataLen: props.fileSize,

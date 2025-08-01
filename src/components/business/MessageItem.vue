@@ -257,8 +257,8 @@ function getAppIdFromMessage(): string {
       return appIdMatch[1]
     }
   }
-  // 默认AppID（微信电脑版）
-  return 'wx6618f1cfc6c132f8'
+
+  return ''
 }
 
 // 打开链接

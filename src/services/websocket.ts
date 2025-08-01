@@ -412,7 +412,7 @@ export class WebSocketService {
             try {
               // 解析AppID
               const appIdMatch = msg.originalContent.match(/<appmsg appid="([^"]*)"/)
-              const appId = appIdMatch ? appIdMatch[1] : 'wx6618f1cfc6c132f8'
+              const appId = appIdMatch ? appIdMatch[1] : ''
 
               fileCacheManager.addFileToCache({
                 fileName: fileName,

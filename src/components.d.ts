@@ -64,6 +64,7 @@ declare module 'vue' {
     Logos: typeof import('./components/Logos.vue')['default']
     MessageBoxDemo: typeof import('./components/MessageBoxDemo.vue')['default']
     MessageItem: typeof import('./components/business/MessageItem.vue')['default']
+    ProxyManagement: typeof import('./components/business/ProxyManagement.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     VideoMessage: typeof import('./components/common/VideoMessage.vue')['default']

@@ -6,6 +6,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Picture, User, Setting, Monitor } from '@element-plus/icons-vue'
 import QRCode from 'qrcode'
 import type { ProxyConfig, LoginAccount } from '@/types/auth'
+import { proxyApi, type ProxyInfo, getProxyDisplayName } from '@/api/proxy'
 
 const router = useRouter()
 // const authStore = useAuthStore()
@@ -146,6 +147,95 @@ const resetQRCode = () => {
 const goBack = () => {
   router.push('/')
 }
+
+// 代理相关数据
+const availableProxies = ref<ProxyInfo[]>([])
+const filteredProxies = ref<ProxyInfo[]>([])
+const availableCountries = ref<string[]>([])
+const selectedCountry = ref('')
+const selectedProxyId = ref<number | null>(null)
+const selectedProxy = ref<ProxyInfo | null>(null)
+const showProxyManagement = ref(false)
+const qrProxyMode = ref('none') // 二维码登录代理模式
+const passwordProxyMode = ref('none') // 密码登录代理模式
+
+// 获取可用代理列表
+const loadAvailableProxies = async () => {
+  try {
+    const response = await proxyApi.getAvailableProxies()
+    if (response.code === 0) {
+      availableProxies.value = response.data.list
+      filteredProxies.value = response.data.list
+
+      // 提取地区列表
+      const countries = new Set<string>()
+      response.data.list.forEach(proxy => {
+        if (proxy.country) {
+          countries.add(proxy.country)
+        }
+      })
+      availableCountries.value = Array.from(countries).sort()
+    }
+  } catch (error) {
+    console.error('获取代理列表失败:', error)
+  }
+}
+
+// 根据地区筛选代理
+const filterProxiesByCountry = () => {
+  if (selectedCountry.value) {
+    filteredProxies.value = availableProxies.value.filter(proxy =>
+      proxy.country === selectedCountry.value
+    )
+  } else {
+    filteredProxies.value = availableProxies.value
+  }
+  selectedProxyId.value = null
+  selectedProxy.value = null
+}
+
+// 选择代理
+const handleProxySelect = () => {
+  if (selectedProxyId.value) {
+    selectedProxy.value = availableProxies.value.find(proxy =>
+      proxy.id === selectedProxyId.value
+    ) || null
+
+    if (selectedProxy.value) {
+      // 更新表单数据
+      updateFormProxy(selectedProxy.value)
+    }
+  }
+}
+
+// 更新表单代理配置
+const updateFormProxy = (proxy: ProxyInfo) => {
+  const proxyConfig = {
+    ProxyIp: proxy.ip,
+    ProxyUser: proxy.username,
+    ProxyPassword: proxy.password,
+    Host: proxy.ip,
+    Port: proxy.port,
+    Type: 'socks5'
+  }
+
+  // 更新当前活动标签页的表单
+  if (activeTab.value === 'qrcode') {
+    Object.assign(qrForm.proxy, proxyConfig)
+  } else if (activeTab.value === 'password') {
+    Object.assign(passwordForm.proxy, proxyConfig)
+  }
+}
+
+// 刷新代理列表
+const refreshProxyList = () => {
+  loadAvailableProxies()
+}
+
+// 组件挂载时加载代理列表
+onMounted(() => {
+  loadAvailableProxies()
+})
 </script>
 
 <template>
@@ -187,18 +277,78 @@ const goBack = () => {
               
               <el-collapse>
                 <el-collapse-item title="代理设置（可选）" name="proxy">
-                  <el-form-item label="代理IP">
-                    <el-input v-model="qrForm.proxy.ProxyIp" placeholder="代理服务器IP" />
+                  <!-- 代理选择方式 -->
+                  <el-form-item label="代理配置">
+                    <el-radio-group v-model="qrProxyMode" @change="handleQrProxyModeChange">
+                      <el-radio value="none">不使用代理</el-radio>
+                      <el-radio value="preset">选择已有代理</el-radio>
+                      <el-radio value="manual">手动配置</el-radio>
+                    </el-radio-group>
                   </el-form-item>
-                  <el-form-item label="代理端口">
-                    <el-input-number v-model="qrForm.proxy.Port" placeholder="代理端口" />
-                  </el-form-item>
-                  <el-form-item label="用户名">
-                    <el-input v-model="qrForm.proxy.ProxyUser" placeholder="代理用户名（可选）" />
-                  </el-form-item>
-                  <el-form-item label="密码">
-                    <el-input v-model="qrForm.proxy.ProxyPassword" type="password" placeholder="代理密码（可选）" />
-                  </el-form-item>
+
+                  <!-- 选择已有代理 -->
+                  <template v-if="qrProxyMode === 'preset'">
+                    <el-form-item label="地区筛选">
+                      <el-select v-model="selectedCountry" placeholder="选择地区" clearable @change="filterProxiesByCountry">
+                        <el-option label="全部地区" value="" />
+                        <el-option v-for="country in availableCountries" :key="country" :label="country" :value="country" />
+                      </el-select>
+                    </el-form-item>
+
+                    <el-form-item label="选择代理">
+                      <el-select
+                        v-model="selectedProxyId"
+                        placeholder="选择一个可用的代理"
+                        filterable
+                        @change="handleProxySelect"
+                        style="width: 100%"
+                      >
+                        <el-option
+                          v-for="proxy in filteredProxies"
+                          :key="proxy.id"
+                          :label="getProxyDisplayName(proxy)"
+                          :value="proxy.id"
+                          :disabled="proxy.status !== 'active'"
+                        />
+                      </el-select>
+                    </el-form-item>
+
+                    <el-form-item v-if="selectedProxy">
+                      <el-alert
+                        :title="`已选择代理: ${selectedProxy.ip}:${selectedProxy.port} [${selectedProxy.country || '未知地区'}]`"
+                        type="success"
+                        :closable="false"
+                        show-icon
+                      />
+                    </el-form-item>
+
+                    <div class="proxy-actions">
+                      <el-button size="small" @click="refreshProxyList">
+                        <el-icon><Refresh /></el-icon>
+                        刷新列表
+                      </el-button>
+                      <el-button size="small" type="primary" @click="showProxyManagement = true">
+                        <el-icon><Setting /></el-icon>
+                        管理代理
+                      </el-button>
+                    </div>
+                  </template>
+
+                  <!-- 手动配置代理 -->
+                  <template v-if="qrProxyMode === 'manual'">
+                    <el-form-item label="代理IP">
+                      <el-input v-model="qrForm.proxy.ProxyIp" placeholder="代理服务器IP" />
+                    </el-form-item>
+                    <el-form-item label="代理端口">
+                      <el-input-number v-model="qrForm.proxy.Port" placeholder="代理端口" />
+                    </el-form-item>
+                    <el-form-item label="用户名">
+                      <el-input v-model="qrForm.proxy.ProxyUser" placeholder="代理用户名（可选）" />
+                    </el-form-item>
+                    <el-form-item label="密码">
+                      <el-input v-model="qrForm.proxy.ProxyPassword" type="password" placeholder="代理密码（可选）" />
+                    </el-form-item>
+                  </template>
                 </el-collapse-item>
               </el-collapse>
             </el-form>
