@@ -214,6 +214,7 @@ import { Refresh, SwitchButton, Delete, Timer } from '@element-plus/icons-vue'
 import type { LoginAccount, ProxyConfig } from '@/types/auth'
 import { loginApi } from '@/api/auth'
 import { useAuthStore } from '@/stores/auth'
+import { useTimerManager } from '@/utils/timerManager'
 
 // Props
 const props = defineProps<{
@@ -229,6 +230,7 @@ const emit = defineEmits<{
 
 // Store
 const authStore = useAuthStore()
+const { createTimer, clearTimer, clearAllTimers } = useTimerManager()
 
 // 响应式数据
 const visible = computed({
@@ -310,6 +312,9 @@ const formatTime = (time: string | Date | undefined) => {
 }
 
 const handleClose = () => {
+  console.log('模态框关闭，清理定时器')
+  clearQRTimer()
+  showReloginDialog.value = false
   visible.value = false
 }
 
@@ -457,26 +462,22 @@ const startQRCodeCheck = () => {
   }
 
   // 每2秒检查一次二维码状态
-  qrCheckTimer.value = setInterval(async () => {
+  const timerKey = `qr-check-${props.account?.wxid || 'unknown'}`
+  createTimer(timerKey, async () => {
     try {
       await checkQRCodeStatus()
     } catch (error) {
       console.error('检测二维码状态失败:', error)
     }
-  }, 2000)
+  }, 2000, 'interval')
 
   // 设置5分钟超时
-  qrTimeoutTimer.value = setTimeout(() => {
-    if (qrCheckTimer.value) {
-      clearInterval(qrCheckTimer.value)
-      qrCheckTimer.value = null
-    }
-    if (qrTimeoutTimer.value) {
-      clearTimeout(qrTimeoutTimer.value)
-      qrTimeoutTimer.value = null
-    }
+  const timeoutKey = `qr-timeout-${props.account?.wxid || 'unknown'}`
+  createTimer(timeoutKey, () => {
+    clearTimer(timerKey)
+    clearTimer(timeoutKey)
     qrStatus.value = '二维码已过期，请刷新'
-  }, 300000) // 5分钟
+  }, 300000, 'timeout') // 5分钟
 }
 
 // 检查二维码状态
@@ -491,7 +492,34 @@ const checkQRCodeStatus = async () => {
       clearQRTimer()
 
       qrStatus.value = '登录成功！正在初始化...'
-      ElMessage.success('扫码登录成功！')
+
+      // 如果账号有代理配置，登录成功后自动设置代理
+      if (props.account?.proxy && props.account.proxy.Host) {
+        try {
+          console.log('登录成功，正在设置代理...', props.account.proxy)
+          const proxyResponse = await loginApi.setProxy({
+            Wxid: response.Data.wxid,
+            Type: props.account.proxy.Type || 'SOCKS5',
+            Host: props.account.proxy.Host,
+            Port: props.account.proxy.Port,
+            User: props.account.proxy.ProxyUser || '',
+            Password: props.account.proxy.ProxyPassword || ''
+          })
+
+          if (proxyResponse.Success) {
+            console.log('代理设置成功:', proxyResponse)
+            ElMessage.success('扫码登录成功，代理已自动配置')
+          } else {
+            console.warn('代理设置失败:', proxyResponse.Message)
+            ElMessage.warning(`扫码登录成功，但代理设置失败: ${proxyResponse.Message}`)
+          }
+        } catch (error) {
+          console.error('设置代理时发生错误:', error)
+          ElMessage.warning('扫码登录成功，但代理设置失败')
+        }
+      } else {
+        ElMessage.success('扫码登录成功！')
+      }
 
       // 执行二次登录
       if (response.Data && response.Data.wxid) {
@@ -581,13 +609,23 @@ const getStatusClass = () => {
 
 // 清理定时器
 const clearQRTimer = () => {
+  console.log('清理二维码定时器...')
+  const timerKey = `qr-check-${props.account?.wxid || 'unknown'}`
+  const timeoutKey = `qr-timeout-${props.account?.wxid || 'unknown'}`
+
+  clearTimer(timerKey)
+  clearTimer(timeoutKey)
+
+  // 兼容旧的定时器清理
   if (qrCheckTimer.value) {
     clearInterval(qrCheckTimer.value)
     qrCheckTimer.value = null
+    console.log('已清理 qrCheckTimer')
   }
   if (qrTimeoutTimer.value) {
     clearTimeout(qrTimeoutTimer.value)
     qrTimeoutTimer.value = null
+    console.log('已清理 qrTimeoutTimer')
   }
 }
 
@@ -698,7 +736,9 @@ watch(visible, (show) => {
 
 // 组件卸载时清理定时器
 onUnmounted(() => {
+  console.log('AccountManagementModal 组件卸载，清理所有定时器')
   clearQRTimer()
+  clearAllTimers() // 清理所有相关定时器
 })
 </script>
 

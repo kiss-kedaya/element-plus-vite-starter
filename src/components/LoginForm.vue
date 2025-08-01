@@ -238,6 +238,12 @@ const generateQRCode = async () => {
 
 // 开始登录检查
 const startLoginCheck = (deviceId: string) => {
+  // 先清理之前的定时器
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
+  }
+
   countdown.value = 120 // 2分钟超时
   countdownTimer = setInterval(async () => {
     countdown.value--
@@ -249,6 +255,35 @@ const startLoginCheck = (deviceId: string) => {
 
       if (response.Success && response.Data?.wxid) {
         clearInterval(countdownTimer!)
+
+        // 如果使用了代理，登录成功后自动设置代理
+        if (qrForm.value.proxy.ProxyIp) {
+          try {
+            console.log('登录成功，正在设置代理...', qrForm.value.proxy)
+            const proxyResponse = await loginApi.setProxy({
+              Wxid: response.Data.wxid,
+              Type: 'SOCKS5', // 默认使用SOCKS5
+              Host: qrForm.value.proxy.ProxyIp,
+              Port: qrForm.value.proxy.Port,
+              User: qrForm.value.proxy.ProxyUser || '',
+              Password: qrForm.value.proxy.ProxyPassword || ''
+            })
+
+            if (proxyResponse.Success) {
+              console.log('代理设置成功:', proxyResponse)
+              ElMessage.success('登录成功，代理已自动配置')
+            } else {
+              console.warn('代理设置失败:', proxyResponse.Message)
+              ElMessage.warning(`登录成功，但代理设置失败: ${proxyResponse.Message}`)
+            }
+          } catch (error) {
+            console.error('设置代理时发生错误:', error)
+            ElMessage.warning('登录成功，但代理设置失败')
+          }
+        } else {
+          ElMessage.success('登录成功')
+        }
+
         const accountData = {
           wxid: response.Data.wxid,
           nickname: response.Data.nickname || qrForm.value.deviceName,
@@ -275,14 +310,19 @@ const startLoginCheck = (deviceId: string) => {
   }, 1000)
 }
 
-// 重置二维码
-const resetQRCode = () => {
-  qrCodeUrl.value = ''
-  countdown.value = 0
+// 清理定时器
+const clearTimer = () => {
   if (countdownTimer) {
     clearInterval(countdownTimer)
     countdownTimer = null
   }
+}
+
+// 重置二维码
+const resetQRCode = () => {
+  qrCodeUrl.value = ''
+  countdown.value = 0
+  clearTimer()
 }
 
 // 密码登录
@@ -337,9 +377,19 @@ const loginWithPassword = async () => {
 
 // 清理定时器
 onUnmounted(() => {
-  if (countdownTimer) {
-    clearInterval(countdownTimer)
-  }
+  clearTimer()
+})
+
+// 监听组件关闭事件
+const handleClose = () => {
+  clearTimer()
+  emit('close')
+}
+
+// 暴露清理方法给父组件
+defineExpose({
+  clearTimer,
+  resetQRCode
 })
 </script>
 
