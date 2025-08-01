@@ -18,7 +18,6 @@ declare module 'vue' {
     ElAlert: typeof import('element-plus/es')['ElAlert']
     ElAside: typeof import('element-plus/es')['ElAside']
     ElAvatar: typeof import('element-plus/es')['ElAvatar']
-    ElBadge: typeof import('element-plus/es')['ElBadge']
     ElButton: typeof import('element-plus/es')['ElButton']
     ElCard: typeof import('element-plus/es')['ElCard']
     ElCheckbox: typeof import('element-plus/es')['ElCheckbox']
@@ -60,8 +59,6 @@ declare module 'vue' {
     GroupManagement: typeof import('./components/GroupManagement.vue')['default']
     HelloWorld: typeof import('./components/HelloWorld.vue')['default']
     ImageMessage: typeof import('./components/common/ImageMessage.vue')['default']
-    ImagePreview: typeof import('./components/common/ImagePreview.vue')['default']
-    LazyImage: typeof import('./components/common/LazyImage.vue')['default']
     LoadingSpinner: typeof import('./components/common/LoadingSpinner.vue')['default']
     LoginForm: typeof import('./components/LoginForm.vue')['default']
     Logos: typeof import('./components/Logos.vue')['default']
@@ -70,7 +67,5 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     VideoMessage: typeof import('./components/common/VideoMessage.vue')['default']
-    VirtualList: typeof import('./components/common/VirtualList.vue')['default']
-    VirtualMessageList: typeof import('./components/common/VirtualMessageList.vue')['default']
   }
 }

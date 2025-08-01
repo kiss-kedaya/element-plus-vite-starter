@@ -3,7 +3,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 // import { useAuthStore } from '@/stores/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Qrcode, User, Setting, Monitor } from '@element-plus/icons-vue'
+import { Picture, User, Setting, Monitor } from '@element-plus/icons-vue'
 import QRCode from 'qrcode'
 import type { ProxyConfig, LoginAccount } from '@/types/auth'
 
@@ -206,7 +206,7 @@ const goBack = () => {
             <div class="qrcode-section">
               <div v-if="!qrCodeUrl" class="qrcode-placeholder">
                 <el-icon size="64" color="#ccc">
-                  <Qrcode />
+                  <Picture />
                 </el-icon>
                 <p>点击生成二维码</p>
               </div>

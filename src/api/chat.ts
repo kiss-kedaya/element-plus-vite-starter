@@ -17,11 +17,6 @@ export const chatApi = {
     return api.post('/Msg/UploadImg', params)
   },
 
-  // 发送图片消息
-  sendImageMessage: (params: SendImageMessageRequest): Promise<MessageResponse> => {
-    return api.post('/Msg/UploadImg', params)
-  },
-
   // 发送CDN文件（转发已存在的文件）
   sendCDNFile: (params: { Wxid: string; ToWxid: string; Content: string }): Promise<ChatResponse> => {
     return api.post('/Msg/SendCDNFile', params)
@@ -42,10 +37,7 @@ export const chatApi = {
     return api.post('/Msg/SendCDNImg', params)
   },
 
-  // 发送CDN文件（转发文件）
-  sendCDNFile: (params: { Wxid: string, ToWxid: string, Content: string }): Promise<MessageResponse> => {
-    return api.post('/Msg/SendCDNFile', params)
-  },
+
 
   // 发送名片
   sendBusinessCard: (params: { Wxid: string, ToWxid: string, CardWxid: string }): Promise<MessageResponse> => {

@@ -127,12 +127,12 @@ export default defineConfig(({ command, mode }) => {
 
             // 业务组件
             components: [
-              './src/components/common/VirtualList.vue',
-              './src/components/common/VirtualMessageList.vue',
-              './src/components/common/LazyImage.vue',
               './src/components/common/BaseModal.vue',
               './src/components/common/BaseButton.vue',
-              './src/components/common/LoadingSpinner.vue'
+              './src/components/common/LoadingSpinner.vue',
+              './src/components/common/FileMessage.vue',
+              './src/components/common/ImageMessage.vue',
+              './src/components/common/VideoMessage.vue'
             ]
           },
 
