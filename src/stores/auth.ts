@@ -163,7 +163,14 @@ export const useAuthStore = defineStore('auth', () => {
       // 设置当前账号为第一个在线账号
       if (accounts.value.length > 0 && !currentAccount.value) {
         const onlineAccount = accounts.value.find(acc => acc.status === 'online')
-        currentAccount.value = onlineAccount || accounts.value[0]
+        const selectedAccount = onlineAccount || accounts.value[0]
+        currentAccount.value = selectedAccount
+
+        // 设置文件缓存管理器的当前微信账号
+        if (selectedAccount.wxid) {
+          console.log('初始化时设置文件缓存管理器账号:', selectedAccount.wxid)
+          fileCacheManager.setCurrentWxid(selectedAccount.wxid)
+        }
       }
       return accounts.value
     } catch (error) {

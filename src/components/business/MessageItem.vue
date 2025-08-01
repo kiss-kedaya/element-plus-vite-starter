@@ -365,7 +365,6 @@ function openLink(url?: string) {
               :user-name="getUserNameForDownload()"
               :app-id="getAppIdFromMessage()"
               :original-content="message.fileData?.originalContent"
-              :can-forward="!message.fromMe && !!message.fileData?.originalContent"
               :message-status="message.status"
               :from-me="message.fromMe"
             />
@@ -456,6 +455,9 @@ function openLink(url?: string) {
               :wxid="authStore.currentAccount?.wxid"
               :user-name="getUserNameForDownload()"
               :app-id="getAppIdFromMessage()"
+              :original-content="message.fileData?.originalContent"
+              :message-status="message.status"
+              :from-me="message.fromMe"
             />
           </div>
 

@@ -401,8 +401,8 @@ export const useChatStore = defineStore('chat', () => {
         console.log('找到缓存文件，使用转发方式发送:', cachedFile)
         ElMessage.success('检测到相同文件，使用快速发送模式')
 
-        // 使用缓存的文件信息进行转发
-        return await forwardFileMessage(wxid, toUserName, cachedFile.originalContent)
+        // 使用缓存的文件信息进行发送
+        return await sendCachedFileMessage(wxid, toUserName, cachedFile.originalContent)
       }
 
       // 检查文件类型
@@ -477,23 +477,54 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  // 转发文件消息
-  const forwardFileMessage = async (wxid: string, toUserName: string, originalContent: string) => {
+  // 发送缓存文件消息
+  const sendCachedFileMessage = async (wxid: string, toUserName: string, originalContent: string) => {
     isSending.value = true
 
     // 立即显示消息，状态为发送中
     const messageId = Date.now().toString()
     const currentTime = Date.now()
 
-    // 从XML中解析文件名
+    // 从XML中解析文件信息
     let fileName = '未知文件'
+    let fileSize = 0
+    let attachId = ''
+    let cdnUrl = ''
+    let aesKey = ''
+
     try {
+      // 解析文件名
       const titleMatch = originalContent.match(/<title>(.*?)<\/title>/)
       if (titleMatch) {
         fileName = titleMatch[1]
       }
+
+      // 解析文件大小
+      const totallenMatch = originalContent.match(/<totallen>(\d+)<\/totallen>/)
+      if (totallenMatch) {
+        fileSize = parseInt(totallenMatch[1])
+      }
+
+      // 解析attachId
+      const attachidMatch = originalContent.match(/<attachid>(.*?)<\/attachid>/)
+      if (attachidMatch) {
+        attachId = attachidMatch[1]
+      }
+
+      // 解析CDN URL和AES Key
+      const cdnurlMatch = originalContent.match(/<cdnurl>(.*?)<\/cdnurl>/)
+      if (cdnurlMatch) {
+        cdnUrl = cdnurlMatch[1]
+      }
+
+      const aeskeyMatch = originalContent.match(/<aeskey>(.*?)<\/aeskey>/)
+      if (aeskeyMatch) {
+        aesKey = aeskeyMatch[1]
+      }
+
+      console.log('解析的文件信息:', { fileName, fileSize, attachId, cdnUrl: cdnUrl.substring(0, 50) + '...' })
     } catch (error) {
-      console.warn('解析文件名失败:', error)
+      console.warn('解析文件信息失败:', error)
     }
 
     const message: ChatMessage = {
@@ -510,6 +541,14 @@ export const useChatStore = defineStore('chat', () => {
       clientMsgId: parseInt(messageId),
       createTime: Math.floor(currentTime / 1000),
       newMsgId: parseInt(messageId),
+      fileData: {
+        name: fileName,
+        size: fileSize,
+        originalContent: originalContent,
+        attachId: attachId,
+        cdnUrl: cdnUrl,
+        aesKey: aesKey
+      }
     }
     addMessage(toUserName, message)
 
@@ -1008,7 +1047,7 @@ export const useChatStore = defineStore('chat', () => {
     sendTextMessage,
     sendImageMessage,
     sendFileMessage,
-    forwardFileMessage,
+    sendCachedFileMessage,
     clearMessages,
     updateMessageStatus,
     retryMessage,

@@ -77,18 +77,7 @@
           处理中
         </el-button>
 
-        <!-- 转发按钮 -->
-        <el-button
-          v-if="canForward"
-          type="success"
-          size="small"
-          @click="showForwardDialog"
-          :loading="forwarding"
-          style="margin-left: 8px;"
-        >
-          <el-icon><Share /></el-icon>
-          转发
-        </el-button>
+
       </div>
     </div>
   </div>
@@ -96,7 +85,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Document, VideoPlay, Picture, Files, Download, Loading, Share, Check, Close } from '@element-plus/icons-vue'
+import { Document, VideoPlay, Picture, Files, Download, Loading, Check, Close } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { downloadFile as downloadFileAPI } from '@/api/index'
 import { useChatStore } from '@/stores/chat'
@@ -113,8 +102,7 @@ interface Props {
   wxid?: string
   userName?: string
   appId?: string
-  originalContent?: string  // 原始XML内容，用于转发
-  canForward?: boolean      // 是否可以转发
+  originalContent?: string  // 原始XML内容，用于缓存匹配
   messageStatus?: string    // 消息状态：sending, sent, failed
   fromMe?: boolean          // 是否是自己发送的消息
 }
@@ -122,16 +110,12 @@ interface Props {
 const props = defineProps<Props>()
 
 const downloading = ref(false)
-const forwarding = ref(false)
 
 // 获取store实例
 const chatStore = useChatStore()
 const authStore = useAuthStore()
 
-// 计算是否可以转发
-const canForward = computed(() => {
-  return props.canForward && props.originalContent && authStore.currentAccount
-})
+
 
 // 根据文件类型判断图标
 const isDocument = computed(() => {
@@ -332,56 +316,7 @@ const downloadCdnFile = async () => {
   }
 }
 
-// 显示转发对话框
-const showForwardDialog = () => {
-  if (!canForward.value) {
-    ElMessage.warning('无法转发此文件')
-    return
-  }
 
-  // 这里可以显示一个选择联系人的对话框
-  // 为了简化，我们直接转发到当前会话
-  if (chatStore.currentSession) {
-    forwardToSession(chatStore.currentSession.id)
-  } else {
-    ElMessage.warning('请先选择要转发到的会话')
-  }
-}
-
-// 转发到指定会话
-const forwardToSession = async (toWxid: string) => {
-  if (!props.originalContent || !authStore.currentAccount) {
-    ElMessage.warning('转发参数不完整')
-    return
-  }
-
-  forwarding.value = true
-
-  try {
-    console.log('开始转发文件:', {
-      fileName: props.fileName,
-      toWxid,
-      hasOriginalContent: !!props.originalContent
-    })
-
-    const result = await chatStore.forwardFileMessage(
-      authStore.currentAccount.wxid,
-      toWxid,
-      props.originalContent
-    )
-
-    if (result.Success) {
-      ElMessage.success('文件转发成功')
-    } else {
-      throw new Error(result.Message || '转发失败')
-    }
-  } catch (error: any) {
-    console.error('转发文件失败:', error)
-    ElMessage.error(error.message || '转发文件失败')
-  } finally {
-    forwarding.value = false
-  }
-}
 </script>
 
 <style scoped lang="scss">

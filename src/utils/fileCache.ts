@@ -23,9 +23,14 @@ class FileCacheManager {
 
   // 设置当前微信账号
   setCurrentWxid(wxid: string): void {
+    console.log('设置当前微信账号:', { from: this.currentWxid, to: wxid })
+
     if (this.currentWxid !== wxid) {
       console.log('切换微信账号，重新加载缓存:', { from: this.currentWxid, to: wxid })
       this.currentWxid = wxid
+      this.loadCacheFromStorage()
+    } else if (this.currentWxid === wxid && this.cache.size === 0) {
+      console.log('相同账号但缓存为空，尝试重新加载:', { wxid })
       this.loadCacheFromStorage()
     }
   }
@@ -57,7 +62,14 @@ class FileCacheManager {
 
     try {
       const storageKey = this.generateStorageKey()
+      console.log('尝试从localStorage加载缓存:', { storageKey, wxid: this.currentWxid })
+
       const cacheData = localStorage.getItem(storageKey)
+      console.log('localStorage原始数据:', {
+        hasData: !!cacheData,
+        dataLength: cacheData?.length || 0,
+        dataPreview: cacheData?.substring(0, 100) + '...'
+      })
 
       if (cacheData) {
         const parsedData = JSON.parse(cacheData)
@@ -66,7 +78,8 @@ class FileCacheManager {
         console.log('从localStorage加载缓存成功:', {
           wxid: this.currentWxid,
           cacheSize: this.cache.size,
-          storageKey
+          storageKey,
+          cacheKeys: Array.from(this.cache.keys())
         })
 
         // 加载后清理过期缓存
@@ -182,6 +195,7 @@ class FileCacheManager {
   private cleanExpiredCache(): void {
     const now = Date.now()
     const expiredKeys: string[] = []
+    let deletedOldCount = 0
 
     for (const [key, fileInfo] of this.cache.entries()) {
       if (now - fileInfo.cacheTime > this.CACHE_EXPIRE_TIME) {
@@ -203,11 +217,12 @@ class FileCacheManager {
         this.cache.delete(key)
       })
 
-      console.log(`清理了 ${toDelete.length} 个旧缓存项`)
+      deletedOldCount = toDelete.length
+      console.log(`清理了 ${deletedOldCount} 个旧缓存项`)
     }
 
-    if (expiredKeys.length > 0 || toDelete.length > 0) {
-      console.log(`清理了 ${expiredKeys.length} 个过期缓存项，${toDelete.length} 个旧缓存项`)
+    if (expiredKeys.length > 0 || deletedOldCount > 0) {
+      console.log(`清理了 ${expiredKeys.length} 个过期缓存项，${deletedOldCount} 个旧缓存项`)
       // 清理后保存到localStorage
       this.saveCacheToStorage()
     }
@@ -259,6 +274,51 @@ class FileCacheManager {
 
 // 创建全局实例
 export const fileCacheManager = new FileCacheManager()
+
+// 调试工具：检查localStorage中的所有缓存
+export function debugLocalStorageCache() {
+  console.log('=== localStorage 缓存调试信息 ===')
+
+  const allKeys = Object.keys(localStorage)
+  const cacheKeys = allKeys.filter(key => key.startsWith('wechat_file_cache_'))
+
+  console.log('所有localStorage键:', allKeys)
+  console.log('文件缓存相关键:', cacheKeys)
+
+  cacheKeys.forEach(key => {
+    try {
+      const data = localStorage.getItem(key)
+      if (data) {
+        const parsed = JSON.parse(data)
+        console.log(`缓存 ${key}:`, {
+          dataLength: data.length,
+          entriesCount: parsed.length,
+          entries: parsed.map(([cacheKey, fileInfo]: [string, any]) => ({
+            cacheKey,
+            fileName: fileInfo.fileName,
+            fileSize: fileInfo.fileSize,
+            cacheTime: new Date(fileInfo.cacheTime).toLocaleString()
+          }))
+        })
+      }
+    } catch (error) {
+      console.error(`解析缓存 ${key} 失败:`, error)
+    }
+  })
+
+  console.log('当前fileCacheManager状态:', {
+    currentWxid: fileCacheManager['currentWxid'],
+    cacheSize: fileCacheManager['cache'].size,
+    cacheEntries: Array.from(fileCacheManager['cache'].entries())
+  })
+
+  console.log('=== 调试信息结束 ===')
+}
+
+// 在全局暴露调试函数
+if (typeof window !== 'undefined') {
+  (window as any).debugFileCache = debugLocalStorageCache
+}
 
 // 格式化文件大小显示
 export function formatFileSize(bytes: number): string {
