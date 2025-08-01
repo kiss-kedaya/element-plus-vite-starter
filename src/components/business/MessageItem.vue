@@ -5,6 +5,8 @@ import type { ChatMessage } from '@/types/chat'
 import { Document, Picture, RefreshRight, Loading, VideoPlay } from '@element-plus/icons-vue'
 import EmojiImage from '@/components/common/EmojiImage.vue'
 import ImageMessage from '@/components/common/ImageMessage.vue'
+import VideoMessage from '@/components/common/VideoMessage.vue'
+import FileMessage from '@/components/common/FileMessage.vue'
 import { computed } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useAuthStore } from '@/stores/auth'
@@ -213,30 +215,39 @@ function getSenderDisplayName() {
               :compress-type="message.imageCompressType"
               :image-data="message.imageData"
               :image-path="message.imagePath"
+              :cdn-file-aes-key="message.imageCdnFileAesKey"
+              :cdn-file-no="message.imageCdnFileNo"
             />
-            <div v-else class="image-placeholder">
-              <el-icon class="image-placeholder-icon">
-                <Picture />
-              </el-icon>
-              <span class="image-placeholder-text">图片</span>
-            </div>
+          </div>
+
+          <!-- 视频消息 -->
+          <div v-else-if="message.type === 'video'" class="message-video">
+            <VideoMessage
+              v-if="chatStore.currentSession"
+              :msg-id="getMsgId"
+              :wxid="authStore.currentAccount?.wxid"
+              :to-wxid="chatStore.currentSession.id"
+              :aes-key="message.videoAesKey"
+              :md5="message.videoMd5"
+              :new-md5="message.videoNewMd5"
+              :data-len="message.videoDataLen"
+              :compress-type="message.videoCompressType"
+              :play-length="message.videoPlayLength"
+              :cdn-video-url="message.videoCdnUrl"
+              :from-user-name="message.videoFromUserName"
+              :video-data="message.videoData"
+              :video-path="message.videoPath"
+            />
           </div>
 
           <!-- 文件消息 -->
           <div v-else-if="message.type === 'file'" class="message-file">
-            <div class="file-icon">
-              <el-icon>
-                <Document />
-              </el-icon>
-            </div>
-            <div class="file-info">
-              <div class="file-name">
-                {{ message.fileData?.name }}
-              </div>
-              <div class="file-size">
-                {{ formatFileSize(message.fileData?.size) }}
-              </div>
-            </div>
+            <FileMessage
+              :file-name="message.fileData?.name || '未知文件'"
+              :file-size="message.fileData?.size || 0"
+              :file-url="message.fileData?.url"
+              :mime-type="message.fileData?.mimeType"
+            />
           </div>
 
           <!-- 表情消息 -->
@@ -293,46 +304,39 @@ function getSenderDisplayName() {
               :compress-type="message.imageCompressType"
               :image-data="message.imageData"
               :image-path="message.imagePath"
+              :cdn-file-aes-key="message.imageCdnFileAesKey"
+              :cdn-file-no="message.imageCdnFileNo"
             />
-            <div v-else class="image-placeholder">
-              <el-icon class="image-placeholder-icon">
-                <Picture />
-              </el-icon>
-              <span class="image-placeholder-text">图片</span>
-            </div>
           </div>
 
           <!-- 文件消息 -->
           <div v-else-if="message.type === 'file'" class="message-file">
-            <div class="file-icon">
-              <el-icon>
-                <Document />
-              </el-icon>
-            </div>
-            <div class="file-info">
-              <div class="file-name">
-                {{ message.fileData?.name }}
-              </div>
-              <div class="file-size">
-                {{ formatFileSize(message.fileData?.size) }}
-              </div>
-            </div>
+            <FileMessage
+              :file-name="message.fileData?.name || '未知文件'"
+              :file-size="message.fileData?.size || 0"
+              :file-url="message.fileData?.url"
+              :mime-type="message.fileData?.mimeType"
+            />
           </div>
 
           <!-- 视频消息 -->
           <div v-else-if="message.type === 'video'" class="message-video">
-            <div class="video-placeholder">
-              <el-icon class="video-icon">
-                <VideoPlay />
-              </el-icon>
-              <div class="video-info">
-                <div class="video-title">视频消息</div>
-                <div class="video-details">
-                  <span v-if="message.videoPlayLength">{{ formatVideoDuration(message.videoPlayLength) }}</span>
-                  <span v-if="message.videoLength">{{ formatFileSize(message.videoLength) }}</span>
-                </div>
-              </div>
-            </div>
+            <VideoMessage
+              v-if="chatStore.currentSession"
+              :msg-id="getMsgId"
+              :wxid="authStore.currentAccount?.wxid"
+              :to-wxid="chatStore.currentSession.id"
+              :aes-key="message.videoAesKey"
+              :md5="message.videoMd5"
+              :new-md5="message.videoNewMd5"
+              :data-len="message.videoDataLen"
+              :compress-type="message.videoCompressType"
+              :play-length="message.videoPlayLength"
+              :cdn-video-url="message.videoCdnUrl"
+              :from-user-name="message.videoFromUserName"
+              :video-data="message.videoData"
+              :video-path="message.videoPath"
+            />
           </div>
 
           <!-- 表情消息 -->
@@ -638,6 +642,53 @@ function getSenderDisplayName() {
       }
     }
   }
+}
+
+.message-video {
+  .video-content {
+    max-width: 300px;
+    max-height: 400px;
+    border-radius: 8px;
+  }
+
+  .video-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 200px;
+    height: 120px;
+    background: var(--el-color-primary-light-9);
+    border: 1px dashed var(--el-color-primary-light-5);
+    border-radius: 8px;
+    color: var(--el-text-color-secondary);
+
+    .video-icon {
+      font-size: 32px;
+      margin-right: 8px;
+      color: var(--el-color-primary);
+    }
+
+    .video-info {
+      .video-title {
+        font-size: 14px;
+        margin-bottom: 4px;
+      }
+
+      .video-details {
+        font-size: 12px;
+        color: var(--el-text-color-placeholder);
+
+        span {
+          margin-right: 8px;
+        }
+      }
+    }
+  }
+}
+
+.message-file {
+  display: inline-block;
+  max-width: 100%;
 }
 
 .message-emoji {

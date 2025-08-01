@@ -56,30 +56,8 @@ export const loginApi = {
   },
 
   // 检查二维码状态
-  checkQRCodeStatus: async (params: { Wxid: string, Uuid: string }): Promise<LoginResponse> => {
-    const response = await request.post<LoginResponse>('/Login/CheckLogin', params)
-    return {
-      Code: response.code,
-      Success: response.success,
-      Message: response.message,
-      Data: response.data
-    }
-  },
-
-  // 确认登录
-  confirmLogin: async (params: { Wxid: string, Uuid: string }): Promise<LoginResponse> => {
-    const response = await request.post<LoginResponse>('/Login/ConfirmLogin', params)
-    return {
-      Code: response.code,
-      Success: response.success,
-      Message: response.message,
-      Data: response.data
-    }
-  },
-
-  // 获取登录状态
-  getLoginStatus: async (wxid: string): Promise<LoginResponse> => {
-    const response = await request.post<LoginResponse>('/Login/GetLoginStatus', { Wxid: wxid })
+  checkQRCodeStatus: async (params: { Uuid: string }): Promise<LoginResponse> => {
+    const response = await request.post<LoginResponse>('/Login/LoginCheckQR', params)
     return {
       Code: response.code,
       Success: response.success,
@@ -119,11 +97,8 @@ export const loginApi = {
   // 设备复用登录 - 生成二维码
   getQRCodeForDeviceReuse: async (params: QRCodeLoginRequest): Promise<QRCodeResponse> => {
     const response = await request.post<any>('/Login/LoginGetQRCar', params)
-    return {
-      Code: response.code,
-      Success: response.success,
-      Message: response.message,
-      Data: response.data
-    }
+
+    // 直接返回原始响应，因为API返回的字段就是大写的
+    return response
   },
 }

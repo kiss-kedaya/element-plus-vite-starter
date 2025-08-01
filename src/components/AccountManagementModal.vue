@@ -162,7 +162,7 @@
             断开连接
           </el-button>
 
-          <el-button v-if="account.status === 'online'" type="success" @click="enableHeartbeat"
+          <el-button v-if="account.status !== 'online'" type="warning" @click="enableHeartbeat"
             :loading="heartbeatLoading" plain>
             <el-icon>
               <Timer />
@@ -403,25 +403,30 @@ const generateQRCode = async () => {
       Proxy: props.account.proxy
     })
 
-    if (response.Success && response.Data?.QrUrl) {
-      qrCodeUrl.value = response.Data.QrUrl
-      // 获取UUID用于状态检查
-      currentUuid.value = response.Data.Uuid || response.Data.uuid || ''
-      qrStatus.value = '请使用微信扫描二维码'
+    // 检查响应格式：Code: 1 表示成功，或者 Success: true
+    if ((response.Code === 1 || response.Success === true) && response.Data) {
+      // 优先使用QrBase64，不要使用QrUrl
+      if (response.Data.QrBase64) {
+        qrCodeUrl.value = response.Data.QrBase64
+        currentUuid.value = response.Data.Uuid || response.Data.uuid || ''
+        qrStatus.value = '请使用微信扫描二维码'
 
-      // 开始检查二维码状态
-      if (currentUuid.value) {
-        startQRCodeCheck()
-      }
-    } else if (response.Success && response.Data?.QrBase64) {
-      // 如果没有QrUrl但有QrBase64，使用base64数据
-      qrCodeUrl.value = response.Data.QrBase64
-      currentUuid.value = response.Data.Uuid || response.Data.uuid || ''
-      qrStatus.value = '请使用微信扫描二维码'
+        // 开始检查二维码状态
+        if (currentUuid.value) {
+          startQRCodeCheck()
+        }
+      } else if (response.Data.QrUrl) {
+        // 备用方案：如果没有QrBase64但有QrUrl
+        qrCodeUrl.value = response.Data.QrUrl
+        currentUuid.value = response.Data.Uuid || response.Data.uuid || ''
+        qrStatus.value = '请使用微信扫描二维码'
 
-      // 开始检查二维码状态
-      if (currentUuid.value) {
-        startQRCodeCheck()
+        // 开始检查二维码状态
+        if (currentUuid.value) {
+          startQRCodeCheck()
+        }
+      } else {
+        throw new Error('响应中没有找到二维码数据')
       }
     } else {
       throw new Error(response.Message || '生成二维码失败')
@@ -603,10 +608,9 @@ const enableHeartbeat = async () => {
     )
 
     heartbeatLoading.value = true
-
     // 发送心跳请求
     const response = await fetch(`http://localhost:8059/api/Login/AutoHeartBeat?wxid=${props.account.wxid}`, {
-      method: 'GET',
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       }
@@ -696,6 +700,8 @@ onUnmounted(() => {
 <style scoped lang="scss">
 .account-management {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  height: 80vh;
+  overflow-y: auto;
 
   .account-info-card,
   .proxy-card,

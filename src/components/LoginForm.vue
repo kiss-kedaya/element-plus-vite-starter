@@ -6,18 +6,20 @@
         <el-form :model="qrForm" label-width="100px" class="qr-form">
           <el-form-item label="设备类型">
             <el-select v-model="qrForm.deviceType" placeholder="选择设备类型">
-              <el-option label="iPad" value="iPad" />
-              <el-option label="Windows" value="Windows" />
-              <el-option label="Android平板" value="AndroidPad" />
+              <el-option label="车载微信" value="Car" />
             </el-select>
           </el-form-item>
-          
+
           <el-form-item label="设备ID">
-            <el-input v-model="qrForm.deviceId" placeholder="输入设备ID" />
+            <el-input v-model="qrForm.deviceId" placeholder="自动生成随机设备ID">
+              <template #append>
+                <el-button @click="generateRandomDeviceInfo">随机生成</el-button>
+              </template>
+            </el-input>
           </el-form-item>
-          
+
           <el-form-item label="设备名称">
-            <el-input v-model="qrForm.deviceName" placeholder="输入设备名称" />
+            <el-input v-model="qrForm.deviceName" placeholder="自动生成随机设备名称" />
           </el-form-item>
           
           <!-- 代理配置 -->
@@ -109,7 +111,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import QRCode from 'qrcode'
 import { loginApi } from '@/api/auth'
@@ -128,7 +130,7 @@ const showPasswordProxyConfig = ref([])
 
 // 表单数据
 const qrForm = ref({
-  deviceType: 'iPad',
+  deviceType: 'Car',
   deviceId: '',
   deviceName: '',
   proxy: {
@@ -154,18 +156,44 @@ const passwordForm = ref({
 
 let countdownTimer: NodeJS.Timeout | null = null
 
-// 生成设备ID
+// 组件挂载时自动生成随机设备信息
+onMounted(() => {
+  generateRandomDeviceInfo()
+})
+
+// 生成随机设备ID
 const generateDeviceId = () => {
-  return 'DEV_' + Math.random().toString(36).substr(2, 9).toUpperCase()
+  // 生成类似车载设备的ID格式
+  const prefix = 'CAR'
+  const timestamp = Date.now().toString().slice(-6)
+  const random = Math.random().toString(36).substr(2, 6).toUpperCase()
+  return `${prefix}_${timestamp}_${random}`
+}
+
+// 生成随机车载设备名称
+const generateCarDeviceName = () => {
+  const carBrands = ['奔驰', '宝马', '奥迪', '特斯拉', '蔚来', '理想', '小鹏', '比亚迪', '吉利', '长城']
+  const carModels = ['智能座舱', '车载系统', '中控屏', '智能终端', '车机']
+  const versions = ['Pro', 'Max', 'Plus', 'Elite', 'Premium']
+
+  const brand = carBrands[Math.floor(Math.random() * carBrands.length)]
+  const model = carModels[Math.floor(Math.random() * carModels.length)]
+  const version = versions[Math.floor(Math.random() * versions.length)]
+
+  return `${brand}${model}${version}`
+}
+
+// 生成随机设备信息
+const generateRandomDeviceInfo = () => {
+  qrForm.value.deviceId = generateDeviceId()
+  qrForm.value.deviceName = generateCarDeviceName()
 }
 
 // 生成二维码
 const generateQRCode = async () => {
-  if (!qrForm.value.deviceId) {
-    qrForm.value.deviceId = generateDeviceId()
-  }
-  if (!qrForm.value.deviceName) {
-    qrForm.value.deviceName = `微信机器人_${qrForm.value.deviceType}`
+  // 如果没有设备信息，自动生成随机信息
+  if (!qrForm.value.deviceId || !qrForm.value.deviceName) {
+    generateRandomDeviceInfo()
   }
 
   isLoading.value = true
@@ -182,16 +210,23 @@ const generateQRCode = async () => {
       } : undefined
     }
 
-    const response = await loginApi.getQRCode(qrForm.value.deviceType, params)
+    // 使用车载版二维码接口
+    const response = await loginApi.getQRCodeForDeviceReuse(params)
 
-    if (response.Success && response.Data?.QRCodeData) {
-      qrCodeUrl.value = await QRCode.toDataURL(response.Data.QRCodeData)
-      ElMessage.success('二维码生成成功，请使用微信扫码登录')
+    // 检查响应格式：Code: 1 表示成功，或者 Success: true
+    if ((response.Code === 1 || response.Success === true) && response.Data) {
+      // 直接使用返回的QrBase64，不要使用QrUrl
+      if (response.Data.QrBase64) {
+        qrCodeUrl.value = response.Data.QrBase64
+        ElMessage.success('车载版二维码生成成功，请使用微信扫码登录')
 
-      // 开始检查登录状态
-      startLoginCheck(response.Data.DeviceId || qrForm.value.deviceId)
+        // 开始检查登录状态，使用Uuid
+        startLoginCheck(response.Data.Uuid)
+      } else {
+        throw new Error('响应中没有找到QrBase64数据')
+      }
     } else {
-      throw new Error(response.Message || '生成二维码失败')
+      throw new Error(response.Message || '生成车载版二维码失败')
     }
   } catch (error: any) {
     ElMessage.error(error.message || '生成二维码失败')
@@ -209,7 +244,6 @@ const startLoginCheck = (deviceId: string) => {
 
     try {
       const response = await loginApi.checkQRCodeStatus({
-        Wxid: '',
         Uuid: deviceId
       })
 
@@ -220,7 +254,7 @@ const startLoginCheck = (deviceId: string) => {
           nickname: response.Data.nickname || qrForm.value.deviceName,
           avatar: response.Data.avatar || '',
           status: 'online' as const,
-          deviceType: qrForm.value.deviceType,
+          deviceType: 'Car', // 车载版设备类型
           deviceId: qrForm.value.deviceId,
           deviceName: qrForm.value.deviceName,
           loginTime: new Date(),

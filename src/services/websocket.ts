@@ -1,6 +1,7 @@
 import type { ChatMessage } from '@/types/chat'
 import { ElMessage } from 'element-plus'
 import { WEBSOCKET_CONFIG } from '@/config/websocket'
+import { parseImageMessage, parseVideoMessage } from '@/utils/imageMessageParser'
 
 // 事件类型定义
 export interface WebSocketEvents {
@@ -219,11 +220,52 @@ export class WebSocketService {
         isGroupMessage,
       }
 
-      // 处理群聊消息的特殊字段
+      // 特殊处理：撤回消息需要提前处理，避免重复
+      if (msg.msgType === 10002) {
+        // 解析撤回消息的XML内容，提取replacemsg
+        let recallContent = '[系统消息]'
+
+        if (msg.originalContent) {
+          try {
+            // 提取replacemsg中的内容
+            const replaceMsgMatch = msg.originalContent.match(/<replacemsg><!\[CDATA\[(.*?)\]\]><\/replacemsg>/)
+            if (replaceMsgMatch && replaceMsgMatch[1]) {
+              recallContent = replaceMsgMatch[1]
+            } else {
+              // 备用方案：直接查找CDATA内容
+              const cdataMatch = msg.originalContent.match(/\[CDATA\[(.*?)\]\]/)
+              if (cdataMatch && cdataMatch[1]) {
+                recallContent = cdataMatch[1]
+              }
+            }
+          } catch (error) {
+            console.warn('解析撤回消息内容失败:', error)
+          }
+        }
+
+        chatMessage.content = recallContent
+        chatMessage.type = 'system'
+        chatMessage.fromMe = false
+
+        // 保存额外数据
+        if (msg.extraData) {
+          chatMessage.extraData = msg.extraData
+        }
+
+        // 直接发送消息，跳过后续处理
+        this.emit('chat_message', chatMessage)
+        return
+      }
+
+      // 设置发送者信息（群聊和个人聊天都需要）
       if (isGroupMessage) {
         chatMessage.actualSender = msg.actualSender // 实际发送者wxid
         chatMessage.actualSenderName = msg.actualSenderName // 实际发送者名称
         chatMessage.groupId = msg.toUser // 群聊ID
+      } else {
+        // 个人聊天消息也设置发送者信息
+        chatMessage.actualSender = fromMe ? data.wxid : msg.fromUser
+        chatMessage.actualSenderName = fromMe ? msg.toUserName : msg.fromUserName
       }
 
       // 处理图片消息
@@ -238,48 +280,32 @@ export class WebSocketService {
 
         // 解析XML数据获取图片信息
         if (msg.originalContent) {
-          // 提取AES密钥
-          const aesKeyMatch = msg.originalContent.match(/aeskey\s*=\s*"([^"]+)"/)
-          if (aesKeyMatch) {
-            chatMessage.imageAesKey = aesKeyMatch[1]
-          }
+          // 使用新的图片消息解析工具
+          const imageParams = parseImageMessage(msg.originalContent)
 
-          // 提取MD5
-          const md5Match = msg.originalContent.match(/md5\s*=\s*"([^"]+)"/)
-          if (md5Match) {
-            chatMessage.imageMd5 = md5Match[1]
-          }
+          // 设置解析出的图片参数
+          chatMessage.imageAesKey = imageParams.aesKey
+          chatMessage.imageMd5 = imageParams.md5
+          chatMessage.imageDataLen = imageParams.dataLen
+          chatMessage.imageCompressType = imageParams.compressType
 
-          // 提取数据长度 - 尝试多种可能的字段名
-          let dataLen = 0
-          const lengthMatch = msg.originalContent.match(/length\s*=\s*"([^"]+)"/)
-          if (lengthMatch) {
-            dataLen = parseInt(lengthMatch[1])
-          } else {
-            // 尝试其他可能的字段名
-            const dataSizeMatch = msg.originalContent.match(/datasize\s*=\s*"([^"]+)"/)
-            if (dataSizeMatch) {
-              dataLen = parseInt(dataSizeMatch[1])
-            } else {
-              const sizeMatch = msg.originalContent.match(/size\s*=\s*"([^"]+)"/)
-              if (sizeMatch) {
-                dataLen = parseInt(sizeMatch[1])
-              }
-            }
-          }
-          chatMessage.imageDataLen = dataLen
+          // CDN下载参数（优先使用）
+          chatMessage.imageCdnFileAesKey = imageParams.cdnFileAesKey
+          chatMessage.imageCdnFileNo = imageParams.cdnFileNo
 
-          // 提取压缩类型（如果有）
-          const compressMatch = msg.originalContent.match(/compresstype\s*=\s*"([^"]+)"/)
-          if (compressMatch) {
-            chatMessage.imageCompressType = parseInt(compressMatch[1])
-          }
+          // 额外的CDN信息（用于备用下载方式）
+          chatMessage.imageCdnThumbUrl = imageParams.cdnThumbUrl
+          chatMessage.imageCdnMidUrl = imageParams.cdnMidUrl
 
           console.log('图片信息解析结果:', {
             imageAesKey: chatMessage.imageAesKey,
             imageMd5: chatMessage.imageMd5,
             imageDataLen: chatMessage.imageDataLen,
-            imageCompressType: chatMessage.imageCompressType
+            imageCompressType: chatMessage.imageCompressType,
+            cdnFileAesKey: chatMessage.imageCdnFileAesKey,
+            cdnFileNo: chatMessage.imageCdnFileNo,
+            cdnThumbUrl: chatMessage.imageCdnThumbUrl,
+            cdnMidUrl: chatMessage.imageCdnMidUrl
           })
         }
 
@@ -326,57 +352,33 @@ export class WebSocketService {
 
         // 解析XML数据获取视频信息
         if (msg.originalContent) {
-          // 提取AES密钥
-          const aesKeyMatch = msg.originalContent.match(/aeskey\s*=\s*"([^"]+)"/)
-          if (aesKeyMatch) {
-            chatMessage.videoAesKey = aesKeyMatch[1]
-          }
+          const videoParams = parseVideoMessage(msg.originalContent)
 
-          // 提取CDN视频URL
-          const cdnVideoUrlMatch = msg.originalContent.match(/cdnvideourl\s*=\s*"([^"]+)"/)
-          if (cdnVideoUrlMatch) {
-            chatMessage.videoCdnUrl = cdnVideoUrlMatch[1]
-          }
+          // 设置解析出的视频参数
+          chatMessage.videoAesKey = videoParams.aesKey
+          chatMessage.videoMd5 = videoParams.md5
+          chatMessage.videoNewMd5 = videoParams.newMd5
+          chatMessage.videoDataLen = videoParams.dataLen
+          chatMessage.videoCompressType = videoParams.compressType || 0
+          chatMessage.videoPlayLength = videoParams.playLength
+          chatMessage.videoCdnUrl = videoParams.cdnVideoUrl
+          chatMessage.videoThumbUrl = videoParams.cdnThumbUrl
+          chatMessage.videoThumbAesKey = videoParams.cdnThumbAesKey
+          chatMessage.videoThumbLength = videoParams.cdnThumbLength
+          chatMessage.videoThumbWidth = videoParams.cdnThumbWidth
+          chatMessage.videoThumbHeight = videoParams.cdnThumbHeight
+          chatMessage.videoFromUserName = videoParams.fromUserName
 
-          // 提取视频长度（文件大小）
-          const lengthMatch = msg.originalContent.match(/length\s*=\s*"([^"]+)"/)
-          if (lengthMatch) {
-            chatMessage.videoLength = parseInt(lengthMatch[1])
-          }
-
-          // 提取播放时长
-          const playLengthMatch = msg.originalContent.match(/playlength\s*=\s*"([^"]+)"/)
-          if (playLengthMatch) {
-            chatMessage.videoPlayLength = parseInt(playLengthMatch[1])
-          }
-
-          // 提取缩略图信息
-          const thumbUrlMatch = msg.originalContent.match(/cdnthumburl\s*=\s*"([^"]+)"/)
-          if (thumbUrlMatch) {
-            chatMessage.videoThumbUrl = thumbUrlMatch[1]
-          }
-
-          const thumbAesKeyMatch = msg.originalContent.match(/cdnthumbaeskey\s*=\s*"([^"]+)"/)
-          if (thumbAesKeyMatch) {
-            chatMessage.videoThumbAesKey = thumbAesKeyMatch[1]
-          }
-
-          // 提取缩略图尺寸
-          const thumbWidthMatch = msg.originalContent.match(/cdnthumbwidth\s*=\s*"([^"]+)"/)
-          if (thumbWidthMatch) {
-            chatMessage.videoThumbWidth = parseInt(thumbWidthMatch[1])
-          }
-
-          const thumbHeightMatch = msg.originalContent.match(/cdnthumbheight\s*=\s*"([^"]+)"/)
-          if (thumbHeightMatch) {
-            chatMessage.videoThumbHeight = parseInt(thumbHeightMatch[1])
-          }
-
-          // 提取MD5
-          const md5Match = msg.originalContent.match(/md5\s*=\s*"([^"]+)"/)
-          if (md5Match) {
-            chatMessage.videoMd5 = md5Match[1]
-          }
+          console.log('视频信息解析结果:', {
+            videoAesKey: chatMessage.videoAesKey,
+            videoMd5: chatMessage.videoMd5,
+            videoNewMd5: chatMessage.videoNewMd5,
+            videoDataLen: chatMessage.videoDataLen,
+            videoPlayLength: chatMessage.videoPlayLength,
+            videoCdnUrl: chatMessage.videoCdnUrl,
+            videoThumbUrl: chatMessage.videoThumbUrl,
+            videoThumbAesKey: chatMessage.videoThumbAesKey
+          })
         }
       }
 
@@ -452,14 +454,16 @@ export class WebSocketService {
         }
       }
 
-      // 处理系统消息
+
+
+      // 处理系统消息（撤回消息已在前面处理）
       if (msg.msgType === 10000) {
         // 使用originalContent作为系统消息内容，如果没有则使用content
         chatMessage.content = msg.originalContent || msg.content || '[系统消息]'
-        
+
         // 系统消息不属于任何人发送
         chatMessage.fromMe = false
-        
+
         // 保存额外数据
         if (msg.extraData) {
           chatMessage.extraData = msg.extraData
@@ -501,6 +505,8 @@ export class WebSocketService {
       case 47: // 表情消息
         return 'emoji'
       case 10000: // 系统消息
+        return 'system'
+      case 10002: // 撤回消息
         return 'system'
       default:
         return 'text'

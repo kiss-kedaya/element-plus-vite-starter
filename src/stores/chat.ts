@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { chatApi } from '@/api/chat'
 import { friendApi } from '@/api/friend'
+import { uploadFile } from '@/api'
 import { webSocketService } from '@/services/websocket'
 import { useAuthStore } from '@/stores/auth'
 
@@ -118,12 +119,12 @@ export const useChatStore = defineStore('chat', () => {
       console.log(`加载了 ${messageCount} 条缓存消息`)
     }
 
-    // 加载当前选中的会话
-    const cachedCurrentSession = loadFromCache(CACHE_KEYS.CURRENT_SESSION, wxid)
-    if (cachedCurrentSession && sessions.value.find(s => s.id === cachedCurrentSession.id)) {
-      currentSession.value = cachedCurrentSession
-      console.log(`恢复当前会话: ${cachedCurrentSession.name}`)
-    }
+    // 不自动恢复当前会话，等待用户点击选择
+    // const cachedCurrentSession = loadFromCache(CACHE_KEYS.CURRENT_SESSION, wxid)
+    // if (cachedCurrentSession && sessions.value.find(s => s.id === cachedCurrentSession.id)) {
+    //   currentSession.value = cachedCurrentSession
+    //   console.log(`恢复当前会话: ${cachedCurrentSession.name}`)
+    // }
   }
 
   // 保存数据到缓存
@@ -166,13 +167,40 @@ export const useChatStore = defineStore('chat', () => {
       currentSession.value = session
       // 标记为已读
       session.unreadCount = 0
-      // 加载消息历史
-      loadMessages(sessionId)
+
+      // 懒加载：只加载当前会话的最近消息（限制数量）
+      loadSessionMessagesLazy(sessionId)
 
       // 自动保存到缓存
       const authStore = useAuthStore()
       if (authStore.currentAccount?.wxid) {
         saveCachedData(authStore.currentAccount.wxid)
+      }
+    }
+  }
+
+  // 懒加载会话消息（限制数量，避免卡顿）
+  const loadSessionMessagesLazy = (sessionId: string) => {
+    const authStore = useAuthStore()
+    if (!authStore.currentAccount?.wxid) return
+
+    const cachedMessages = loadFromCache(CACHE_KEYS.MESSAGES, authStore.currentAccount.wxid)
+    if (cachedMessages && cachedMessages[sessionId]) {
+      const allMessages = cachedMessages[sessionId] || []
+      // 只加载最近的50条消息，避免页面卡顿
+      const recentMessages = allMessages.slice(-50)
+
+
+
+      // 只设置当前会话的消息
+      if (!messages.value[sessionId]) {
+        messages.value[sessionId] = []
+      }
+      messages.value[sessionId] = recentMessages
+    } else {
+      // 如果没有缓存消息，初始化为空数组
+      if (!messages.value[sessionId]) {
+        messages.value[sessionId] = []
       }
     }
   }
@@ -203,7 +231,11 @@ export const useChatStore = defineStore('chat', () => {
       const session = sessions.value[sessionIndex]
       session.lastMessage = message.content
       session.lastMessageTime = message.timestamp
-      if (message.fromMe === false) {
+
+      // 只有在以下情况下才增加未读计数：
+      // 1. 消息不是自己发送的
+      // 2. 用户当前没有在查看这个会话
+      if (message.fromMe === false && currentSession.value?.id !== sessionId) {
         session.unreadCount++
       }
 
@@ -355,8 +387,103 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  const sendFileMessage = async (wxid: string, toUserName: string, file: File) => {
+    isSending.value = true
+
+    // 检查文件类型
+    if (file.type.startsWith('image/')) {
+      // 如果是图片文件，转换为base64并使用图片发送接口
+      try {
+        const reader = new FileReader()
+        const base64Promise = new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string)
+          reader.onerror = reject
+        })
+        reader.readAsDataURL(file)
+
+        const base64 = await base64Promise
+        return await sendImageMessage(wxid, toUserName, base64)
+      } catch (error) {
+        console.error('图片文件处理失败:', error)
+        throw new Error('图片文件处理失败')
+      } finally {
+        isSending.value = false
+      }
+    }
+
+    // 立即显示消息，状态为发送中
+    const messageId = Date.now().toString()
+    const currentTime = Date.now()
+    const message: ChatMessage = {
+      id: messageId,
+      content: `[文件] ${file.name}`,
+      timestamp: new Date(),
+      fromMe: true,
+      type: 'file',
+      fileData: {
+        name: file.name,
+        size: file.size,
+        url: URL.createObjectURL(file)
+      },
+      status: 'sending',
+      sessionId: toUserName,
+      isGroupMessage: toUserName.includes('@chatroom'),
+      actualSender: wxid,
+      canRecall: false,
+      clientMsgId: parseInt(messageId),
+      createTime: Math.floor(currentTime / 1000),
+      newMsgId: parseInt(messageId),
+    }
+    addMessage(toUserName, message)
+
+    try {
+      // 对于非图片文件，后端暂不支持直接上传
+      // 这里可以显示一个提示消息
+      updateMessageStatus(toUserName, messageId, 'failed', false)
+      throw new Error('后端暂不支持非图片文件的直接上传，只支持图片文件和CDN文件转发')
+    }
+    catch (error) {
+      console.error('发送文件失败:', error)
+      updateMessageStatus(toUserName, messageId, 'failed', true)
+      throw error
+    }
+    finally {
+      isSending.value = false
+    }
+  }
+
   const clearMessages = (sessionId: string) => {
+    console.log(`开始清空会话 ${sessionId} 的消息`)
+
+    // 清空内存中的消息
     delete messages.value[sessionId]
+    console.log(`已清空内存中会话 ${sessionId} 的消息`)
+
+    // 同时清空缓存中的消息
+    const authStore = useAuthStore()
+    if (authStore.currentAccount?.wxid) {
+      const wxid = authStore.currentAccount.wxid
+      const cacheKey = `${CACHE_KEYS.MESSAGES}_${wxid}`
+
+      // 加载当前缓存的所有消息
+      const cachedMessages = loadFromCache(CACHE_KEYS.MESSAGES, wxid) || {}
+      console.log(`加载缓存消息，会话 ${sessionId} 原有消息数量:`, cachedMessages[sessionId]?.length || 0)
+
+      // 删除指定会话的消息
+      delete cachedMessages[sessionId]
+
+      // 保存更新后的缓存
+      saveToCache(CACHE_KEYS.MESSAGES, cachedMessages, wxid)
+      console.log(`已清空缓存中会话 ${sessionId} 的消息`)
+
+      // 验证缓存是否真的被清空
+      const verifyCache = loadFromCache(CACHE_KEYS.MESSAGES, wxid) || {}
+      console.log(`验证缓存清空结果，会话 ${sessionId} 消息数量:`, verifyCache[sessionId]?.length || 0)
+    } else {
+      console.warn('无法清空缓存：当前账号信息不存在')
+    }
+
+    console.log(`会话 ${sessionId} 消息清空完成`)
   }
 
   const updateMessageStatus = (sessionId: string, messageId: string, status: ChatMessage['status'], canRetry: boolean = false, realMessageData?: any) => {
@@ -443,18 +570,6 @@ export const useChatStore = defineStore('chat', () => {
         if (messageIndex !== -1) {
           sessionMessages.splice(messageIndex, 1)
         }
-
-        // 添加系统消息提示撤回
-        const recallNotice: ChatMessage = {
-          id: Date.now().toString(),
-          content: '你撤回了一条消息',
-          timestamp: new Date(),
-          fromMe: false,
-          type: 'system',
-          status: 'sent',
-          sessionId: sessionId,
-        }
-        sessionMessages.push(recallNotice)
 
         console.log('消息撤回成功')
       } else {
@@ -599,6 +714,30 @@ export const useChatStore = defineStore('chat', () => {
       // 图片相关字段
       imageData: data.imageData,
       imagePath: data.imagePath,
+      imageAesKey: data.imageAesKey,
+      imageMd5: data.imageMd5,
+      imageDataLen: data.imageDataLen,
+      imageCompressType: data.imageCompressType,
+      // CDN下载参数
+      imageCdnFileAesKey: data.imageCdnFileAesKey,
+      imageCdnFileNo: data.imageCdnFileNo,
+      // 其他CDN信息
+      imageCdnThumbUrl: data.imageCdnThumbUrl,
+      imageCdnMidUrl: data.imageCdnMidUrl,
+      // 视频相关字段
+      videoAesKey: data.videoAesKey,
+      videoMd5: data.videoMd5,
+      videoNewMd5: data.videoNewMd5,
+      videoDataLen: data.videoDataLen,
+      videoCompressType: data.videoCompressType,
+      videoPlayLength: data.videoPlayLength,
+      videoCdnUrl: data.videoCdnUrl,
+      videoThumbUrl: data.videoThumbUrl,
+      videoThumbAesKey: data.videoThumbAesKey,
+      videoThumbLength: data.videoThumbLength,
+      videoThumbWidth: data.videoThumbWidth,
+      videoThumbHeight: data.videoThumbHeight,
+      videoFromUserName: data.videoFromUserName,
       // 文件相关字段
       fileData: data.fileData,
       // 其他字段
@@ -784,6 +923,7 @@ export const useChatStore = defineStore('chat', () => {
     loadMessages,
     sendTextMessage,
     sendImageMessage,
+    sendFileMessage,
     clearMessages,
     updateMessageStatus,
     retryMessage,

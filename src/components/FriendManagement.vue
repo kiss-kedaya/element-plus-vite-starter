@@ -193,9 +193,12 @@
           </el-form-item>
           <el-form-item label="验证来源">
             <el-select v-model="addFriendForm.scene" placeholder="选择验证来源">
-              <el-option label="通过搜索添加" :value="1" />
-              <el-option label="通过群聊添加" :value="2" />
-              <el-option label="通过名片添加" :value="3" />
+              <el-option
+                v-for="option in SCENE_OPTIONS"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
             </el-select>
           </el-form-item>
         </el-form>
@@ -271,6 +274,79 @@ import { useChatStore } from '@/stores/chat'
 import { useRouter } from 'vue-router'
 import type { SearchContactRequest, SendFriendRequestRequest } from '@/types/friend'
 
+// 临时内联常量定义，避免导入问题
+const FRIEND_OPCODE = {
+  NO_VERIFY: 1,      // 免验证发送请求
+  SEND_REQUEST: 2,   // 发送验证申请
+  ACCEPT_REQUEST: 3  // 通过好友验证
+} as const
+
+const FRIEND_SCENE = {
+  QQ: 1,              // QQ来源
+  EMAIL: 2,           // 邮箱来源
+  WECHAT_ID: 3,       // 微信号来源
+  ADDRESS_BOOK: 13,   // 通讯录来源
+  CHAT_ROOM: 14,      // 群聊来源
+  PHONE: 15,          // 手机号来源
+  NEARBY: 18,         // 附近的人
+  BOTTLE: 25,         // 漂流瓶
+  SHAKE: 29,          // 摇一摇
+  QRCODE: 30          // 二维码
+} as const
+
+const SCENE_OPTIONS = [
+  { label: '通过微信号搜索', value: FRIEND_SCENE.WECHAT_ID },
+  { label: '通过QQ添加', value: FRIEND_SCENE.QQ },
+  { label: '通过邮箱添加', value: FRIEND_SCENE.EMAIL },
+  { label: '通过通讯录添加', value: FRIEND_SCENE.ADDRESS_BOOK },
+  { label: '通过群聊添加', value: FRIEND_SCENE.CHAT_ROOM },
+  { label: '通过手机号添加', value: FRIEND_SCENE.PHONE },
+  { label: '通过附近的人', value: FRIEND_SCENE.NEARBY },
+  { label: '通过二维码添加', value: FRIEND_SCENE.QRCODE }
+] as const
+
+// 简化的验证函数
+const validateFriendRequestParams = (params: SendFriendRequestRequest) => {
+  const errors: string[] = []
+
+  if (!params.Wxid?.trim()) errors.push('发送方微信ID不能为空')
+  if (!params.V1?.trim()) errors.push('V1参数不能为空')
+  if (!params.V2?.trim()) errors.push('V2参数不能为空')
+  if (!params.VerifyContent?.trim()) errors.push('验证消息不能为空')
+
+  if (params.V1 && !params.V1.startsWith('v3_')) {
+    errors.push('V1参数格式不正确，应该以v3_开头')
+  }
+
+  if (params.V2 && !params.V2.startsWith('v4_')) {
+    errors.push('V2参数格式不正确，应该以v4_开头')
+  }
+
+  return { isValid: errors.length === 0, errors }
+}
+
+const createFriendRequestParams = (
+  wxid: string,
+  v1: string,
+  v2: string,
+  verifyContent: string,
+  scene: number = FRIEND_SCENE.WECHAT_ID,
+  opcode: number = FRIEND_OPCODE.SEND_REQUEST
+): SendFriendRequestRequest => {
+  return {
+    Wxid: wxid.trim(),
+    V1: v1.trim(),
+    V2: v2.trim(),
+    Opcode: opcode,
+    Scene: scene,
+    VerifyContent: verifyContent.trim()
+  }
+}
+
+const formatFriendRequestParams = (params: SendFriendRequestRequest): string => {
+  return `好友请求参数: Wxid=${params.Wxid}, V1=${params.V1}, V2=${params.V2}, Opcode=${params.Opcode}, Scene=${params.Scene}, VerifyContent=${params.VerifyContent}`
+}
+
 // 定义好友类型
 interface Friend {
   wxid: string
@@ -328,7 +404,7 @@ const remarkForm = ref({
 // 添加好友表单数据
 const addFriendForm = ref({
   verifyContent: '你好，我想加你为好友',
-  scene: 1
+  scene: FRIEND_SCENE.WECHAT_ID // 默认为通过微信号搜索
 })
 
 // 好友数据
@@ -440,13 +516,14 @@ const searchUser = async () => {
       searchResult.value = {
         wxid: response.Data.UserName?.string || searchForm.value.keyword,
         nickname: response.Data.NickName?.string || '未知用户',
-        alias: '',
+        alias: response.Data.Alias || '',
         avatar: response.Data.BigHeadImgUrl || '',
-        region: '未知',
+        region: `${response.Data.Country || ''} ${response.Data.Province || ''}`.trim() || '未知',
         signature: response.Data.Signature || '',
-        v1: response.Data.V1,
-        v2: response.Data.V2,
-        antispamTicket: response.Data.AntispamTicket
+        // 根据新的响应数据结构设置V1和V2
+        v1: response.Data.UserName?.string || '', // V1使用UserName (v3_...@stranger)
+        v2: response.Data.AntispamTicket || '', // V2使用AntispamTicket (v4_...@stranger)
+        antispamTicket: response.Data.AntispamTicket || ''
       }
 
       ElMessage.success('搜索完成')
@@ -473,24 +550,42 @@ const openAddFriendDialog = () => {
 
 // 确认添加好友
 const confirmAddFriend = async () => {
-  if (!searchResult.value || !props.account?.wxid) return
+  if (!searchResult.value || !props.account?.wxid) {
+    ElMessage.error('缺少必要信息')
+    return
+  }
 
   if (!addFriendForm.value.verifyContent.trim()) {
     ElMessage.warning('请输入打招呼内容')
     return
   }
 
+  // 验证V1和V2参数
+  if (!searchResult.value.v1 || !searchResult.value.v2) {
+    ElMessage.error('搜索结果缺少必要参数，请重新搜索')
+    return
+  }
+
   addFriendLoading.value = true
   try {
-    const params: SendFriendRequestRequest = {
-      Wxid: props.account.wxid,
-      V1: searchResult.value.v1 || '',
-      V2: searchResult.value.v2 || '',
-      Opcode: 1,
-      Scene: addFriendForm.value.scene,
-      VerifyContent: addFriendForm.value.verifyContent
+    // 创建请求参数
+    const params = createFriendRequestParams(
+      props.account.wxid,
+      searchResult.value.v1,
+      searchResult.value.v2,
+      addFriendForm.value.verifyContent,
+      addFriendForm.value.scene,
+      FRIEND_OPCODE.SEND_REQUEST
+    )
+
+    // 验证参数
+    const validation = validateFriendRequestParams(params)
+    if (!validation.isValid) {
+      ElMessage.error(`参数验证失败：${validation.errors.join(', ')}`)
+      return
     }
 
+    console.log('发送好友请求参数:', formatFriendRequestParams(params))
     const response = await friendApi.sendFriendRequest(params)
 
     if (response.Success) {
@@ -500,7 +595,7 @@ const confirmAddFriend = async () => {
       searchForm.value.keyword = ''
       // 重置表单
       addFriendForm.value.verifyContent = '你好，我想加你为好友'
-      addFriendForm.value.scene = 1
+      addFriendForm.value.scene = FRIEND_SCENE.WECHAT_ID
       // 刷新好友列表
       await refreshFriends()
     } else {

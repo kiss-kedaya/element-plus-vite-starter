@@ -16,6 +16,20 @@ import {
 } from '@element-plus/icons-vue'
 import type { Friend } from '@/types/friend'
 
+// 临时内联常量定义，避免导入问题
+const FRIEND_SCENE = {
+  QQ: 1,              // QQ来源
+  EMAIL: 2,           // 邮箱来源
+  WECHAT_ID: 3,       // 微信号来源
+  ADDRESS_BOOK: 13,   // 通讯录来源
+  CHAT_ROOM: 14,      // 群聊来源
+  PHONE: 15,          // 手机号来源
+  NEARBY: 18,         // 附近的人
+  BOTTLE: 25,         // 漂流瓶
+  SHAKE: 29,          // 摇一摇
+  QRCODE: 30          // 二维码
+} as const
+
 const router = useRouter()
 const authStore = useAuthStore()
 const friendStore = useFriendStore()
@@ -103,8 +117,9 @@ const searchContact = async () => {
         avatar: result.Data.SmallHeadImgUrl || '',
         signature: result.Data.Signature || '',
         sex: result.Data.Sex || 0,
-        v1: result.Data.UserName?.string || '',
-        v2: result.Data.AntispamTicket || ''
+        // 根据新的响应数据结构设置V1和V2
+        v1: result.Data.UserName?.string || '', // V1使用UserName (v3_...@stranger)
+        v2: result.Data.AntispamTicket || '' // V2使用AntispamTicket (v4_...@stranger)
       }]
       ElMessage.success('搜索完成')
     } else {
@@ -124,22 +139,29 @@ const addFriend = async (contact: any, verifyMessage?: string) => {
     return
   }
 
+  // 验证必要参数
+  if (!contact.v1 || !contact.v2) {
+    ElMessage.error('联系人信息不完整，请重新搜索')
+    return
+  }
+
   try {
     const message = verifyMessage || `你好，我是${authStore.currentAccount.nickname}`
     const result = await friendStore.sendFriendRequest(
       authStore.currentAccount.wxid,
       contact.v1,
       contact.v2,
-      message
+      message,
+      FRIEND_SCENE.WECHAT_ID // 通过微信号搜索添加
     )
-    
+
     if (result.Success) {
       ElMessage.success('好友请求发送成功')
     } else {
       ElMessage.error(result.Message || '发送好友请求失败')
     }
-  } catch (error) {
-    ElMessage.error('发送好友请求失败')
+  } catch (error: any) {
+    ElMessage.error(error.message || '发送好友请求失败')
     console.error('发送好友请求失败:', error)
   }
 }

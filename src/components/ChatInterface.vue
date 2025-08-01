@@ -25,6 +25,7 @@ import MessageItem from '@/components/business/MessageItem.vue'
 import { useNotification } from '@/composables'
 import { useChatStore } from '@/stores/chat'
 import { useFriendStore } from '@/stores/friend'
+import { useAuthStore } from '@/stores/auth'
 
 // Props
 const props = defineProps<{
@@ -34,6 +35,7 @@ const props = defineProps<{
 // Stores
 const chatStore = useChatStore()
 const friendStore = useFriendStore()
+const authStore = useAuthStore()
 
 // Composables
 const { showError, showSuccess, confirmDelete } = useNotification()
@@ -42,6 +44,8 @@ const { showError, showSuccess, confirmDelete } = useNotification()
 const messageInput = ref('')
 const messagesContainer = ref<HTMLElement>()
 const fileInputRef = ref<HTMLInputElement>()
+const imageInputRef = ref<HTMLInputElement>()
+const isDragOver = ref(false)
 const searchKeyword = ref('')
 
 // 暂时注释掉虚拟滚动相关变量
@@ -68,8 +72,13 @@ const filteredSessions = computed(() => {
 
 // 方法
 function selectSession(session: ChatSession) {
+  // 延迟加载：只有在点击会话时才设置当前会话和加载消息
   chatStore.setCurrentSession(session.id)
-  scrollToBottom()
+
+  // 延迟滚动，确保消息渲染完成
+  nextTick(() => {
+    scrollToBottom()
+  })
 }
 
 async function loadFriendsAsSessions() {
@@ -128,10 +137,14 @@ async function handlePaste(event: ClipboardEvent) {
     return
 
   for (const item of items) {
-    if (item.type.includes('image')) {
+    if (item.kind === 'file') {
       const file = item.getAsFile()
       if (file) {
-        await sendImage(file)
+        if (file.type.startsWith('image/')) {
+          await sendImage(file)
+        } else {
+          await sendFile(file)
+        }
       }
     }
   }
@@ -161,19 +174,95 @@ async function sendImage(file: File) {
   }
 }
 
+// 选择图片文件
+function selectImageFile() {
+  imageInputRef.value?.click()
+}
+
+// 选择任意文件
 function selectFile() {
   fileInputRef.value?.click()
 }
 
+// 处理图片选择
+function handleImageSelect(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (file) {
+    sendImage(file)
+  }
+  // 清空input值，允许重复选择同一文件
+  target.value = ''
+}
+
+// 处理文件选择
 function handleFileSelect(event: Event) {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
   if (file) {
     if (file.type.startsWith('image/')) {
       sendImage(file)
+    } else {
+      sendFile(file)
     }
-    else {
-      showError('暂不支持该文件类型')
+  }
+  // 清空input值，允许重复选择同一文件
+  target.value = ''
+}
+
+// 发送文件
+async function sendFile(file: File) {
+  if (!chatStore.currentSession || !authStore.currentAccount) {
+    showError('请先选择聊天对象')
+    return
+  }
+
+  try {
+    await chatStore.sendFileMessage(
+      authStore.currentAccount.wxid,
+      chatStore.currentSession.id,
+      file
+    )
+    showSuccess('文件发送成功')
+  } catch (error) {
+    showError('发送文件失败')
+    console.error('发送文件失败:', error)
+  }
+}
+
+// 拖拽相关事件处理
+function handleDragOver(event: DragEvent) {
+  event.preventDefault()
+  event.stopPropagation()
+}
+
+function handleDragEnter(event: DragEvent) {
+  event.preventDefault()
+  event.stopPropagation()
+  isDragOver.value = true
+}
+
+function handleDragLeave(event: DragEvent) {
+  event.preventDefault()
+  event.stopPropagation()
+  // 只有当离开整个拖拽区域时才设置为false
+  if (!event.currentTarget?.contains(event.relatedTarget as Node)) {
+    isDragOver.value = false
+  }
+}
+
+function handleDrop(event: DragEvent) {
+  event.preventDefault()
+  event.stopPropagation()
+  isDragOver.value = false
+
+  const files = event.dataTransfer?.files
+  if (files && files.length > 0) {
+    const file = files[0]
+    if (file.type.startsWith('image/')) {
+      sendImage(file)
+    } else {
+      sendFile(file)
     }
   }
 }
@@ -187,11 +276,19 @@ async function clearCurrentMessages() {
       type: 'warning',
     })
 
-    chatStore.clearMessages(chatStore.currentSession.id)
-    // 消息清空完成，不显示提示
+    const sessionId = chatStore.currentSession.id
+    console.log(`UI: 开始清空会话 ${sessionId} 的消息`)
+
+    // 清空消息
+    chatStore.clearMessages(sessionId)
+
+    // 显示成功提示
+    ElMessage.success('消息已清空')
+    console.log(`UI: 会话 ${sessionId} 消息清空操作完成`)
   }
   catch {
     // 用户取消
+    console.log('用户取消了清空消息操作')
   }
 }
 
@@ -319,9 +416,15 @@ async function recallMessage() {
 }
 
 function scrollToBottom() {
+  // 减少延迟，提升响应速度
   nextTick(() => {
     if (messagesContainer.value) {
-      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+      const container = messagesContainer.value
+      // 使用平滑滚动，减少突兀感
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: 'smooth'
+      })
     }
   })
 }
@@ -421,41 +524,37 @@ function getContactAvatar(message: any) {
 
 // 获取联系人头像文字
 function getContactAvatarText(message: any) {
-  console.log('获取头像文字，消息数据:', {
-    isGroupMessage: message.isGroupMessage,
-    actualSenderName: message.actualSenderName,
-    actualSender: message.actualSender,
-    fromMe: message.fromMe,
-    sessionId: message.sessionId,
-  })
-
-  // 如果不是自己的消息
-  if (!message.fromMe) {
-    // 优先使用实际发送者名称（无论是群聊还是个人聊天）
-    if (message.actualSenderName) {
-      console.log('使用实际发送者名称:', message.actualSenderName)
-      return message.actualSenderName.charAt(0)
-    }
-
-    // 如果是群聊消息但没有发送者名称，使用发送者ID
-    if (message.isGroupMessage && message.actualSender) {
-      return message.actualSender.charAt(0)
-    }
-
-    // 如果是个人聊天且没有发送者名称，使用会话名称
-    if (!message.isGroupMessage && chatStore.currentSession) {
-      return chatStore.currentSession.name.charAt(0)
-    }
+  // 如果是自己的消息，返回空字符串（由MessageItem的myAvatar属性处理）
+  if (message.fromMe) {
+    return ''
   }
 
-  // 兜底逻辑：使用会话名称
-  if (chatStore.currentSession) {
-    return chatStore.currentSession.name.charAt(0)
+  // 对于对方的消息，按优先级获取头像文字
+  let avatarText = ''
+
+  // 1. 优先使用实际发送者名称
+  if (message.actualSenderName && message.actualSenderName.trim()) {
+    avatarText = message.actualSenderName.trim().charAt(0)
+  }
+  // 2. 如果是群聊且有发送者ID，使用发送者ID
+  else if (message.isGroupMessage && message.actualSender && message.actualSender.trim()) {
+    avatarText = message.actualSender.trim().charAt(0)
+  }
+  // 3. 使用当前会话名称
+  else if (chatStore.currentSession && chatStore.currentSession.name.trim()) {
+    avatarText = chatStore.currentSession.name.trim().charAt(0)
+  }
+  // 4. 使用会话ID作为兜底
+  else if (message.sessionId && message.sessionId.trim()) {
+    avatarText = message.sessionId.trim().charAt(0)
+  }
+  // 5. 最后的兜底
+  else {
+    avatarText = '?'
   }
 
-  // 最后的兜底逻辑
-
-  return '?'
+  // 确保返回的是有效字符
+  return avatarText || '?'
 }
 
 // 刷新联系人信息
@@ -585,6 +684,32 @@ watch(() => props.account?.wxid, async (newWxid, oldWxid) => {
     }
   }
 })
+
+// 监听当前会话变化，切换会话时滚动到底部
+watch(
+  () => chatStore.currentSession,
+  (newSession, oldSession) => {
+    if (newSession && newSession !== oldSession) {
+      // 只在真正切换会话时滚动，避免初始加载时滚动
+      nextTick(() => {
+        scrollToBottom()
+      })
+    }
+  }
+)
+
+// 监听新消息，只在收到新消息时滚动（不是加载历史消息）
+let lastMessageCount = 0
+watch(
+  () => chatStore.currentMessages.length,
+  (newCount) => {
+    if (newCount > lastMessageCount && lastMessageCount > 0) {
+      // 只有消息数量增加且不是初始加载时才滚动
+      scrollToBottom()
+    }
+    lastMessageCount = newCount
+  }
+)
 
 // 暂时注释掉容器高度计算
 // function calculateMessagesContainerHeight() {
@@ -752,8 +877,19 @@ onUnmounted(() => {
 
         <!-- 消息列表 -->
         <div ref="messagesContainer" class="messages-container">
+          <!-- 未选择会话状态 -->
+          <div v-if="!chatStore.currentSession" class="empty-messages">
+            <div class="empty-messages-content">
+              <el-icon class="empty-messages-icon">
+                <ChatDotRound />
+              </el-icon>
+              <p>请选择一个会话</p>
+              <span>点击左侧会话列表开始聊天</span>
+            </div>
+          </div>
+
           <!-- 空消息状态 -->
-          <div v-if="chatStore.currentMessages.length === 0" class="empty-messages">
+          <div v-else-if="chatStore.currentMessages.length === 0" class="empty-messages">
             <div class="empty-messages-content">
               <el-icon class="empty-messages-icon">
                 <ChatDotRound />
@@ -764,7 +900,7 @@ onUnmounted(() => {
           </div>
 
           <!-- 传统消息列表（暂时替换虚拟滚动） -->
-          <div v-else class="messages-list">
+          <div v-else-if="chatStore.currentSession && chatStore.currentMessages.length > 0" class="messages-list">
             <MessageItem
               v-for="(message, index) in chatStore.currentMessages" :key="message.id" :message="message"
               :show-time="showMessageTime(message, index)" :avatar="getContactAvatar(message)"
@@ -791,15 +927,22 @@ onUnmounted(() => {
         </Teleport>
 
         <!-- 输入区域 -->
-        <div class="input-area">
+        <div
+          class="input-area"
+          @drop="handleDrop"
+          @dragover="handleDragOver"
+          @dragenter="handleDragEnter"
+          @dragleave="handleDragLeave"
+          :class="{ 'drag-over': isDragOver }"
+        >
           <div class="input-toolbar">
-            <el-button link class="toolbar-btn" @click="selectFile">
+            <el-button link class="toolbar-btn" @click="selectImageFile">
               <el-icon>
                 <Picture />
               </el-icon>
               图片
             </el-button>
-            <el-button link class="toolbar-btn">
+            <el-button link class="toolbar-btn" @click="selectFile">
               <el-icon>
                 <Document />
               </el-icon>
@@ -822,7 +965,8 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <input ref="fileInputRef" type="file" accept="image/*,*/*" style="display: none" @change="handleFileSelect">
+          <input ref="imageInputRef" type="file" accept="image/*" style="display: none" @change="handleImageSelect">
+          <input ref="fileInputRef" type="file" style="display: none" @change="handleFileSelect">
         </div>
       </div>
     </div>
@@ -1328,7 +1472,7 @@ onUnmounted(() => {
   border: 2px solid #409eff;
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-  z-index: 10000;
+  z-index: 1060;
   min-width: 120px;
   overflow: hidden;
 
@@ -1374,6 +1518,31 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(20px);
   padding: 12px 20px;
+  position: relative;
+  transition: all 0.3s ease;
+
+  &.drag-over {
+    background: var(--el-color-primary-light-9);
+    border-color: var(--el-color-primary);
+    border-style: dashed;
+
+    &::before {
+      content: '拖拽文件到此处发送';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: var(--el-color-primary);
+      font-size: 16px;
+      font-weight: 500;
+      pointer-events: none;
+      z-index: 10;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 8px 16px;
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+  }
 }
 
 .input-toolbar {

@@ -3,6 +3,26 @@ import { ref, computed } from 'vue'
 import type { Friend, FriendRequest } from '@/types/friend'
 import { friendApi } from '@/api/friend'
 
+// 临时内联常量定义，避免导入问题
+const FRIEND_OPCODE = {
+  NO_VERIFY: 1,      // 免验证发送请求
+  SEND_REQUEST: 2,   // 发送验证申请
+  ACCEPT_REQUEST: 3  // 通过好友验证
+} as const
+
+const FRIEND_SCENE = {
+  QQ: 1,              // QQ来源
+  EMAIL: 2,           // 邮箱来源
+  WECHAT_ID: 3,       // 微信号来源
+  ADDRESS_BOOK: 13,   // 通讯录来源
+  CHAT_ROOM: 14,      // 群聊来源
+  PHONE: 15,          // 手机号来源
+  NEARBY: 18,         // 附近的人
+  BOTTLE: 25,         // 漂流瓶
+  SHAKE: 29,          // 摇一摇
+  QRCODE: 30          // 二维码
+} as const
+
 export const useFriendStore = defineStore('friend', () => {
   // 状态
   const friends = ref<Record<string, Friend[]>>({}) // 按wxid分组的好友列表
@@ -97,18 +117,27 @@ export const useFriendStore = defineStore('friend', () => {
     }
   }
 
-  const sendFriendRequest = async (wxid: string, v1: string, v2: string, verifyContent: string) => {
+  const sendFriendRequest = async (wxid: string, v1: string, v2: string, verifyContent: string, scene: number = 3) => {
     isAdding.value = true
     try {
+      // 参数验证
+      if (!wxid || !v1 || !v2) {
+        throw new Error('缺少必要参数：wxid、V1、V2不能为空')
+      }
+
+      if (!verifyContent.trim()) {
+        throw new Error('验证消息不能为空')
+      }
+
       const result = await friendApi.sendFriendRequest({
         Wxid: wxid,
         V1: v1,
         V2: v2,
-        Opcode: 2,
-        Scene: 3,
-        VerifyContent: verifyContent
+        Opcode: FRIEND_OPCODE.SEND_REQUEST, // 发送验证申请
+        Scene: scene, // 默认为微信号来源，可自定义
+        VerifyContent: verifyContent.trim()
       })
-      
+
       if (result.Success) {
         // 添加到好友请求列表
         const request: FriendRequest = {
@@ -116,13 +145,13 @@ export const useFriendStore = defineStore('friend', () => {
           wxid: v1,
           nickname: '未知',
           avatar: '',
-          verifyContent,
+          verifyContent: verifyContent.trim(),
           status: 'pending',
           timestamp: new Date()
         }
         friendRequests.value.push(request)
       }
-      
+
       return result
     } catch (error) {
       console.error('发送好友请求失败:', error)
@@ -144,9 +173,10 @@ export const useFriendStore = defineStore('friend', () => {
         const searchResult = await searchContact(wxid, target.identifier)
         
         if (searchResult.Success && searchResult.Data) {
-          const v1 = searchResult.Data.UserName?.string
-          const v2 = searchResult.Data.AntispamTicket
-          
+          // 根据新的响应数据结构获取V1和V2
+          const v1 = searchResult.Data.UserName?.string || '' // V1使用UserName (v3_...@stranger)
+          const v2 = searchResult.Data.AntispamTicket || '' // V2使用AntispamTicket (v4_...@stranger)
+
           if (v1 && v2) {
             const addResult = await sendFriendRequest(wxid, v1, v2, target.message)
             results.push({

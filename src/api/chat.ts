@@ -17,9 +17,14 @@ export const chatApi = {
     return api.post('/Msg/UploadImg', params)
   },
 
-  // 发送文件消息
-  sendFileMessage: (params: SendFileMessageRequest): Promise<MessageResponse> => {
-    return api.post('/Msg/SendFile', params)
+  // 发送图片消息
+  sendImageMessage: (params: SendImageMessageRequest): Promise<MessageResponse> => {
+    return api.post('/Msg/UploadImg', params)
+  },
+
+  // 发送CDN文件（转发已存在的文件）
+  sendCDNFile: (params: { Wxid: string; ToWxid: string; Content: string }): Promise<ChatResponse> => {
+    return api.post('/Msg/SendCDNFile', params)
   },
 
   // 发送视频消息
@@ -110,4 +115,19 @@ export const downloadImage = (params: {
   };
 }): Promise<any> => {
   return api.post('/Tools/DownloadImg', params)
+}
+
+// 下载视频
+export const downloadVideo = (params: {
+  Wxid: string;
+  ToWxid: string;
+  MsgId: number;
+  DataLen: number;
+  CompressType?: number;
+  Section?: {
+    StartPos: number;
+    DataLen: number;
+  };
+}): Promise<any> => {
+  return api.post('/Tools/DownloadVideo', params)
 }

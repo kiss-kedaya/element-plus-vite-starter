@@ -66,3 +66,35 @@ api.interceptors.response.use(
 export * from './auth'
 export * from './chat'
 export * from './friend'
+
+// 文件转换为base64的辅助函数
+export const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+// 图片上传API（使用base64格式）
+export const uploadImage = async (file: File, wxid: string, toWxid: string) => {
+  const base64 = await fileToBase64(file)
+  return api.post('/Msg/UploadImg', {
+    Wxid: wxid,
+    ToWxid: toWxid,
+    Base64: base64
+  })
+}
+
+// 注意：后端没有通用的文件上传接口
+// 只支持图片上传和CDN文件转发
+export const uploadFile = async (file: File, onProgress?: (progress: number) => void) => {
+  // 检查文件类型
+  if (file.type.startsWith('image/')) {
+    throw new Error('图片文件请使用 uploadImage 函数')
+  }
+
+  // 对于非图片文件，后端暂不支持直接上传
+  throw new Error('后端暂不支持非图片文件的直接上传，只支持CDN文件转发')
+}
