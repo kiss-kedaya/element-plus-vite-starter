@@ -215,6 +215,7 @@ import type { LoginAccount, ProxyConfig } from '@/types/auth'
 import { loginApi } from '@/api/auth'
 import { useAuthStore } from '@/stores/auth'
 import { useTimerManager } from '@/utils/timerManager'
+import { useQRCodeManager } from '@/utils/qrCodeManager'
 
 // Props
 const props = defineProps<{
@@ -231,6 +232,7 @@ const emit = defineEmits<{
 // Store
 const authStore = useAuthStore()
 const { createTimer, clearTimer, clearAllTimers } = useTimerManager()
+const { startCheck, stopCheck, stopAllChecks } = useQRCodeManager()
 
 // 响应式数据
 const visible = computed({
@@ -449,48 +451,14 @@ const refreshQRCode = () => {
 
 // 开始检查二维码状态
 const startQRCodeCheck = () => {
-  // 清除之前的检查定时器
-  if (qrCheckTimer.value) {
-    clearInterval(qrCheckTimer.value)
-    qrCheckTimer.value = null
-  }
-
-  // 清除之前的超时定时器
-  if (qrTimeoutTimer.value) {
-    clearTimeout(qrTimeoutTimer.value)
-    qrTimeoutTimer.value = null
-  }
-
-  // 每2秒检查一次二维码状态
-  const timerKey = `qr-check-${props.account?.wxid || 'unknown'}`
-  createTimer(timerKey, async () => {
-    try {
-      await checkQRCodeStatus()
-    } catch (error) {
-      console.error('检测二维码状态失败:', error)
-    }
-  }, 2000, 'interval')
-
-  // 设置5分钟超时
-  const timeoutKey = `qr-timeout-${props.account?.wxid || 'unknown'}`
-  createTimer(timeoutKey, () => {
-    clearTimer(timerKey)
-    clearTimer(timeoutKey)
-    qrStatus.value = '二维码已过期，请刷新'
-  }, 300000, 'timeout') // 5分钟
-}
-
-// 检查二维码状态
-const checkQRCodeStatus = async () => {
   if (!currentUuid.value) return
 
-  try {
-    const response = await loginApi.checkQRCodeStatus({ Uuid: currentUuid.value })
+  const checkKey = `account-modal-${props.account?.wxid || 'unknown'}`
 
-    if (response.Success && response.Message === "登录成功") {
-      // 登录成功
-      clearQRTimer()
-
+  // 使用全局二维码管理器
+  startCheck(checkKey, {
+    uuid: currentUuid.value,
+    onSuccess: async (data) => {
       qrStatus.value = '登录成功！正在初始化...'
 
       // 如果账号有代理配置，登录成功后自动设置代理
@@ -498,7 +466,7 @@ const checkQRCodeStatus = async () => {
         try {
           console.log('登录成功，正在设置代理...', props.account.proxy)
           const proxyResponse = await loginApi.setProxy({
-            Wxid: response.Data.wxid,
+            Wxid: data.wxid,
             Type: props.account.proxy.Type || 'SOCKS5',
             Host: props.account.proxy.Host,
             Port: props.account.proxy.Port,
@@ -522,8 +490,8 @@ const checkQRCodeStatus = async () => {
       }
 
       // 执行二次登录
-      if (response.Data && response.Data.wxid) {
-        await performSecondAuth(response.Data.wxid)
+      if (data && data.wxid) {
+        await performSecondAuth(data.wxid)
       }
 
       // 关闭模态框并刷新
@@ -531,44 +499,23 @@ const checkQRCodeStatus = async () => {
         showReloginDialog.value = false
         emit('refresh')
       }, 2000)
-
-    } else if (response.Success && response.Data) {
-      // API调用成功，根据Data中的状态判断
-      const data = response.Data
-
-      if (data.expiredTime <= 0) {
-        // 二维码已过期
-        clearQRTimer()
-        qrStatus.value = '二维码已过期，请刷新'
-
-      } else if (data.status === 0) {
-        // 等待扫码
-        qrStatus.value = `等待扫码... (${data.expiredTime}秒后过期)`
-
-      } else if (data.status === 1) {
-        // 已扫码，等待确认
-        qrStatus.value = `${data.nickName || '用户'}已扫码，请在手机上确认登录 (${data.expiredTime}秒后过期)`
-
-      } else if (data.status === 4) {
-        // 用户取消登录
-        clearQRTimer()
-        qrStatus.value = '用户取消登录'
-
-      } else {
-        // 其他状态
-        qrStatus.value = `状态: ${data.status} (${data.expiredTime}秒后过期)`
-      }
-
-    } else {
-      // API调用失败
-      console.error('二维码检测失败:', response)
-      qrStatus.value = `检测失败: ${response.Message || '未知错误'}`
+    },
+    onStatusChange: (status) => {
+      qrStatus.value = status
+    },
+    onError: (error) => {
+      qrStatus.value = `检测失败: ${error}`
+    },
+    onExpired: () => {
+      qrStatus.value = '二维码已过期，请刷新'
+    },
+    onCancelled: () => {
+      qrStatus.value = '用户取消登录'
     }
-  } catch (error: any) {
-    console.error('检测二维码状态失败:', error)
-    qrStatus.value = '网络错误，检测失败'
-  }
+  })
 }
+
+// 检查二维码状态 - 现在由 qrCodeManager 统一处理
 
 // 执行二次登录
 const performSecondAuth = async (wxid: string) => {
@@ -610,11 +557,10 @@ const getStatusClass = () => {
 // 清理定时器
 const clearQRTimer = () => {
   console.log('清理二维码定时器...')
-  const timerKey = `qr-check-${props.account?.wxid || 'unknown'}`
-  const timeoutKey = `qr-timeout-${props.account?.wxid || 'unknown'}`
+  const checkKey = `account-modal-${props.account?.wxid || 'unknown'}`
 
-  clearTimer(timerKey)
-  clearTimer(timeoutKey)
+  // 使用全局管理器停止检查
+  stopCheck(checkKey)
 
   // 兼容旧的定时器清理
   if (qrCheckTimer.value) {
@@ -738,7 +684,7 @@ watch(visible, (show) => {
 onUnmounted(() => {
   console.log('AccountManagementModal 组件卸载，清理所有定时器')
   clearQRTimer()
-  clearAllTimers() // 清理所有相关定时器
+  stopAllChecks() // 停止所有二维码检查
 })
 </script>
 

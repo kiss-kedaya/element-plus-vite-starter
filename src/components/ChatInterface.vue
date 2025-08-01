@@ -675,11 +675,11 @@ watch(() => props.account?.wxid, async (newWxid, oldWxid) => {
 
       }
       else {
-        console.warn(`WebSocket连接失败: ${newWxid}，将在模拟模式下运行`)
+        console.warn(`WebSocket连接失败: ${newWxid}，将使用离线模式`)
       }
     }
     catch (error) {
-      console.warn(`WebSocket连接失败: ${newWxid}，将在模拟模式下运行`, error)
+      console.warn(`WebSocket连接失败: ${newWxid}，将使用离线模式`, error)
       // 不显示错误消息，因为这在开发环境中是正常的
     }
   }
@@ -747,11 +747,11 @@ onMounted(async () => {
 
       }
       else {
-        console.warn('WebSocket连接失败，将在模拟模式下运行')
+        console.warn('WebSocket连接失败，将使用离线模式')
       }
     }
     catch (error) {
-      console.warn('WebSocket连接失败，将在模拟模式下运行')
+      console.warn('WebSocket连接失败，将使用离线模式')
       // 不显示错误消息，因为这在开发环境中是正常的
     }
   }

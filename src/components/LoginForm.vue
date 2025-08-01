@@ -53,7 +53,7 @@
               </div>
               <div class="qr-tips">
                 <p>请使用微信扫描二维码登录</p>
-                <p class="countdown" v-if="countdown > 0">{{ countdown }}秒后自动登录成功（演示）</p>
+                <p class="countdown" v-if="countdown > 0">{{ countdown }}秒后过期，请及时扫码</p>
                 <el-button size="small" @click="resetQRCode">重新生成</el-button>
               </div>
             </div>

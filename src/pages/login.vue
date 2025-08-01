@@ -7,6 +7,7 @@ import { Picture, User, Setting, Monitor, Refresh } from '@element-plus/icons-vu
 import QRCode from 'qrcode'
 import type { ProxyConfig, LoginAccount } from '@/types/auth'
 import { proxyApi, type ProxyInfo, getProxyDisplayName } from '@/api/proxy'
+import { loginApi } from '@/api/auth'
 import ProxyManagement from '@/components/business/ProxyManagement.vue'
 
 const router = useRouter()
@@ -16,6 +17,7 @@ const activeTab = ref('qrcode')
 const isLoading = ref(false)
 const qrCodeUrl = ref('')
 const qrCodeData = ref('')
+const currentUuid = ref('')
 
 // 二维码登录表单
 const qrForm = reactive({
@@ -75,18 +77,25 @@ const generateQRCode = async () => {
 
   isLoading.value = true
   try {
-    // 模拟二维码生成
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    // 调用真实的API生成二维码
+    const response = await loginApi.getQRCode('Car', {
+      DeviceId: qrForm.deviceId,
+      DeviceName: qrForm.deviceName,
+      DeviceType: 'car-31'
+    })
 
-    // 生成一个示例二维码
-    const sampleData = 'https://login.weixin.qq.com/l/sample-qr-code'
-    qrCodeData.value = sampleData
-    qrCodeUrl.value = await QRCode.toDataURL(sampleData)
+    if (response.Success && response.Data) {
+      qrCodeData.value = response.Data.qrCodeData || response.Data.QrCodeData
+      qrCodeUrl.value = await QRCode.toDataURL(qrCodeData.value)
+      currentUuid.value = response.Data.uuid || response.Data.Uuid
 
-    ElMessage.success('二维码生成成功，请使用微信扫码登录（演示模式）')
+      ElMessage.success('二维码生成成功，请使用微信扫码登录')
 
-    // 开始轮询检查登录状态
-    startLoginStatusCheck()
+      // 开始轮询检查登录状态
+      startLoginStatusCheck()
+    } else {
+      throw new Error(response.Message || '生成二维码失败')
+    }
   } catch (error) {
     console.error('生成二维码失败:', error)
     ElMessage.error('生成二维码失败，请检查网络连接')
@@ -103,11 +112,21 @@ const loginWithPassword = async () => {
 
   isLoading.value = true
   try {
-    // 模拟登录过程
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    // 调用真实的62数据登录API
+    const response = await loginApi.loginWithData62({
+      Username: passwordForm.username,
+      Password: passwordForm.password,
+      Data62: passwordForm.data62,
+      DeviceName: qrForm.deviceName || 'Device_Login',
+      Proxy: passwordForm.proxy
+    })
 
-    ElMessage.success('登录成功（演示模式）')
-    router.push('/dashboard')
+    if (response.Success) {
+      ElMessage.success('登录成功')
+      router.push('/dashboard')
+    } else {
+      throw new Error(response.Message || '登录失败')
+    }
   } catch (error) {
     console.error('登录失败:', error)
     ElMessage.error('登录失败，请检查账号密码')
@@ -123,27 +142,54 @@ const startLoginStatusCheck = () => {
     clearInterval(statusCheckTimer)
   }
 
-  // 模拟登录状态检查
-  statusCheckTimer = setInterval(() => {
-    // 演示模式：10秒后自动"登录成功"
-    setTimeout(() => {
-      if (statusCheckTimer) {
-        clearInterval(statusCheckTimer)
-        ElMessage.success('扫码登录成功（演示模式）')
+  if (!currentUuid.value) {
+    ElMessage.error('二维码UUID无效')
+    return
+  }
+
+  // 真实的登录状态检查
+  statusCheckTimer = setInterval(async () => {
+    try {
+      const response = await loginApi.checkQRCodeStatus({ Uuid: currentUuid.value })
+
+      if (response.Success && response.Message === "登录成功") {
+        clearInterval(statusCheckTimer!)
+        statusCheckTimer = null
+        ElMessage.success('扫码登录成功')
         router.push('/dashboard')
+      } else if (response.Success && response.Data) {
+        const data = response.Data
+        if (data.expiredTime <= 0) {
+          clearInterval(statusCheckTimer!)
+          statusCheckTimer = null
+          ElMessage.error('二维码已过期，请重新生成')
+          resetQRCode()
+        } else if (data.status === 4) {
+          clearInterval(statusCheckTimer!)
+          statusCheckTimer = null
+          ElMessage.warning('用户取消登录')
+          resetQRCode()
+        }
+        // 其他状态继续轮询
       }
-    }, 10000)
-  }, 1000)
+    } catch (error) {
+      console.error('检查登录状态失败:', error)
+    }
+  }, 2000) // 每2秒检查一次
 }
 
+// 重置二维码
 const resetQRCode = () => {
   qrCodeUrl.value = ''
   qrCodeData.value = ''
+  currentUuid.value = ''
   if (statusCheckTimer) {
     clearInterval(statusCheckTimer)
     statusCheckTimer = null
   }
 }
+
+
 
 const goBack = () => {
   router.push('/')

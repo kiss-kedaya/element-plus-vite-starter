@@ -96,8 +96,19 @@
     </el-container>
 
     <!-- 登录对话框 -->
-    <el-dialog v-model="showLoginDialog" title="账号登录" width="600px" :close-on-click-modal="false">
-      <LoginForm @login-success="handleLoginSuccess" @close="showLoginDialog = false" />
+    <el-dialog
+      v-model="showLoginDialog"
+      title="账号登录"
+      width="600px"
+      :close-on-click-modal="false"
+      :destroy-on-close="true"
+      @close="handleLoginDialogClose"
+    >
+      <LoginForm
+        v-if="showLoginDialog"
+        @login-success="handleLoginSuccess"
+        @close="handleLoginDialogClose"
+      />
     </el-dialog>
 
     <!-- 账号管理对话框 -->
@@ -169,8 +180,14 @@ const selectAccount = (account) => {
 
 const handleLoginSuccess = (accountData) => {
   authStore.addAccount(accountData)
-  showLoginDialog.value = false
+  handleLoginDialogClose()
   ElMessage.success('登录成功！')
+}
+
+const handleLoginDialogClose = () => {
+  showLoginDialog.value = false
+  // 确保组件被完全销毁，清理所有定时器
+  console.log('登录对话框关闭，组件将被销毁')
 }
 
 const openAccountManagement = (account) => {
