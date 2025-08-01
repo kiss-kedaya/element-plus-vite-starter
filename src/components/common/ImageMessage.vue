@@ -268,7 +268,11 @@ const loadImage = async () => {
         ToWxid: props.toWxid,
         MsgId: props.msgId,
         DataLen: props.dataLen,
-        CompressType: props.compressType || 0
+        CompressType: props.compressType || 0,
+        Section: {
+          StartPos: 0,
+          DataLen: props.dataLen
+        }
       }
 
       response = await downloadImage(downloadParams)

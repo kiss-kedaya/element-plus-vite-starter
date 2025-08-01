@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { LoginAccount, ProxyConfig } from '@/types/auth'
+import { fileCacheManager } from '@/utils/fileCache'
 import { loginApi } from '@/api/auth'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -51,6 +52,9 @@ export const useAuthStore = defineStore('auth', () => {
     if (account) {
       const previousAccount = currentAccount.value
       currentAccount.value = account
+
+      // 设置文件缓存管理器的当前微信账号
+      fileCacheManager.setCurrentWxid(wxid)
 
       // 如果是真正的账号切换（不是初始化），触发数据清空事件
       if (previousAccount && previousAccount.wxid !== wxid) {

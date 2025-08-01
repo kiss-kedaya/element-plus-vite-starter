@@ -2,6 +2,7 @@ import type { ChatMessage } from '@/types/chat'
 import { ElMessage } from 'element-plus'
 import { WEBSOCKET_CONFIG } from '@/config/websocket'
 import { parseImageMessage, parseVideoMessage } from '@/utils/imageMessageParser'
+import { fileCacheManager } from '@/utils/fileCache'
 
 // 事件类型定义
 export interface WebSocketEvents {
@@ -82,6 +83,11 @@ export class WebSocketService {
 
       this.isConnecting = true
       this.currentWxid = wxid
+
+      // 设置文件缓存管理器的当前微信账号
+      if (wxid) {
+        fileCacheManager.setCurrentWxid(wxid)
+      }
 
       try {
         // WebSocket服务器地址，包含wxid参数
@@ -214,7 +220,7 @@ export class WebSocketService {
         content: msg.content || '',
         timestamp: msg.createTime ? new Date(msg.createTime * 1000) : new Date(),
         fromMe,
-        type: this.getMsgType(msg.msgType),
+        type: this.getMsgType(msg.msgType, msg.contentType, msg.extraData),
         status: 'received',
         sessionId,
         isGroupMessage,
@@ -344,6 +350,101 @@ export class WebSocketService {
           path: msg.content,
         }
         chatMessage.content = '[文件]'
+      }
+
+      // 处理链接/小程序/文件消息 (msgType: 49)
+      if (msg.msgType === 49) {
+        // 检查是否是文件消息
+        if (msg.contentType === 'file' || (msg.extraData && msg.extraData.type === 'file')) {
+          // 解析文件信息
+          const fileName = msg.extraData?.title || '未知文件'
+          const fileExt = msg.extraData?.fileExt || ''
+
+          // 解析XML获取更多文件信息
+          let fileSize = 0
+          let cdnUrl = ''
+          let aesKey = ''
+          let attachId = ''
+
+          if (msg.originalContent) {
+            try {
+              // 解析文件大小
+              const totalLenMatch = msg.originalContent.match(/<totallen>(\d+)<\/totallen>/)
+              if (totalLenMatch) {
+                fileSize = parseInt(totalLenMatch[1])
+              }
+
+              // 解析CDN URL
+              const cdnUrlMatch = msg.originalContent.match(/<cdnattachurl>(.*?)<\/cdnattachurl>/)
+              if (cdnUrlMatch) {
+                cdnUrl = cdnUrlMatch[1]
+              }
+
+              // 解析AES密钥
+              const aesKeyMatch = msg.originalContent.match(/<aeskey>(.*?)<\/aeskey>/)
+              if (aesKeyMatch) {
+                aesKey = aesKeyMatch[1]
+              }
+
+              // 解析附件ID
+              const attachIdMatch = msg.originalContent.match(/<attachid>(.*?)<\/attachid>/)
+              if (attachIdMatch) {
+                attachId = attachIdMatch[1]
+              }
+            } catch (error) {
+              console.warn('解析文件消息XML失败:', error)
+            }
+          }
+
+          chatMessage.fileData = {
+            name: fileName,
+            size: fileSize,
+            ext: fileExt,
+            cdnUrl: cdnUrl,
+            aesKey: aesKey,
+            attachId: attachId,
+            originalContent: msg.originalContent
+          }
+          chatMessage.content = `[文件: ${fileName}]`
+
+          // 将文件信息添加到缓存
+          if (fileName && fileSize > 0 && attachId && msg.originalContent) {
+            try {
+              // 解析AppID
+              const appIdMatch = msg.originalContent.match(/<appmsg appid="([^"]*)"/)
+              const appId = appIdMatch ? appIdMatch[1] : 'wx6618f1cfc6c132f8'
+
+              fileCacheManager.addFileToCache({
+                fileName: fileName,
+                fileSize: fileSize,
+                originalContent: msg.originalContent,
+                attachId: attachId,
+                cdnUrl: cdnUrl,
+                aesKey: aesKey,
+                appId: appId
+              })
+              console.log('文件已缓存:', { fileName, fileSize, attachId })
+            } catch (error) {
+              console.warn('缓存文件信息失败:', error)
+            }
+          }
+        } else if (msg.contentType === 'link' || (msg.extraData && msg.extraData.type === 'link')) {
+          // 链接消息处理
+          const linkTitle = msg.extraData?.title || msg.content || '链接'
+          const linkUrl = msg.extraData?.url || ''
+          const thumbUrl = msg.extraData?.thumbUrl || ''
+
+          chatMessage.linkData = {
+            title: linkTitle,
+            url: linkUrl,
+            thumbUrl: thumbUrl,
+            originalContent: msg.originalContent
+          }
+          chatMessage.content = linkTitle
+        } else {
+          // 其他类型的49消息（小程序等）
+          chatMessage.content = msg.content || '[小程序/其他]'
+        }
       }
 
       // 处理视频消息
@@ -492,7 +593,7 @@ export class WebSocketService {
   }
 
   // 根据消息类型转换
-  private getMsgType(msgType: number): string {
+  private getMsgType(msgType: number, contentType?: string, extraData?: any): string {
     switch (msgType) {
       case 1: // 文本消息
         return 'text'
@@ -504,6 +605,16 @@ export class WebSocketService {
         return 'video'
       case 47: // 表情消息
         return 'emoji'
+      case 49: // 链接/小程序/文件消息
+        // 根据 contentType 和 extraData 进一步判断
+        if (contentType === 'file' || (extraData && extraData.type === 'file')) {
+          return 'file'
+        } else if (contentType === 'link' || (extraData && extraData.type === 'link')) {
+          return 'link'
+        } else {
+          // 默认为链接类型
+          return 'link'
+        }
       case 10000: // 系统消息
         return 'system'
       case 10002: // 撤回消息

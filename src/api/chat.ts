@@ -90,6 +90,54 @@ export const chatApi = {
     FileNo: string;
   }): Promise<any> => {
     return api.post('/Tools/CdnDownloadImage', params)
+  },
+
+  // 转发文件消息
+  forwardFileMessage: (params: {
+    Wxid: string;
+    ToWxid: string;
+    Content: string; // 原始消息的XML内容
+  }): Promise<MessageResponse> => {
+    console.log('发送文件转发请求:', {
+      url: '/Msg/SendCDNFile',
+      params: {
+        ...params,
+        Content: params.Content.substring(0, 100) + '...' // 只显示前100个字符
+      }
+    })
+    return api.post('/Msg/SendCDNFile', params)
+  },
+
+  // 转发图片消息
+  forwardImageMessage: (params: {
+    Wxid: string;
+    ToWxid: string;
+    Content: string; // 原始消息的XML内容
+  }): Promise<MessageResponse> => {
+    console.log('发送图片转发请求:', {
+      url: '/Msg/SendCDNImg',
+      params: {
+        ...params,
+        Content: params.Content.substring(0, 100) + '...'
+      }
+    })
+    return api.post('/Msg/SendCDNImg', params)
+  },
+
+  // 转发视频消息
+  forwardVideoMessage: (params: {
+    Wxid: string;
+    ToWxid: string;
+    Content: string; // 原始消息的XML内容
+  }): Promise<MessageResponse> => {
+    console.log('发送视频转发请求:', {
+      url: '/Msg/SendCDNVideo',
+      params: {
+        ...params,
+        Content: params.Content.substring(0, 100) + '...'
+      }
+    })
+    return api.post('/Msg/SendCDNVideo', params)
   }
 }
 
@@ -109,11 +157,15 @@ export const downloadImage = (params: {
   MsgId: number;
   DataLen: number;
   CompressType?: number;
-  Section?: {
+  Section: {
     StartPos: number;
     DataLen: number;
   };
 }): Promise<any> => {
+  console.log('发送图片下载请求:', {
+    url: '/Tools/DownloadImg',
+    params
+  })
   return api.post('/Tools/DownloadImg', params)
 }
 
@@ -124,10 +176,14 @@ export const downloadVideo = (params: {
   MsgId: number;
   DataLen: number;
   CompressType?: number;
-  Section?: {
+  Section: {
     StartPos: number;
     DataLen: number;
   };
 }): Promise<any> => {
+  console.log('发送视频下载请求:', {
+    url: '/Tools/DownloadVideo',
+    params
+  })
   return api.post('/Tools/DownloadVideo', params)
 }

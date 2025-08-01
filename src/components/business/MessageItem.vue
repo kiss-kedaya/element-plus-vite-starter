@@ -158,6 +158,117 @@ function getSenderDisplayName() {
   return '未知用户'
 }
 
+// 根据文件名和扩展名获取MIME类型
+function getFileMimeType(fileName?: string, fileExt?: string): string {
+  const ext = fileExt || (fileName ? fileName.split('.').pop()?.toLowerCase() : '')
+
+  const mimeTypes: Record<string, string> = {
+    // 图片
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'gif': 'image/gif',
+    'bmp': 'image/bmp',
+    'webp': 'image/webp',
+    'svg': 'image/svg+xml',
+
+    // 文档
+    'pdf': 'application/pdf',
+    'doc': 'application/msword',
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'xls': 'application/vnd.ms-excel',
+    'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'ppt': 'application/vnd.ms-powerpoint',
+    'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'txt': 'text/plain',
+
+    // 视频
+    'mp4': 'video/mp4',
+    'avi': 'video/x-msvideo',
+    'mov': 'video/quicktime',
+    'wmv': 'video/x-ms-wmv',
+    'flv': 'video/x-flv',
+    'mkv': 'video/x-matroska',
+    'webm': 'video/webm',
+
+    // 音频
+    'mp3': 'audio/mpeg',
+    'wav': 'audio/wav',
+    'flac': 'audio/flac',
+    'aac': 'audio/aac',
+
+    // 压缩文件
+    'zip': 'application/zip',
+    'rar': 'application/x-rar-compressed',
+    '7z': 'application/x-7z-compressed',
+    'tar': 'application/x-tar',
+    'gz': 'application/gzip'
+  }
+
+  return mimeTypes[ext || ''] || 'application/octet-stream'
+}
+
+// 获取文件URL
+function getFileUrl(fileData?: any): string | undefined {
+  if (!fileData) return undefined
+
+  // 优先级：url > path > cdnUrl
+  if (fileData.url) {
+    return fileData.url
+  }
+
+  if (fileData.path) {
+    return fileData.path
+  }
+
+  // 对于CDN文件，目前暂时返回undefined，因为需要特殊的下载处理
+  // 后续可以实现CDN文件的下载逻辑
+  if (fileData.cdnUrl) {
+    console.log('检测到CDN文件，需要特殊处理:', {
+      cdnUrl: fileData.cdnUrl,
+      aesKey: fileData.aesKey,
+      attachId: fileData.attachId
+    })
+    // 暂时返回undefined，显示"处理中"状态
+    return undefined
+  }
+
+  return undefined
+}
+
+// 获取下载文件时使用的用户名
+function getUserNameForDownload(): string {
+  // 对于文件下载，通常使用发送方的用户名
+  if (props.message.fromMe) {
+    // 如果是自己发送的，使用当前账号的wxid
+    return authStore.currentAccount?.wxid || ''
+  } else {
+    // 如果是对方发送的，使用发送方的信息
+    return props.message.actualSender || props.message.sessionId || ''
+  }
+}
+
+// 从消息中获取AppID
+function getAppIdFromMessage(): string {
+  // 从原始XML内容中解析AppID
+  if (props.message.fileData?.originalContent) {
+    const appIdMatch = props.message.fileData.originalContent.match(/<appmsg appid="([^"]*)"/)
+    if (appIdMatch) {
+      return appIdMatch[1]
+    }
+  }
+  // 默认AppID（微信电脑版）
+  return 'wx6618f1cfc6c132f8'
+}
+
+// 打开链接
+function openLink(url?: string) {
+  if (!url) return
+
+  // 在新窗口中打开链接
+  window.open(url, '_blank')
+}
+
 
 </script>
 
@@ -245,9 +356,32 @@ function getSenderDisplayName() {
             <FileMessage
               :file-name="message.fileData?.name || '未知文件'"
               :file-size="message.fileData?.size || 0"
-              :file-url="message.fileData?.url"
-              :mime-type="message.fileData?.mimeType"
+              :file-url="getFileUrl(message.fileData)"
+              :mime-type="getFileMimeType(message.fileData?.name, message.fileData?.ext)"
+              :cdn-url="message.fileData?.cdnUrl"
+              :aes-key="message.fileData?.aesKey"
+              :attach-id="message.fileData?.attachId"
+              :wxid="authStore.currentAccount?.wxid"
+              :user-name="getUserNameForDownload()"
+              :app-id="getAppIdFromMessage()"
+              :original-content="message.fileData?.originalContent"
+              :can-forward="!message.fromMe && !!message.fileData?.originalContent"
+              :message-status="message.status"
+              :from-me="message.fromMe"
             />
+          </div>
+
+          <!-- 链接消息 -->
+          <div v-else-if="message.type === 'link'" class="message-link">
+            <div class="link-card" @click="openLink(message.linkData?.url)">
+              <div class="link-content">
+                <div class="link-title">{{ message.linkData?.title || message.content }}</div>
+                <div class="link-url">{{ message.linkData?.url }}</div>
+              </div>
+              <div v-if="message.linkData?.thumbUrl" class="link-thumb">
+                <img :src="message.linkData.thumbUrl" alt="链接缩略图" />
+              </div>
+            </div>
           </div>
 
           <!-- 表情消息 -->
@@ -314,8 +448,14 @@ function getSenderDisplayName() {
             <FileMessage
               :file-name="message.fileData?.name || '未知文件'"
               :file-size="message.fileData?.size || 0"
-              :file-url="message.fileData?.url"
-              :mime-type="message.fileData?.mimeType"
+              :file-url="getFileUrl(message.fileData)"
+              :mime-type="getFileMimeType(message.fileData?.name, message.fileData?.ext)"
+              :cdn-url="message.fileData?.cdnUrl"
+              :aes-key="message.fileData?.aesKey"
+              :attach-id="message.fileData?.attachId"
+              :wxid="authStore.currentAccount?.wxid"
+              :user-name="getUserNameForDownload()"
+              :app-id="getAppIdFromMessage()"
             />
           </div>
 
@@ -758,6 +898,69 @@ function getSenderDisplayName() {
 
     .emoji-text {
       font-size: 12px;
+    }
+  }
+
+  // 链接消息样式
+  .message-link {
+    .link-card {
+      display: flex;
+      max-width: 300px;
+      border: 1px solid var(--el-border-color-light);
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: var(--el-bg-color);
+
+      &:hover {
+        border-color: var(--el-color-primary);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+
+      .link-content {
+        flex: 1;
+        padding: 12px;
+        min-width: 0;
+
+        .link-title {
+          font-size: 14px;
+          font-weight: 500;
+          color: var(--el-text-color-primary);
+          line-height: 1.4;
+          margin-bottom: 4px;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .link-url {
+          font-size: 12px;
+          color: var(--el-text-color-secondary);
+          line-height: 1.2;
+          display: -webkit-box;
+          -webkit-line-clamp: 1;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+      }
+
+      .link-thumb {
+        width: 60px;
+        height: 60px;
+        flex-shrink: 0;
+        margin: 12px 12px 12px 0;
+
+        img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          border-radius: 4px;
+        }
+      }
     }
   }
 }

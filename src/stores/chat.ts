@@ -6,6 +6,8 @@ import { friendApi } from '@/api/friend'
 import { uploadFile } from '@/api'
 import { webSocketService } from '@/services/websocket'
 import { useAuthStore } from '@/stores/auth'
+import { fileCacheManager } from '@/utils/fileCache'
+import { ElMessage } from 'element-plus'
 
 export const useChatStore = defineStore('chat', () => {
   // 状态
@@ -390,26 +392,37 @@ export const useChatStore = defineStore('chat', () => {
   const sendFileMessage = async (wxid: string, toUserName: string, file: File) => {
     isSending.value = true
 
-    // 检查文件类型
-    if (file.type.startsWith('image/')) {
-      // 如果是图片文件，转换为base64并使用图片发送接口
-      try {
-        const reader = new FileReader()
-        const base64Promise = new Promise<string>((resolve, reject) => {
-          reader.onload = () => resolve(reader.result as string)
-          reader.onerror = reject
-        })
-        reader.readAsDataURL(file)
+    try {
+      // 首先检查文件缓存
+      console.log('检查文件缓存:', { fileName: file.name, fileSize: file.size })
+      const cachedFile = await fileCacheManager.findCachedFile(file)
 
-        const base64 = await base64Promise
-        return await sendImageMessage(wxid, toUserName, base64)
-      } catch (error) {
-        console.error('图片文件处理失败:', error)
-        throw new Error('图片文件处理失败')
-      } finally {
-        isSending.value = false
+      if (cachedFile) {
+        console.log('找到缓存文件，使用转发方式发送:', cachedFile)
+        ElMessage.success('检测到相同文件，使用快速发送模式')
+
+        // 使用缓存的文件信息进行转发
+        return await forwardFileMessage(wxid, toUserName, cachedFile.originalContent)
       }
-    }
+
+      // 检查文件类型
+      if (file.type.startsWith('image/')) {
+        // 如果是图片文件，转换为base64并使用图片发送接口
+        try {
+          const reader = new FileReader()
+          const base64Promise = new Promise<string>((resolve, reject) => {
+            reader.onload = () => resolve(reader.result as string)
+            reader.onerror = reject
+          })
+          reader.readAsDataURL(file)
+
+          const base64 = await base64Promise
+          return await sendImageMessage(wxid, toUserName, base64)
+        } catch (error) {
+          console.error('图片文件处理失败:', error)
+          throw new Error('图片文件处理失败')
+        }
+      }
 
     // 立即显示消息，状态为发送中
     const messageId = Date.now().toString()
@@ -436,18 +449,89 @@ export const useChatStore = defineStore('chat', () => {
     }
     addMessage(toUserName, message)
 
-    try {
-      // 对于非图片文件，后端暂不支持直接上传
-      // 这里可以显示一个提示消息
-      updateMessageStatus(toUserName, messageId, 'failed', false)
-      throw new Error('后端暂不支持非图片文件的直接上传，只支持图片文件和CDN文件转发')
-    }
-    catch (error) {
+      try {
+        // 对于非图片文件，如果没有缓存，则无法发送
+        updateMessageStatus(toUserName, messageId, 'failed', false)
+
+        // 提供更详细的错误信息
+        const errorMessage = `无法发送文件 "${file.name}"。\n\n` +
+          '原因：\n' +
+          '1. 该文件不是图片格式\n' +
+          '2. 未找到该文件的缓存信息\n\n' +
+          '解决方案：\n' +
+          '• 如果要发送图片，请使用 JPG、PNG 等图片格式\n' +
+          '• 如果要发送其他文件，请先在微信中接收过相同的文件，然后再尝试发送'
+
+        throw new Error(errorMessage)
+      }
+      catch (error) {
+        console.error('发送文件失败:', error)
+        updateMessageStatus(toUserName, messageId, 'failed', true)
+        throw error
+      }
+    } catch (error) {
       console.error('发送文件失败:', error)
+      throw error
+    } finally {
+      isSending.value = false
+    }
+  }
+
+  // 转发文件消息
+  const forwardFileMessage = async (wxid: string, toUserName: string, originalContent: string) => {
+    isSending.value = true
+
+    // 立即显示消息，状态为发送中
+    const messageId = Date.now().toString()
+    const currentTime = Date.now()
+
+    // 从XML中解析文件名
+    let fileName = '未知文件'
+    try {
+      const titleMatch = originalContent.match(/<title>(.*?)<\/title>/)
+      if (titleMatch) {
+        fileName = titleMatch[1]
+      }
+    } catch (error) {
+      console.warn('解析文件名失败:', error)
+    }
+
+    const message: ChatMessage = {
+      id: messageId,
+      content: `[文件] ${fileName}`,
+      timestamp: new Date(),
+      fromMe: true,
+      type: 'file',
+      status: 'sending',
+      sessionId: toUserName,
+      isGroupMessage: toUserName.includes('@chatroom'),
+      actualSender: wxid,
+      canRecall: false,
+      clientMsgId: parseInt(messageId),
+      createTime: Math.floor(currentTime / 1000),
+      newMsgId: parseInt(messageId),
+    }
+    addMessage(toUserName, message)
+
+    try {
+      const result = await chatApi.forwardFileMessage({
+        Wxid: wxid,
+        ToWxid: toUserName,
+        Content: originalContent
+      })
+
+      if (result.Success) {
+        updateMessageStatus(toUserName, messageId, 'sent', false, result)
+      } else {
+        updateMessageStatus(toUserName, messageId, 'failed', true)
+      }
+
+      return result
+    } catch (error) {
+      console.error('转发文件失败:', error)
       updateMessageStatus(toUserName, messageId, 'failed', true)
       throw error
-    }
-    finally {
+    } finally {
       isSending.value = false
     }
   }
@@ -924,6 +1008,7 @@ export const useChatStore = defineStore('chat', () => {
     sendTextMessage,
     sendImageMessage,
     sendFileMessage,
+    forwardFileMessage,
     clearMessages,
     updateMessageStatus,
     retryMessage,

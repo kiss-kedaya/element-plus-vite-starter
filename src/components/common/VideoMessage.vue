@@ -183,7 +183,11 @@ const loadVideo = async () => {
       ToWxid: props.toWxid,
       MsgId: props.msgId,
       DataLen: props.dataLen,
-      CompressType: props.compressType || 0
+      CompressType: props.compressType || 0,
+      Section: {
+        StartPos: 0,
+        DataLen: props.dataLen
+      }
     }
 
     const response = await downloadVideo(downloadParams)

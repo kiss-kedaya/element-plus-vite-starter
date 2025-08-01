@@ -33,11 +33,16 @@
       <div v-if="searchResult" class="search-result">
         <el-divider content-position="left">搜索结果</el-divider>
         <div class="user-card">
-          <el-avatar :src="searchResult.avatar" :size="50">
+          <el-avatar :src="searchResult.avatar" :size="50" @error="handleAvatarError">
             {{ getDisplayValue(searchResult.nickname).charAt(0) || '?' }}
           </el-avatar>
           <div class="user-info">
-            <div class="nickname">{{ getDisplayValue(searchResult.nickname) }}</div>
+            <div class="nickname">
+              {{ getDisplayValue(searchResult.nickname) }}
+              <el-tag v-if="searchResult.sex === 1" type="info" size="small" style="margin-left: 8px;">男</el-tag>
+              <el-tag v-if="searchResult.sex === 2" type="warning" size="small" style="margin-left: 8px;">女</el-tag>
+              <el-tag v-if="searchResult.verifyFlag > 0" type="success" size="small" style="margin-left: 8px;">认证</el-tag>
+            </div>
             <div class="wxid">
               <span v-if="getDisplayValue(searchResult.alias).trim()">微信号：{{ getDisplayValue(searchResult.alias) }}</span>
               <span class="wxid-info">[{{ getDisplayValue(searchResult.wxid) }}]</span>
@@ -513,13 +518,21 @@ const searchUser = async () => {
     const response = await friendApi.searchContact(params)
 
     if (response.Success && response.Data) {
+      console.log('搜索用户响应:', response)
+      console.log('头像URL信息:', {
+        BigHeadImgUrl: response.Data.BigHeadImgUrl,
+        SmallHeadImgUrl: response.Data.SmallHeadImgUrl
+      })
+
       searchResult.value = {
-        wxid: response.Data.UserName?.string || searchForm.value.keyword,
+        wxid: response.Data.Pyinitial?.string || searchForm.value.keyword, // wxid是Pyinitial.string
         nickname: response.Data.NickName?.string || '未知用户',
-        alias: response.Data.Alias || '',
-        avatar: response.Data.BigHeadImgUrl || '',
-        region: `${response.Data.Country || ''} ${response.Data.Province || ''}`.trim() || '未知',
+        alias: response.Data.Province || '', // 微信号是Province字段
+        avatar: response.Data.BigHeadImgUrl || response.Data.SmallHeadImgUrl || '',
+        region: `${response.Data.Country || ''} ${response.Data.City || ''}`.trim() || '未知',
         signature: response.Data.Signature || '',
+        sex: response.Data.Sex || 0,
+        verifyFlag: response.Data.VerifyFlag || 0,
         // 根据新的响应数据结构设置V1和V2
         v1: response.Data.UserName?.string || '', // V1使用UserName (v3_...@stranger)
         v2: response.Data.AntispamTicket || '', // V2使用AntispamTicket (v4_...@stranger)
@@ -990,6 +1003,12 @@ const getDisplayValue = (value: any): string => {
 
   // 其他情况直接转换为字符串
   return String(value)
+}
+
+// 头像加载错误处理
+const handleAvatarError = (event: Event) => {
+  console.warn('头像加载失败:', searchResult.value?.avatar)
+  // 可以在这里设置默认头像或者其他处理
 }
 
 const updateRemark = async () => {

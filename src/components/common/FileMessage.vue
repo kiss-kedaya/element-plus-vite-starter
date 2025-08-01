@@ -16,24 +16,78 @@
       </div>
       
       <div class="file-actions">
-        <el-button 
-          v-if="fileUrl" 
-          type="primary" 
-          size="small" 
+        <!-- 有直接下载链接 -->
+        <el-button
+          v-if="fileUrl"
+          type="primary"
+          size="small"
           @click="downloadFile"
           :loading="downloading"
         >
           <el-icon><Download /></el-icon>
           下载
         </el-button>
-        <el-button 
-          v-else 
-          type="info" 
-          size="small" 
+        <!-- 有CDN信息可以下载 -->
+        <el-button
+          v-else-if="cdnUrl && !fromMe"
+          type="warning"
+          size="small"
+          @click="downloadCdnFile"
+          :loading="downloading"
+        >
+          <el-icon><Download /></el-icon>
+          下载
+        </el-button>
+        <!-- 自己发送的消息，根据状态显示 -->
+        <el-button
+          v-else-if="fromMe && messageStatus === 'sent'"
+          type="success"
+          size="small"
+          disabled
+        >
+          <el-icon><Check /></el-icon>
+          已发送
+        </el-button>
+        <el-button
+          v-else-if="fromMe && messageStatus === 'failed'"
+          type="danger"
+          size="small"
+          disabled
+        >
+          <el-icon><Close /></el-icon>
+          发送失败
+        </el-button>
+        <el-button
+          v-else-if="fromMe && messageStatus === 'sending'"
+          type="info"
+          size="small"
+          disabled
+        >
+          <el-icon><Loading /></el-icon>
+          发送中
+        </el-button>
+        <!-- 其他情况显示处理中 -->
+        <el-button
+          v-else
+          type="info"
+          size="small"
           disabled
         >
           <el-icon><Loading /></el-icon>
           处理中
+        </el-button>
+
+        <!-- 转发按钮 -->
+        <el-button
+          v-if="canForward"
+          type="success"
+          size="small"
+          @click="showForwardDialog"
+          :loading="forwarding"
+          style="margin-left: 8px;"
+        >
+          <el-icon><Share /></el-icon>
+          转发
         </el-button>
       </div>
     </div>
@@ -42,19 +96,42 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Document, VideoPlay, Picture, Files, Download, Loading } from '@element-plus/icons-vue'
+import { Document, VideoPlay, Picture, Files, Download, Loading, Share, Check, Close } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { downloadFile as downloadFileAPI } from '@/api/index'
+import { useChatStore } from '@/stores/chat'
+import { useAuthStore } from '@/stores/auth'
 
 interface Props {
   fileName: string
   fileSize: number
   fileUrl?: string
   mimeType?: string
+  cdnUrl?: string
+  aesKey?: string
+  attachId?: string
+  wxid?: string
+  userName?: string
+  appId?: string
+  originalContent?: string  // 原始XML内容，用于转发
+  canForward?: boolean      // 是否可以转发
+  messageStatus?: string    // 消息状态：sending, sent, failed
+  fromMe?: boolean          // 是否是自己发送的消息
 }
 
 const props = defineProps<Props>()
 
 const downloading = ref(false)
+const forwarding = ref(false)
+
+// 获取store实例
+const chatStore = useChatStore()
+const authStore = useAuthStore()
+
+// 计算是否可以转发
+const canForward = computed(() => {
+  return props.canForward && props.originalContent && authStore.currentAccount
+})
 
 // 根据文件类型判断图标
 const isDocument = computed(() => {
@@ -97,18 +174,212 @@ const downloadFile = async () => {
     link.href = props.fileUrl
     link.download = props.fileName
     link.target = '_blank'
-    
+
     // 触发下载
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-    
+
     ElMessage.success('文件下载已开始')
   } catch (error) {
     console.error('下载文件失败:', error)
     ElMessage.error('下载文件失败')
   } finally {
     downloading.value = false
+  }
+}
+
+// 下载CDN文件
+const downloadCdnFile = async () => {
+  console.log('downloadCdnFile 函数开始执行')
+  console.log('Props检查:', {
+    attachId: props.attachId,
+    wxid: props.wxid,
+    userName: props.userName,
+    fileSize: props.fileSize
+  })
+
+  if (!props.attachId || !props.wxid || !props.userName) {
+    console.error('参数验证失败:', {
+      attachId: !!props.attachId,
+      wxid: !!props.wxid,
+      userName: !!props.userName
+    })
+    ElMessage.warning('文件下载参数不完整')
+    return
+  }
+
+  downloading.value = true
+  console.log('设置downloading为true，开始下载流程')
+
+  try {
+    const downloadParams = {
+      Wxid: props.wxid,
+      AppID: props.appId || 'wx6618f1cfc6c132f8', // 默认AppID
+      AttachId: props.attachId,
+      UserName: props.userName,
+      DataLen: props.fileSize,
+      Section: {
+        StartPos: 0,
+        DataLen: props.fileSize
+      }
+    }
+
+    console.log('开始下载文件:', {
+      fileName: props.fileName,
+      attachId: props.attachId,
+      wxid: props.wxid,
+      userName: props.userName,
+      fileSize: props.fileSize,
+      downloadParams
+    })
+
+    console.log('即将调用downloadFileAPI...')
+    console.log('downloadFileAPI函数类型:', typeof downloadFileAPI)
+    console.log('downloadFileAPI函数:', downloadFileAPI)
+
+    if (typeof downloadFileAPI !== 'function') {
+      throw new Error('downloadFileAPI不是一个函数，可能导入失败')
+    }
+
+    let response
+    try {
+      response = await downloadFileAPI(downloadParams)
+      console.log('downloadFileAPI调用成功，响应:', response)
+    } catch (apiError: any) {
+      console.error('downloadFileAPI调用异常:', apiError)
+      console.error('异常详情:', {
+        name: apiError.name,
+        message: apiError.message,
+        stack: apiError.stack,
+        response: apiError.response
+      })
+      throw apiError
+    }
+
+    console.log('下载API响应:', response)
+
+    // 检查响应格式
+    if (response && response.Success && response.Data) {
+      // 从响应中获取文件数据
+      const fileData = response.Data.data || response.Data.Data
+      const base64Data = fileData?.buffer || fileData?.Buffer
+
+      console.log('文件数据信息:', {
+        totalLen: response.Data.totalLen,
+        dataLen: response.Data.dataLen,
+        hasBuffer: !!base64Data
+      })
+
+      if (!base64Data) {
+        throw new Error('服务器未返回文件数据')
+      }
+
+      // 将base64转换为blob并下载
+      try {
+        const byteCharacters = atob(base64Data)
+        const byteNumbers = new Array(byteCharacters.length)
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i)
+        }
+        const byteArray = new Uint8Array(byteNumbers)
+        const blob = new Blob([byteArray])
+
+        console.log('文件下载信息:', {
+          fileName: props.fileName,
+          originalSize: response.Data.totalLen,
+          downloadedSize: byteArray.length,
+          blobSize: blob.size
+        })
+
+        // 创建下载链接
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = props.fileName
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+
+        ElMessage.success(`文件下载成功 (${blob.size} 字节)`)
+      } catch (decodeError) {
+        console.error('Base64解码失败:', decodeError)
+        throw new Error('文件数据格式错误')
+      }
+    } else {
+      const errorMsg = response?.Message || '下载失败：服务器响应格式错误'
+      throw new Error(errorMsg)
+    }
+  } catch (error: any) {
+    console.error('下载文件失败:', error)
+    console.error('错误详情:', {
+      message: error.message,
+      response: error.response,
+      stack: error.stack
+    })
+
+    let errorMessage = '下载文件失败'
+    if (error.message) {
+      errorMessage = error.message
+    } else if (error.response?.data?.Message) {
+      errorMessage = error.response.data.Message
+    }
+
+    ElMessage.error(errorMessage)
+  } finally {
+    downloading.value = false
+  }
+}
+
+// 显示转发对话框
+const showForwardDialog = () => {
+  if (!canForward.value) {
+    ElMessage.warning('无法转发此文件')
+    return
+  }
+
+  // 这里可以显示一个选择联系人的对话框
+  // 为了简化，我们直接转发到当前会话
+  if (chatStore.currentSession) {
+    forwardToSession(chatStore.currentSession.id)
+  } else {
+    ElMessage.warning('请先选择要转发到的会话')
+  }
+}
+
+// 转发到指定会话
+const forwardToSession = async (toWxid: string) => {
+  if (!props.originalContent || !authStore.currentAccount) {
+    ElMessage.warning('转发参数不完整')
+    return
+  }
+
+  forwarding.value = true
+
+  try {
+    console.log('开始转发文件:', {
+      fileName: props.fileName,
+      toWxid,
+      hasOriginalContent: !!props.originalContent
+    })
+
+    const result = await chatStore.forwardFileMessage(
+      authStore.currentAccount.wxid,
+      toWxid,
+      props.originalContent
+    )
+
+    if (result.Success) {
+      ElMessage.success('文件转发成功')
+    } else {
+      throw new Error(result.Message || '转发失败')
+    }
+  } catch (error: any) {
+    console.error('转发文件失败:', error)
+    ElMessage.error(error.message || '转发文件失败')
+  } finally {
+    forwarding.value = false
   }
 }
 </script>

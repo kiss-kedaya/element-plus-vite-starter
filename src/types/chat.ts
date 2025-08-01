@@ -25,7 +25,19 @@ export interface ChatMessage {
   fileData?: {
     name: string
     size: number
+    url?: string
+    path?: string
+    ext?: string
+    cdnUrl?: string
+    aesKey?: string
+    attachId?: string
+    originalContent?: string
+  }
+  linkData?: {
+    title: string
     url: string
+    thumbUrl?: string
+    originalContent?: string
   }
   // 群聊相关字段
   isGroupMessage?: boolean    // 是否为群聊消息

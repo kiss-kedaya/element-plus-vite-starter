@@ -53,6 +53,7 @@ declare module 'vue' {
     ElTabs: typeof import('element-plus/es')['ElTabs']
     ElTag: typeof import('element-plus/es')['ElTag']
     EmojiImage: typeof import('./components/common/EmojiImage.vue')['default']
+    FileCacheManager: typeof import('./components/business/FileCacheManager.vue')['default']
     FileMessage: typeof import('./components/common/FileMessage.vue')['default']
     FriendManagement: typeof import('./components/FriendManagement.vue')['default']
     FriendManagement_backup: typeof import('./components/FriendManagement_backup.vue')['default']

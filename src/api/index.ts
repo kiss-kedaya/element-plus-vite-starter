@@ -24,14 +24,27 @@ api.interceptors.request.use(
 // 响应拦截器
 api.interceptors.response.use(
   (response) => {
+    console.log('API响应成功:', {
+      url: response.config.url,
+      status: response.status,
+      data: response.data
+    })
     return response.data
   },
   (error) => {
     console.error('API请求错误:', error)
-    
+    console.error('错误详细信息:', {
+      message: error.message,
+      response: error.response,
+      request: error.request,
+      config: error.config
+    })
+
     // 统一错误处理
     if (error.response) {
       const { status, data } = error.response
+      console.error(`HTTP错误 ${status}:`, data)
+
       switch (status) {
         case 400:
           console.error('请求参数错误')
@@ -51,7 +64,7 @@ api.interceptors.response.use(
         default:
           console.error(`请求失败: ${status}`)
       }
-      
+
       return Promise.reject(data || error.response)
     } else if (error.request) {
       console.error('网络连接错误')
@@ -97,4 +110,37 @@ export const uploadFile = async (file: File, onProgress?: (progress: number) => 
 
   // 对于非图片文件，后端暂不支持直接上传
   throw new Error('后端暂不支持非图片文件的直接上传，只支持CDN文件转发')
+}
+
+// 下载文件API
+export const downloadFile = async (params: {
+  Wxid: string
+  AppID: string
+  AttachId: string
+  UserName: string
+  DataLen: number
+  Section: {
+    StartPos: number
+    DataLen: number
+  }
+}) => {
+  console.log('发送下载文件请求:', {
+    url: '/Tools/DownloadFile',
+    params
+  })
+
+  try {
+    const response = await api.post('/Tools/DownloadFile', params)
+    console.log('下载文件API原始响应:', response)
+    return response
+  } catch (error: any) {
+    console.error('下载文件API调用失败:', {
+      error,
+      message: error.message,
+      response: error.response,
+      status: error.response?.status,
+      data: error.response?.data
+    })
+    throw error
+  }
 }
