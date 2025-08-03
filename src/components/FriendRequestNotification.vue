@@ -158,8 +158,14 @@ const rejectRequest = async (request: FriendRequest) => {
   }
 }
 
-const handleFriendRequest = async (data: any) => {
+const handleFriendRequest = async (data: any, messageWxid?: string) => {
   console.log('收到好友请求:', data)
+
+  // 检查好友请求是否属于当前账号
+  if (messageWxid && authStore.currentAccount?.wxid && messageWxid !== authStore.currentAccount.wxid) {
+    console.log(`好友请求属于账号 ${messageWxid}，但当前账号是 ${authStore.currentAccount.wxid}，跳过处理`)
+    return
+  }
 
   const request: FriendRequest = {
     id: Date.now().toString() + Math.random(),

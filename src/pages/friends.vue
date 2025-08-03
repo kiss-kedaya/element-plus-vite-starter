@@ -4,10 +4,10 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useFriendStore } from '@/stores/friend'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { 
-  User, 
-  Search, 
-  Plus, 
+import {
+  User,
+  Search,
+  Plus,
   Refresh,
   Phone,
   Message,
@@ -15,6 +15,7 @@ import {
   UserFilled
 } from '@element-plus/icons-vue'
 import type { Friend } from '@/types/friend'
+import { friendApi } from '@/api/friend'
 
 // 临时内联常量定义，避免导入问题
 const FRIEND_SCENE = {
@@ -111,8 +112,12 @@ const searchContact = async () => {
     )
     
     if (result.Success && result.Data) {
+      // 判断是否为陌生人（UserName包含@stranger）
+      const isStranger = result.Data.UserName?.string?.includes('@stranger') || false
+
       searchResults.value = [{
-        wxid: result.Data.UserName?.string || '',
+        // 对于陌生人，显示Pyinitial作为wxid；对于好友，显示UserName
+        wxid: isStranger ? (result.Data.Pyinitial?.string || '') : (result.Data.UserName?.string || ''),
         nickname: result.Data.NickName?.string || '',
         avatar: result.Data.SmallHeadImgUrl || '',
         signature: result.Data.Signature || '',
@@ -218,12 +223,32 @@ const deleteFriend = async (friend: Friend) => {
       '确认删除',
       { type: 'warning' }
     )
-    
-    // 这里调用删除好友的API
-    ElMessage.success('删除成功')
-    loadFriends()
-  } catch (error) {
-    // 用户取消删除
+
+    if (!authStore.currentAccount) {
+      ElMessage.error('请先选择账号')
+      return
+    }
+
+    // 调用删除好友的API
+    const result = await friendApi.deleteFriend({
+      Wxid: authStore.currentAccount.wxid,
+      ToWxid: friend.wxid,
+    })
+
+    if (result.Success) {
+      ElMessage.success('删除好友成功')
+      // 从本地好友列表中移除
+      friendStore.removeFriend(authStore.currentAccount.wxid, friend.wxid)
+      // 重新加载好友列表
+      loadFriends()
+    } else {
+      ElMessage.error(result.Message || '删除好友失败')
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('删除好友失败:', error)
+      ElMessage.error(error.message || '删除好友失败')
+    }
   }
 }
 

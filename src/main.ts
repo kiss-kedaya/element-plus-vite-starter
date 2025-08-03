@@ -92,8 +92,22 @@ app.mount('#app')
 
 // 初始化预置文件缓存
 try {
+  console.log('开始初始化预置文件缓存...')
   initPresetFileCache()
   console.log('预置文件缓存初始化完成')
+
+  // 验证初始化结果
+  const cacheData = localStorage.getItem('wechat_file_cache')
+  if (cacheData) {
+    const parsedData = JSON.parse(cacheData)
+    console.log('验证localStorage缓存数据:', {
+      hasData: true,
+      cacheSize: parsedData.length,
+      keys: parsedData.map(([key]: [string, any]) => key)
+    })
+  } else {
+    console.warn('localStorage中没有找到缓存数据')
+  }
 } catch (error) {
   console.error('预置文件缓存初始化失败:', error)
 }

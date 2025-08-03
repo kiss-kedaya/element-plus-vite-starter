@@ -155,18 +155,61 @@ export function isPresetFileCacheInitialized(): boolean {
   try {
     const STORAGE_KEY = 'wechat_file_cache'
     const existingCache = localStorage.getItem(STORAGE_KEY)
-    
+
     if (!existingCache) {
       return false
     }
-    
+
     const parsedData = JSON.parse(existingCache)
     const cacheMap = new Map(parsedData)
-    
+
     // 检查是否包含所有预置文件
     return PRESET_FILE_CACHE.every(([key]) => cacheMap.has(key))
   } catch (error) {
     console.error('检查预置文件缓存状态失败:', error)
     return false
   }
+}
+
+/**
+ * 调试函数：检查缓存状态
+ */
+export function debugFileCache(): void {
+  try {
+    const STORAGE_KEY = 'wechat_file_cache'
+    const cacheData = localStorage.getItem(STORAGE_KEY)
+
+    console.log('=== 文件缓存调试信息 ===')
+    console.log('存储键:', STORAGE_KEY)
+    console.log('localStorage数据存在:', !!cacheData)
+
+    if (cacheData) {
+      const parsedData = JSON.parse(cacheData)
+      const cacheMap = new Map(parsedData)
+
+      console.log('缓存大小:', cacheMap.size)
+      console.log('缓存键列表:', Array.from(cacheMap.keys()))
+      console.log('预置文件数量:', PRESET_FILE_CACHE.length)
+      console.log('预置文件键列表:', PRESET_FILE_CACHE.map(([key]) => key))
+
+      // 检查每个预置文件是否存在
+      PRESET_FILE_CACHE.forEach(([key, fileInfo]) => {
+        const exists = cacheMap.has(key)
+        console.log(`预置文件 "${fileInfo.fileName}" (${key}):`, exists ? '✓ 已缓存' : '✗ 未缓存')
+      })
+
+      console.log('初始化状态:', isPresetFileCacheInitialized())
+    } else {
+      console.log('localStorage中没有缓存数据')
+    }
+
+    console.log('=== 调试信息结束 ===')
+  } catch (error) {
+    console.error('调试缓存失败:', error)
+  }
+}
+
+// 将调试函数挂载到全局对象，方便在控制台调用
+if (typeof window !== 'undefined') {
+  (window as any).debugFileCache = debugFileCache
 }

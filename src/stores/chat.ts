@@ -740,11 +740,9 @@ export const useChatStore = defineStore('chat', () => {
         return true
       }
 
-      // 设置事件监听器（只需要设置一次）
-      if (!webSocketService.hasEventListeners()) {
-        webSocketService.on('chat_message', handleChatMessage)
-        webSocketService.on('system_message', handleSystemMessage)
-      }
+      // 设置事件监听器（强制重新设置以确保正确绑定）
+      webSocketService.on('chat_message', handleChatMessage)
+      webSocketService.on('system_message', handleSystemMessage)
 
       // 建立新的连接
       const connected = await webSocketService.connect(wxid)
@@ -774,38 +772,99 @@ export const useChatStore = defineStore('chat', () => {
         force_refresh: false,
       })
 
-      if (result.Success && result.Data && result.Data.length > 0) {
-        const contactData = result.Data[0]
-        console.log('联系人详情:', contactData)
+      console.log('API返回的完整结果:', result)
+
+      // 处理不同的数据格式
+      let contactData = null
+      if (result.Success && result.Data) {
+        // 检查数据类型
+        if (Array.isArray(result.Data) && result.Data.length > 0) {
+          // 数组格式（从缓存返回）
+          contactData = result.Data[0]
+          console.log('从数组格式获取联系人详情:', contactData)
+        } else if (result.Data.ContactList && Array.isArray(result.Data.ContactList) && result.Data.ContactList.length > 0) {
+          // GetContactResponse格式（从API返回）
+          contactData = result.Data.ContactList[0]
+          console.log('从ContactList获取联系人详情:', contactData)
+        } else {
+          console.warn('未知的数据格式:', result.Data)
+          return null
+        }
+      }
+
+      if (contactData) {
+        console.log('处理联系人数据:', contactData)
+
+        // 提取联系人信息的通用函数
+        const extractContactInfo = (contact: any) => {
+          // 处理不同的字段格式
+          const getNickName = () => {
+            if (contact.NickName) {
+              if (typeof contact.NickName === 'string') return contact.NickName
+              if (contact.NickName.string) return contact.NickName.string
+              if (contact.NickName.String_) return contact.NickName.String_
+            }
+            return ''
+          }
+
+          const getRemark = () => {
+            if (contact.Remark) {
+              if (typeof contact.Remark === 'string') return contact.Remark
+              if (contact.Remark.string) return contact.Remark.string
+              if (contact.Remark.String_) return contact.Remark.String_
+            }
+            return ''
+          }
+
+          const getAlias = () => {
+            if (contact.Alias) {
+              if (typeof contact.Alias === 'string') return contact.Alias
+              if (contact.Alias.string) return contact.Alias.string
+              if (contact.Alias.String_) return contact.Alias.String_
+            }
+            return ''
+          }
+
+          const getAvatar = () => {
+            return contact.SmallHeadImgUrl || contact.BigHeadImgUrl ||
+                   contact.smallHeadImgUrl || contact.bigHeadImgUrl || ''
+          }
+
+          return {
+            nickname: getNickName(),
+            remark: getRemark(),
+            alias: getAlias(),
+            avatar: getAvatar()
+          }
+        }
+
+        const contactInfo = extractContactInfo(contactData)
+        console.log('提取的联系人信息:', contactInfo)
 
         // 处理群聊信息
         if (isGroup) {
-          // 对于群聊，优先从ContactList中获取群名称
-          let groupName = targetWxid
-          if (result.Data[0].ContactList && result.Data[0].ContactList.length > 0) {
-            groupName = result.Data[0].ContactList[0].NickName?.string || targetWxid
-          }
-          else {
-            groupName = contactData.NickName?.string || contactData.Remark?.string || targetWxid
-          }
+          // 对于群聊，优先使用昵称
+          const groupName = contactInfo.nickname || contactInfo.remark || targetWxid
 
           return {
             wxid: targetWxid,
             nickname: groupName,
-            alias: contactData.Alias || '',
-            avatar: contactData.SmallHeadImgUrl || contactData.BigHeadImgUrl || '',
-            remark: contactData.Remark?.string || '',
+            alias: contactInfo.alias,
+            avatar: contactInfo.avatar,
+            remark: contactInfo.remark,
             isGroup,
           }
         }
         else {
-          // 个人联系人
+          // 个人联系人，优先显示备注，然后是昵称
+          const displayName = contactInfo.remark || contactInfo.nickname || contactInfo.alias || targetWxid
+
           return {
             wxid: targetWxid,
-            nickname: contactData.NickName?.string || contactData.Remark?.string || targetWxid,
-            alias: contactData.Alias || '',
-            avatar: contactData.SmallHeadImgUrl || contactData.BigHeadImgUrl || '',
-            remark: contactData.Remark?.string || '',
+            nickname: displayName,
+            alias: contactInfo.alias,
+            avatar: contactInfo.avatar,
+            remark: contactInfo.remark,
             isGroup,
           }
         }
@@ -819,8 +878,16 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   // 处理聊天消息
-  const handleChatMessage = async (data: any) => {
-    console.log('处理聊天消息:', data)
+  const handleChatMessage = async (data: any, messageWxid?: string) => {
+    // 检查消息是否属于当前账号
+    const authStore = useAuthStore()
+    const currentAccountWxid = authStore.currentAccount?.wxid
+
+    // 如果提供了messageWxid，检查是否匹配当前账号
+    if (messageWxid && currentAccountWxid && messageWxid !== currentAccountWxid) {
+      console.log(`消息属于账号 ${messageWxid}，但当前账号是 ${currentAccountWxid}，跳过处理`)
+      return
+    }
 
     const sessionId = data.sessionId || (data.fromMe ? data.toUser : data.fromUser)
     
@@ -935,7 +1002,6 @@ export const useChatStore = defineStore('chat', () => {
       }
 
       addMessage(sessionId, chatMessage)
-      console.log('消息已添加到会话:', sessionId, '当前消息数量:', messages.value[sessionId]?.length || 0)
 
       // 如果当前没有选中会话，自动选中这个会话
       if (!currentSession.value) {
@@ -949,7 +1015,17 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   // 处理系统消息
-  const handleSystemMessage = (data: any) => {
+  const handleSystemMessage = (data: any, messageWxid?: string) => {
+    // 检查消息是否属于当前账号
+    const authStore = useAuthStore()
+    const currentAccountWxid = authStore.currentAccount?.wxid
+
+    // 如果提供了messageWxid，检查是否匹配当前账号
+    if (messageWxid && currentAccountWxid && messageWxid !== currentAccountWxid) {
+      console.log(`系统消息属于账号 ${messageWxid}，但当前账号是 ${currentAccountWxid}，跳过处理`)
+      return
+    }
+
     if (data.message) {
       console.log('系统消息:', data.message)
     }

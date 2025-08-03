@@ -518,13 +518,17 @@ const searchUser = async () => {
         // 如果是通过微信号搜索的，使用搜索关键词作为微信号
         // 因为API响应中通常不包含用户设置的自定义微信号，只有系统生成的微信ID
         wechatAlias = searchForm.value.keyword
-      } else if (response.Data.QuanPin && response.Data.QuanPin.trim() && !response.Data.QuanPin.startsWith('wxid_')) {
+      } else if (response.Data.QuanPin?.string && response.Data.QuanPin.string.trim() && !response.Data.QuanPin.string.startsWith('wxid_')) {
         // 如果QuanPin不是以wxid_开头，可能是微信号
-        wechatAlias = response.Data.QuanPin
+        wechatAlias = response.Data.QuanPin.string
       }
 
+      // 判断是否为陌生人（UserName包含@stranger）
+      const isStranger = response.Data.UserName?.string?.includes('@stranger') || false
+
       searchResult.value = {
-        wxid: response.Data.Pyinitial?.string || searchForm.value.keyword, // wxid是Pyinitial.string
+        // 对于陌生人，显示Pyinitial作为wxid；对于好友，显示UserName
+        wxid: isStranger ? (response.Data.Pyinitial?.string || searchForm.value.keyword) : (response.Data.UserName?.string || searchForm.value.keyword),
         nickname: response.Data.NickName?.string || '未知用户',
         alias: wechatAlias, // 微信号
         avatar: response.Data.BigHeadImgUrl || response.Data.SmallHeadImgUrl || '',

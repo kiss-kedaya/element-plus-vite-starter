@@ -14,6 +14,9 @@
             <el-button type="warning" :icon="Setting" @click="reinitializeCache">
               重新初始化
             </el-button>
+            <el-button type="info" @click="debugCache">
+              调试缓存
+            </el-button>
           </div>
         </div>
       </template>
@@ -103,11 +106,12 @@
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Plus, Setting } from '@element-plus/icons-vue'
-import { 
-  initPresetFileCache, 
-  getPresetFileCacheInfo, 
+import {
+  initPresetFileCache,
+  getPresetFileCacheInfo,
   isPresetFileCacheInitialized,
-  addPresetFileCache
+  addPresetFileCache,
+  debugFileCache
 } from '@/utils/presetFileCache'
 import { fileCacheManager, formatFileSize } from '@/utils/fileCache'
 
@@ -153,7 +157,31 @@ const updateLastUpdateTime = () => {
 
 // 刷新缓存信息
 const refreshCache = () => {
-  cacheStats.value = fileCacheManager.getCacheStats()
+  // 直接从localStorage读取缓存数据
+  try {
+    const STORAGE_KEY = 'wechat_file_cache'
+    const cacheData = localStorage.getItem(STORAGE_KEY)
+
+    if (cacheData) {
+      const parsedData = JSON.parse(cacheData)
+      const cacheMap = new Map(parsedData)
+
+      cacheStats.value = {
+        size: cacheMap.size,
+        files: Array.from(cacheMap.values()).map(file => ({
+          fileName: file.fileName,
+          fileSize: file.fileSize,
+          cacheTime: file.cacheTime
+        }))
+      }
+    } else {
+      cacheStats.value = { size: 0, files: [] }
+    }
+  } catch (error) {
+    console.error('读取缓存数据失败:', error)
+    cacheStats.value = { size: 0, files: [] }
+  }
+
   isInitialized.value = isPresetFileCacheInitialized()
   updateLastUpdateTime()
   console.log('预置文件缓存信息已刷新:', { cacheStats: cacheStats.value, isInitialized: isInitialized.value })
@@ -161,10 +189,23 @@ const refreshCache = () => {
 
 // 检查文件是否在缓存中
 const isFileInCache = (fileName: string, fileSize: number): boolean => {
-  const cacheKey = `${fileName}_${fileSize}`
-  return cacheStats.value.files.some(file => 
-    file.fileName === fileName && file.fileSize === fileSize
-  )
+  try {
+    const STORAGE_KEY = 'wechat_file_cache'
+    const cacheData = localStorage.getItem(STORAGE_KEY)
+
+    if (!cacheData) {
+      return false
+    }
+
+    const parsedData = JSON.parse(cacheData)
+    const cacheMap = new Map(parsedData)
+    const cacheKey = `${fileName}_${fileSize}`
+
+    return cacheMap.has(cacheKey)
+  } catch (error) {
+    console.error('检查文件缓存状态失败:', error)
+    return false
+  }
 }
 
 // 重新初始化缓存
@@ -179,13 +220,19 @@ const reinitializeCache = async () => {
         type: 'warning',
       }
     )
-    
+
     initPresetFileCache()
     refreshCache()
     ElMessage.success('预置文件缓存重新初始化成功')
   } catch {
     // 用户取消操作
   }
+}
+
+// 调试缓存
+const debugCache = () => {
+  debugFileCache()
+  ElMessage.info('调试信息已输出到控制台，请按F12查看')
 }
 
 

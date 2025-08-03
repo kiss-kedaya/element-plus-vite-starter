@@ -6,10 +6,10 @@ import { fileCacheManager } from '@/utils/fileCache'
 
 // 事件类型定义
 export interface WebSocketEvents {
-  chat_message: (data: any) => void
-  system_message: (data: any) => void
-  connection_status: (connected: boolean) => void
-  friend_request: (data: any) => void
+  chat_message: (data: any, wxid: string) => void
+  system_message: (data: any, wxid: string) => void
+  connection_status: (connected: boolean, wxid: string) => void
+  friend_request: (data: any, wxid: string) => void
 }
 
 // 单个账号的WebSocket连接信息
@@ -83,6 +83,12 @@ export class WebSocketService {
         return
       }
 
+      // 如果连接存在但已断开，清理旧连接
+      if (existingConnection && existingConnection.ws.readyState !== WebSocket.OPEN) {
+        console.log(`清理账号 ${wxid} 的旧连接，状态: ${existingConnection.ws.readyState}`)
+        this.connections.delete(wxid)
+      }
+
       // 检查是否正在连接中
       if (existingConnection && existingConnection.isConnecting) {
         console.log('WebSocket正在连接中，等待完成...')
@@ -105,17 +111,21 @@ export class WebSocketService {
       try {
         // WebSocket服务器地址，包含wxid参数
         const wsUrl = WEBSOCKET_CONFIG.getUrl(wxid)
+        console.log(`正在连接WebSocket: ${wsUrl}`)
         const ws = new WebSocket(wsUrl)
         connectionInfo.ws = ws
 
         ws.onopen = () => {
-          console.log(`WebSocket连接已建立 (wxid: ${wxid})`)
+          console.log(`✅ WebSocket连接已建立 (wxid: ${wxid})`)
+          console.log(`当前所有连接:`, Array.from(this.connections.keys()))
           connectionInfo.isConnecting = false
           connectionInfo.reconnectAttempts = 0
+          this.currentWxid = wxid
+          fileCacheManager.setCurrentWxid(wxid)
           this.startHeartbeat(wxid)
 
           // 触发连接状态事件
-          this.emit('connection_status', true)
+          this.emit('connection_status', true, wxid)
           resolve(true)
         }
 
@@ -129,7 +139,7 @@ export class WebSocketService {
           this.stopHeartbeat(wxid)
 
           // 触发连接状态事件
-          this.emit('connection_status', false)
+          this.emit('connection_status', false, wxid)
 
           if (!event.wasClean && connectionInfo.reconnectAttempts < this.maxReconnectAttempts) {
             this.scheduleReconnect(wxid)
@@ -137,8 +147,11 @@ export class WebSocketService {
         }
 
         ws.onerror = (error) => {
-          console.warn(`WebSocket连接失败 (wxid: ${wxid})，将在模拟模式下运行`)
+          console.warn(`❌ WebSocket连接失败 (wxid: ${wxid})，URL: ${wsUrl}`)
+          console.warn('连接错误详情:', error)
           connectionInfo.isConnecting = false
+          // 清理失败的连接
+          this.connections.delete(wxid)
           reject(error)
         }
 
@@ -221,14 +234,14 @@ export class WebSocketService {
 
       switch (message.type) {
         case 'chat_message':
-          this.emit('chat_message', message.data)
+          this.emit('chat_message', message.data, wxid)
           break
         case 'wechat_message':
           // 处理微信消息格式
           this.handleWeChatMessage(message)
           break
         case 'system_message':
-          this.emit('system_message', message.data)
+          this.emit('system_message', message.data, wxid)
           break
         case 'heartbeat_response':
           // 心跳响应，不需要特殊处理
@@ -252,7 +265,6 @@ export class WebSocketService {
     data.messages.forEach((msg: any) => {
       // 过滤掉不需要显示的消息类型
       if (this.shouldFilterMessage(msg)) {
-        console.log('过滤消息:', msg.msgType, msg.msgTypeDesc, msg.contentType)
         return
       }
 
@@ -279,6 +291,19 @@ export class WebSocketService {
       else {
         // 个人消息：会话ID是对方的wxid
         sessionId = fromMe ? msg.toUser : msg.fromUser
+      }
+
+      // 特殊处理：系统消息的会话ID
+      if (msg.msgType === 10000) {
+        // 对于好友申请通过的系统消息，会话ID应该是对方的wxid
+        // 判断消息方向：如果fromUser是当前用户，则会话ID是toUser；反之亦然
+        if (msg.fromUser === data.wxid) {
+          // 当前用户发出的系统消息，会话ID是接收方
+          sessionId = msg.toUser
+        } else {
+          // 对方发来的系统消息，会话ID是发送方
+          sessionId = msg.fromUser
+        }
       }
 
       // 转换为标准聊天消息格式
@@ -326,7 +351,7 @@ export class WebSocketService {
         }
 
         // 直接发送消息，跳过后续处理
-        this.emit('chat_message', chatMessage)
+        this.emit('chat_message', chatMessage, data.wxid)
         return
       }
 
@@ -680,13 +705,13 @@ export class WebSocketService {
 
               console.log('解析的好友请求数据:', friendRequestData)
 
-              // 发送好友请求事件
+              // 发送好友请求事件，传递wxid参数
               this.emit('friend_request', {
                 type: 'friend_request',
                 data: friendRequestData,
                 timestamp: new Date(),
                 wxid: data.wxid
-              })
+              }, data.wxid)
             }
           } catch (error) {
             console.error('解析好友请求XML失败:', error)
@@ -700,7 +725,25 @@ export class WebSocketService {
       // 处理系统消息（撤回消息已在前面处理）
       if (msg.msgType === 10000) {
         // 使用originalContent作为系统消息内容，如果没有则使用content
-        chatMessage.content = msg.originalContent || msg.content || '[系统消息]'
+        let systemContent = msg.originalContent || msg.content || '[系统消息]'
+
+        // 优化好友申请通过消息的显示
+        if (systemContent.includes('你已添加了') || systemContent.includes('通过了你的朋友验证请求')) {
+          // 提取用户名
+          if (systemContent.includes('你已添加了')) {
+            const nameMatch = systemContent.match(/你已添加了(.+?)，/)
+            if (nameMatch && nameMatch[1]) {
+              systemContent = `你已添加了 ${nameMatch[1]} 为好友`
+            }
+          } else if (systemContent.includes('通过了你的朋友验证请求')) {
+            const nameMatch = systemContent.match(/(.+?)通过了你的朋友验证请求/)
+            if (nameMatch && nameMatch[1]) {
+              systemContent = `${nameMatch[1]} 通过了你的好友申请`
+            }
+          }
+        }
+
+        chatMessage.content = systemContent
 
         // 系统消息不属于任何人发送
         chatMessage.fromMe = false
@@ -711,8 +754,8 @@ export class WebSocketService {
         }
       }
 
-      // 发送聊天消息事件
-      this.emit('chat_message', chatMessage)
+      // 发送聊天消息事件，传递wxid参数用于正确路由
+      this.emit('chat_message', chatMessage, data.wxid)
     })
   }
 
