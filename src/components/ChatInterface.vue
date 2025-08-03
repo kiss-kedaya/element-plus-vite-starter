@@ -5,6 +5,7 @@ import {
   Close,
   Delete,
   Document,
+  Edit,
   Loading,
   Picture,
   Position,
@@ -60,6 +61,21 @@ const contextMenu = ref({
   y: 0,
   message: null as any,
 })
+
+// 聊天列表右键菜单
+const sessionContextMenu = ref({
+  visible: false,
+  x: 0,
+  y: 0,
+  session: null as ChatSession | null,
+})
+
+// 备注对话框
+const showRemarkDialog = ref(false)
+const remarkForm = ref({
+  remark: '',
+})
+const currentRemarkSession = ref<ChatSession | null>(null)
 
 // 计算属性
 const filteredSessions = computed(() => {
@@ -388,6 +404,143 @@ function showContextMenu(event: MouseEvent, message: any) {
 function hideContextMenu() {
   contextMenu.value.visible = false
   contextMenu.value.message = null
+}
+
+// 显示聊天列表右键菜单
+function showSessionContextMenu(event: MouseEvent, session: ChatSession) {
+  event.preventDefault()
+  event.stopPropagation()
+
+  // 计算菜单位置，确保不超出视口
+  let x = event.clientX
+  let y = event.clientY
+
+  const menuWidth = 150
+  const menuHeight = 100
+
+  if (x + menuWidth > window.innerWidth) {
+    x = window.innerWidth - menuWidth - 10
+  }
+
+  if (y + menuHeight > window.innerHeight) {
+    y = window.innerHeight - menuHeight - 10
+  }
+
+  sessionContextMenu.value = {
+    visible: true,
+    x,
+    y,
+    session,
+  }
+}
+
+// 隐藏聊天列表右键菜单
+function hideSessionContextMenu() {
+  sessionContextMenu.value.visible = false
+  sessionContextMenu.value.session = null
+}
+
+// 处理聊天列表右键菜单操作
+function handleSessionContextMenuAction(action: string) {
+  const session = sessionContextMenu.value.session
+  if (!session) return
+
+  switch (action) {
+    case 'remark':
+      // 修改备注
+      currentRemarkSession.value = session
+      // 使用当前显示的名称作为默认备注
+      remarkForm.value.remark = session.name || ''
+      showRemarkDialog.value = true
+      break
+    case 'delete':
+      // 删除好友
+      handleDeleteSession(session)
+      break
+  }
+  hideSessionContextMenu()
+}
+
+// 删除会话
+async function handleDeleteSession(session: ChatSession) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除好友 "${session.name}" 吗？这将同时删除聊天记录。`,
+      '删除好友',
+      {
+        type: 'warning',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+      }
+    )
+
+    if (!props.account) {
+      ElMessage.error('账号信息不存在')
+      return
+    }
+
+    // 调用删除好友API
+    await friendApi.deleteFriend({
+      Wxid: props.account.wxid,
+      ToWxid: session.id,
+    })
+
+    // 删除本地会话
+    chatStore.removeSession(session.id)
+    ElMessage.success('好友删除成功')
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('删除好友失败:', error)
+      ElMessage.error(error.message || '删除好友失败')
+    }
+  }
+}
+
+// 更新备注
+async function updateSessionRemark() {
+  if (!currentRemarkSession.value || !props.account) return
+
+  try {
+    const session = currentRemarkSession.value
+    const newRemark = remarkForm.value.remark.trim()
+
+    if (!newRemark) {
+      ElMessage.warning('请输入备注名称')
+      return
+    }
+
+    // 根据会话类型调用不同的API
+    if (session.type === 'friend') {
+      // 好友备注
+      await friendApi.setFriendRemark({
+        Wxid: props.account.wxid,
+        ToWxid: session.id,
+        Remarks: newRemark,
+      })
+    } else if (session.type === 'group') {
+      // 群聊备注 - 需要添加群组API
+      ElMessage.warning('群聊备注功能暂未实现')
+      return
+    }
+
+    // 更新本地会话名称
+    chatStore.updateSessionName(session.id, newRemark)
+
+    ElMessage.success('备注修改成功')
+    showRemarkDialog.value = false
+    currentRemarkSession.value = null
+    remarkForm.value.remark = ''
+  } catch (error: any) {
+    console.error('修改备注失败:', error)
+    ElMessage.error(error.message || '修改备注失败')
+  }
+}
+
+// 取消备注对话框
+function cancelRemarkDialog() {
+  showRemarkDialog.value = false
+  currentRemarkSession.value = null
+  remarkForm.value.remark = ''
 }
 
 // 撤回消息
@@ -765,6 +918,7 @@ onUnmounted(() => {
   // 清理事件监听器
   // window.removeEventListener('resize', handleResize)
   document.removeEventListener('click', hideContextMenu)
+  document.removeEventListener('click', hideSessionContextMenu)
 
   // 注意：不要在这里断开WebSocket连接，让WebSocketService管理连接生命周期
   // 只有在真正需要断开时（比如用户退出登录）才断开
@@ -802,7 +956,9 @@ onUnmounted(() => {
 
         <div
           v-for="session in filteredSessions" :key="session.id" class="session-item"
-          :class="{ active: chatStore.currentSession?.id === session.id }" @click="selectSession(session)"
+          :class="{ active: chatStore.currentSession?.id === session.id }"
+          @click="selectSession(session)"
+          @contextmenu="showSessionContextMenu($event, session)"
         >
           <div class="session-avatar">
             <el-avatar :src="session.avatar || ''" :size="40">
@@ -965,6 +1121,67 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- 聊天列表右键菜单 -->
+    <Teleport to="body">
+      <div
+        v-if="sessionContextMenu.visible"
+        class="session-context-menu"
+        :style="{
+          left: sessionContextMenu.x + 'px',
+          top: sessionContextMenu.y + 'px'
+        }"
+        @click.stop
+      >
+        <div class="context-menu-item" @click="handleSessionContextMenuAction('remark')">
+          <el-icon><Edit /></el-icon>
+          <span>修改备注</span>
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" @click="handleSessionContextMenuAction('deleteSession')">
+          <el-icon><ChatDotRound /></el-icon>
+          <span>删除会话</span>
+        </div>
+        <div class="context-menu-item danger" @click="handleSessionContextMenuAction('deleteFriend')">
+          <el-icon><Delete /></el-icon>
+          <span>删除好友</span>
+        </div>
+      </div>
+
+      <!-- 右键菜单遮罩层 -->
+      <div
+        v-if="sessionContextMenu.visible"
+        class="context-menu-overlay"
+        @click="hideSessionContextMenu"
+        @contextmenu.prevent="hideSessionContextMenu"
+      ></div>
+    </Teleport>
+
+    <!-- 备注修改对话框 -->
+    <el-dialog
+      v-model="showRemarkDialog"
+      title="修改备注"
+      width="400px"
+      :before-close="cancelRemarkDialog"
+    >
+      <el-form :model="remarkForm" label-width="80px">
+        <el-form-item label="备注名称">
+          <el-input
+            v-model="remarkForm.remark"
+            placeholder="请输入备注名称"
+            maxlength="50"
+            show-word-limit
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="cancelRemarkDialog">取消</el-button>
+          <el-button type="primary" @click="updateSessionRemark">确定</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -1622,5 +1839,63 @@ onUnmounted(() => {
     transform: translateY(-1px);
     box-shadow: 0 4px 16px rgba(64, 158, 255, 0.4);
   }
+}
+
+// 聊天列表右键菜单样式
+.session-context-menu {
+  position: fixed;
+  background: #ffffff;
+  border: 2px solid #409eff;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  z-index: 1060;
+  min-width: 150px;
+  overflow: hidden;
+
+  .context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #333;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    &.danger {
+      .el-icon {
+        color: #f56c6c;
+      }
+
+      &:hover {
+        background: rgba(245, 108, 108, 0.1);
+      }
+    }
+
+    .el-icon {
+      font-size: 16px;
+      color: #409eff;
+    }
+  }
+}
+
+.context-menu-divider {
+  height: 1px;
+  background-color: #e4e7ed;
+  margin: 0;
+}
+
+.context-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1059;
+  background: transparent;
 }
 </style>

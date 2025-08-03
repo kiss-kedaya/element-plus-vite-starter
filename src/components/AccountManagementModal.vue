@@ -1,6 +1,6 @@
 <template>
-  <BaseModal v-model="visible" :title="`管理账号 - ${account?.nickname || ''}`" width="800px"
-    custom-class="account-management-modal" @close="handleClose">
+  <BaseModal v-model="visible" :title="`管理账号 - ${account?.nickname || ''}`" width="90%" top="5vh"
+    custom-class="account-management-modal responsive-modal" @close="handleClose">
     <div v-if="account" class="account-management">
       <!-- 账号基本信息 -->
       <el-card class="account-info-card" shadow="never">
@@ -81,13 +81,17 @@
           <div class="card-header">
             <div class="header-left">
               <span>代理设置</span>
-              <el-tag v-if="proxyEnabled && proxyStatus" :type="getProxyStatusType(proxyStatus)" size="small" class="status-tag">
+              <el-tag v-if="proxyEnabled && proxyStatus" :type="getProxyStatusType(proxyStatus)" size="small"
+                class="status-tag">
                 {{ getProxyStatusLabel(proxyStatus) }}
               </el-tag>
             </div>
             <div class="header-right">
-              <el-button v-if="proxyEnabled" @click="testProxyConnection" :loading="proxyTesting" size="small" type="primary" plain>
-                <el-icon><Connection /></el-icon>
+              <el-button v-if="proxyEnabled" @click="testProxyConnection" :loading="proxyTesting" size="small"
+                type="primary" plain>
+                <el-icon>
+                  <Connection />
+                </el-icon>
                 测试连接
               </el-button>
               <el-switch v-model="proxyEnabled" @change="handleProxyToggle" :loading="proxyLoading" />
@@ -109,57 +113,38 @@
           <template v-if="proxyMode === 'preset'">
             <div class="proxy-preset-section">
               <el-form-item label="地区筛选">
-                <el-select
-                  v-model="selectedCountry"
-                  placeholder="选择地区"
-                  clearable
-                  @change="filterProxiesByCountry"
-                  size="large"
-                  :popper-options="{ strategy: 'fixed' }"
-                  popper-class="high-z-index-popper"
-                >
+                <el-select v-model="selectedCountry" placeholder="选择地区" clearable @change="filterProxiesByCountry"
+                  size="large" :popper-options="{ strategy: 'fixed' }">
                   <el-option label="全部地区" value="" />
                   <el-option v-for="country in availableCountries" :key="country" :label="country" :value="country" />
                 </el-select>
               </el-form-item>
 
               <el-form-item label="选择代理">
-                <el-select
-                  v-model="selectedProxyId"
-                  placeholder="选择一个可用的代理"
-                  filterable
-                  @change="handleProxySelect"
-                  size="large"
-                  style="width: 100%"
-                  :popper-options="{ strategy: 'fixed' }"
-                  popper-class="high-z-index-popper"
-                >
-                  <el-option
-                    v-for="proxy in filteredProxies"
-                    :key="proxy.id"
-                    :label="getProxyDisplayName(proxy)"
-                    :value="proxy.id"
-                    :disabled="proxy.status !== 'active'"
-                  />
+                <el-select v-model="selectedProxyId" placeholder="选择一个可用的代理" filterable @change="handleProxySelect"
+                  size="large" style="width: 100%" :popper-options="{ strategy: 'fixed' }">
+                  <el-option v-for="proxy in filteredProxies" :key="proxy.id" :label="getProxyDisplayName(proxy)"
+                    :value="proxy.id" :disabled="proxy.status !== 'active'" />
                 </el-select>
               </el-form-item>
 
               <el-form-item v-if="selectedProxy">
                 <el-alert
                   :title="`已选择代理: ${selectedProxy.ip}:${selectedProxy.port} [${selectedProxy.country || '未知地区'}]`"
-                  type="success"
-                  :closable="false"
-                  show-icon
-                />
+                  type="success" :closable="false" show-icon />
               </el-form-item>
 
               <div class="proxy-preset-actions">
                 <el-button size="small" @click="refreshProxyList">
-                  <el-icon><Refresh /></el-icon>
+                  <el-icon>
+                    <Refresh />
+                  </el-icon>
                   刷新列表
                 </el-button>
                 <el-button size="small" type="primary" @click="showProxyManagement = true">
-                  <el-icon><Setting /></el-icon>
+                  <el-icon>
+                    <Setting />
+                  </el-icon>
                   管理代理
                 </el-button>
               </div>
@@ -235,16 +220,13 @@
             <div class="setting-label">
               <span>自动同意好友请求</span>
               <el-tooltip content="开启后将自动同意所有好友请求" placement="top">
-                <el-icon class="info-icon"><QuestionFilled /></el-icon>
+                <el-icon class="info-icon">
+                  <QuestionFilled />
+                </el-icon>
               </el-tooltip>
             </div>
-            <el-switch
-              v-model="autoAcceptFriend"
-              :loading="autoAcceptLoading"
-              @change="handleAutoAcceptChange"
-              active-text="开启"
-              inactive-text="关闭"
-            />
+            <el-switch v-model="autoAcceptFriend" :loading="autoAcceptLoading" @change="handleAutoAcceptChange"
+              active-text="开启" inactive-text="关闭" />
           </div>
         </div>
 
@@ -309,14 +291,8 @@
   </BaseModal>
 
   <!-- 代理管理对话框 -->
-  <el-dialog
-    v-model="showProxyManagement"
-    title="代理管理"
-    width="80%"
-    top="5vh"
-    :z-index="4000"
-    append-to-body
-  >
+  <el-dialog v-model="showProxyManagement" title="代理管理" width="85%" top="5vh" append-to-body
+    custom-class="proxy-management-dialog" center>
     <ProxyManagement @proxy-updated="refreshProxyList" />
   </el-dialog>
 </template>
@@ -1113,8 +1089,9 @@ onUnmounted(() => {
 <style scoped lang="scss">
 .account-management {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  height: 80vh;
-  overflow-y: auto;
+  height: auto;
+  // 移除内部滚动条，让外层对话框处理滚动
+  overflow-y: visible;
 
   .account-info-card,
   .proxy-card,
@@ -1416,34 +1393,75 @@ onUnmounted(() => {
   }
 }
 
-// 重新登录模态框层级设置
-:deep(.relogin-modal) {
-  z-index: 3500 !important;
-}
+// 响应式账号管理对话框样式
+:deep(.account-management-modal.responsive-modal) {
+  .el-dialog {
+    margin: 0 auto;
 
-// 账号管理模态框内的下拉框层级设置
-:deep(.account-management-modal) {
-  .el-select-dropdown {
-    z-index: 3200 !important;
+    // 小屏幕适配
+    @media (max-width: 768px) {
+      width: 95vw !important;
+      margin: 2vh auto;
+      min-width: unset;
+    }
+
+    // 中等屏幕适配
+    @media (min-width: 769px) and (max-width: 1200px) {
+      width: 85vw !important;
+      max-width: 900px;
+      margin: 5vh auto;
+    }
+
+    // 大屏幕适配
+    @media (min-width: 1201px) {
+      width: 80vw !important;
+      max-width: 1200px;
+      margin: 5vh auto;
+    }
   }
 
-  .el-popper {
-    z-index: 3200 !important;
+  // 统一的对话框主体样式 - 只在内容超出时显示滚动条
+  .el-dialog__body {
+    // 使用 calc 计算精确高度，减去头部和底部空间
+    max-height: calc(90vh - 120px);
+    overflow-y: auto;
+    padding: 20px;
+
+    @media (max-width: 768px) {
+      max-height: calc(95vh - 100px);
+      padding: 15px;
+    }
+
+    @media (min-width: 769px) and (max-width: 1200px) {
+      max-height: calc(92vh - 110px);
+      padding: 18px;
+    }
   }
 }
 
-// 全局下拉框层级设置（针对账号管理模态框）
-.el-select-dropdown.el-popper[data-popper-placement] {
-  z-index: 3200 !important;
-}
+// 代理管理对话框高度和宽度限制
+:deep(.proxy-management-dialog) {
+  .el-dialog {
+    height: 80vh !important;
+    max-width: 95vw;
+    min-width: 1000px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
 
-.el-popper.is-pure {
-  z-index: 3200 !important;
-}
+    // 小屏幕适配
+    @media (max-width: 768px) {
+      min-width: unset;
+      width: 95vw !important;
+    }
+  }
 
-// 高层级下拉框样式
-.high-z-index-popper {
-  z-index: 3200 !important;
+  .el-dialog__body {
+    height: calc(80vh - 120px) !important;
+    overflow-y: auto;
+    padding: 0;
+    flex: 1;
+  }
 }
 
 .qr-loading {

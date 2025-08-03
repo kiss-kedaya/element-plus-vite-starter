@@ -1037,6 +1037,34 @@ export const useChatStore = defineStore('chat', () => {
     return null
   }
 
+  // 删除会话
+  const removeSession = (sessionId: string) => {
+    const sessionIndex = sessions.value.findIndex(s => s.id === sessionId)
+    if (sessionIndex !== -1) {
+      // 删除会话
+      sessions.value.splice(sessionIndex, 1)
+
+      // 删除相关消息
+      delete messages.value[sessionId]
+
+      // 如果删除的是当前会话，清空当前会话
+      if (currentSession.value?.id === sessionId) {
+        currentSession.value = null
+      }
+
+      // 保存到缓存
+      const authStore = useAuthStore()
+      if (authStore.currentAccount?.wxid) {
+        saveCachedData(authStore.currentAccount.wxid)
+      }
+    }
+  }
+
+  // 更新会话名称
+  const updateSessionName = (sessionId: string, newName: string) => {
+    updateSessionInfo(sessionId, { name: newName })
+  }
+
   return {
     // 状态
     sessions,
@@ -1069,6 +1097,8 @@ export const useChatStore = defineStore('chat', () => {
     syncMessages,
     testWebSocketMessage,
     updateSessionInfo,
+    removeSession,
+    updateSessionName,
 
     // 缓存相关方法
     loadCachedData,

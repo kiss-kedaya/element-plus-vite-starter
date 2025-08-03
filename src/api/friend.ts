@@ -94,7 +94,7 @@ export const friendApi = {
   setFriendRemark: (params: {
     Wxid: string;
     ToWxid: string;
-    Remark: string;
+    Remarks: string;
   }): Promise<FriendResponse> => {
     return api.post("/Friend/SetRemarks", params);
   },

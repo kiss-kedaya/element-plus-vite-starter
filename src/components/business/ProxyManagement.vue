@@ -1,25 +1,24 @@
 <template>
   <div class="proxy-management">
-    <el-card>
-      <template #header>
-        <div class="card-header">
-          <span>代理管理</span>
-          <div class="header-actions">
-            <el-button type="primary" @click="showImportDialog = true">
-              <el-icon><Plus /></el-icon>
-              批量导入
-            </el-button>
-            <el-button type="warning" @click="updateProxyCountries">
-              <el-icon><Location /></el-icon>
-              更新地区
-            </el-button>
-            <el-button @click="refreshProxyList">
-              <el-icon><Refresh /></el-icon>
-              刷新
-            </el-button>
-          </div>
+    <div class="proxy-management-content">
+      <!-- 头部操作区域 -->
+      <div class="card-header">
+        <span>代理管理</span>
+        <div class="header-actions">
+          <el-button type="primary" @click="showImportDialog = true">
+            <el-icon><Plus /></el-icon>
+            批量导入
+          </el-button>
+          <el-button type="danger" @click="deleteSelectedProxies" :disabled="selectedProxies.length === 0">
+            <el-icon><Delete /></el-icon>
+            批量删除
+          </el-button>
+          <el-button @click="refreshProxyList">
+            <el-icon><Refresh /></el-icon>
+            刷新
+          </el-button>
         </div>
-      </template>
+      </div>
 
       <!-- 统计信息 -->
       <div class="stats-section">
@@ -79,16 +78,20 @@
       </div>
 
       <!-- 代理列表 -->
-      <div class="proxy-list">
+      <div class="proxy-list table-section">
         <el-table
           :data="proxyList"
           v-loading="loading"
           @selection-change="handleSelectionChange"
           stripe
+          height="450"
+          :table-layout="'auto'"
+          style="width: 100%"
+          :header-cell-style="{ backgroundColor: '#f5f7fa', color: '#606266' }"
         >
           <el-table-column type="selection" width="55" />
-          
-          <el-table-column label="状态" width="80">
+
+          <el-table-column label="状态" min-width="80">
             <template #default="{ row }">
               <el-tag :type="getStatusType(row.status)" size="small">
                 {{ getStatusLabel(row.status) }}
@@ -96,21 +99,25 @@
             </template>
           </el-table-column>
 
-          <el-table-column prop="ip" label="IP地址" width="140" />
-          <el-table-column prop="port" label="端口" width="80" />
-          <el-table-column prop="username" label="用户名" width="120" />
-          <el-table-column prop="country" label="地区" width="100" />
-          
-          <el-table-column label="响应时间" width="100">
+          <el-table-column prop="ip" label="IP地址" min-width="150" />
+          <el-table-column prop="port" label="端口" min-width="80" />
+          <el-table-column prop="username" label="用户名" min-width="120" />
+          <el-table-column prop="country" label="地区" min-width="180">
+            <template #default="{ row }">
+              <span>{{ row.country || '-' }}</span>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="响应时间" min-width="100">
             <template #default="{ row }">
               <span v-if="row.response_time > 0">{{ row.response_time }}ms</span>
               <span v-else>-</span>
             </template>
           </el-table-column>
 
-          <el-table-column prop="expire_date" label="过期时间" width="120" />
+          <el-table-column prop="expire_date" label="过期时间" min-width="120" />
 
-          <el-table-column label="操作" width="150">
+          <el-table-column label="操作" width="150" fixed="right">
             <template #default="{ row }">
               <el-button size="small" @click="testSingleProxy(row.id)">测试</el-button>
               <el-button size="small" type="danger" @click="deleteProxy(row.id)">删除</el-button>
@@ -131,7 +138,7 @@
           />
         </div>
       </div>
-    </el-card>
+    </div>
 
     <!-- 导入对话框 -->
     <el-dialog v-model="showImportDialog" title="批量导入代理" width="600px">
@@ -169,8 +176,13 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh, Search, Connection, Location } from '@element-plus/icons-vue'
+import { Plus, Refresh, Search, Connection, Delete } from '@element-plus/icons-vue'
 import { proxyApi, type ProxyInfo, proxyStatusMap, getProxyCountries } from '@/api/proxy'
+
+// 定义事件
+const emit = defineEmits<{
+  'proxy-updated': []
+}>()
 
 // 响应式数据
 const loading = ref(false)
@@ -305,6 +317,7 @@ const importProxies = async () => {
       importData.proxyList = ''
       refreshProxyList()
       refreshStats()
+      emit('proxy-updated')
     } else {
       ElMessage.error(response.message || '导入失败')
     }
@@ -328,12 +341,16 @@ const testSelectedProxies = async () => {
     const response = await proxyApi.testProxies({ proxy_ids: proxyIds })
     
     if (response.code === 0) {
-      ElMessage.success('代理测试已开始，请稍后查看结果')
-      // 定时刷新列表查看测试结果
+      ElMessage.success('代理测试已开始')
+      // 立即刷新一次，然后定时刷新列表查看测试结果
+      refreshProxyList()
+      emit('proxy-updated')
       setTimeout(() => {
         refreshProxyList()
         refreshStats()
-      }, 3000)
+        emit('proxy-updated')
+        ElMessage.success('代理测试完成')
+      }, 5000)
     }
   } catch (error) {
     console.error('测试代理失败:', error)
@@ -347,10 +364,13 @@ const testSingleProxy = async (id: number) => {
     const response = await proxyApi.testProxies({ proxy_ids: [id] })
     if (response.code === 0) {
       ElMessage.success('代理测试已开始')
+      refreshProxyList()
+      emit('proxy-updated')
       setTimeout(() => {
         refreshProxyList()
         refreshStats()
-      }, 3000)
+        emit('proxy-updated')
+      }, 5000)
     }
   } catch (error) {
     console.error('测试代理失败:', error)
@@ -372,6 +392,7 @@ const deleteProxy = async (id: number) => {
       ElMessage.success('删除成功')
       refreshProxyList()
       refreshStats()
+      emit('proxy-updated')
     }
   } catch (error) {
     if (error !== 'cancel') {
@@ -396,11 +417,15 @@ const updateProxyCountries = async () => {
 
     const response = await proxyApi.updateProxyCountries()
     if (response.code === 0) {
-      ElMessage.success('地区信息更新已开始，请稍后刷新查看结果')
-      // 延迟刷新，给后端一些处理时间
+      ElMessage.success('地区信息更新已开始')
+      // 立即刷新一次，然后延迟再刷新确保获取最新数据
+      refreshProxyList()
+      emit('proxy-updated')
       setTimeout(() => {
         refreshProxyList()
-      }, 3000)
+        emit('proxy-updated')
+        ElMessage.success('地区信息更新完成')
+      }, 5000)
     } else {
       ElMessage.error(response.message || '更新失败')
     }
@@ -408,6 +433,61 @@ const updateProxyCountries = async () => {
     if (error !== 'cancel') {
       console.error('更新地区信息失败:', error)
       ElMessage.error('更新地区信息失败')
+    }
+  }
+}
+
+
+
+// 批量删除选中的代理
+const deleteSelectedProxies = async () => {
+  if (selectedProxies.value.length === 0) {
+    ElMessage.warning('请先选择要删除的代理')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除选中的 ${selectedProxies.value.length} 个代理吗？此操作不可恢复。`,
+      '确认删除',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    // 获取选中代理的ID列表
+    const proxyIds = selectedProxies.value.map(proxy => proxy.id)
+
+    // 批量删除
+    let successCount = 0
+    let errorCount = 0
+
+    for (const proxyId of proxyIds) {
+      try {
+        const response = await proxyApi.deleteProxy(proxyId)
+        if (response.code === 0) {
+          successCount++
+        } else {
+          errorCount++
+        }
+      } catch (error) {
+        errorCount++
+      }
+    }
+
+    if (successCount > 0) {
+      ElMessage.success(`成功删除 ${successCount} 个代理${errorCount > 0 ? `，失败 ${errorCount} 个` : ''}`)
+      refreshProxyList()
+      emit('proxy-updated')
+    } else {
+      ElMessage.error('删除失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('批量删除代理失败:', error)
+      ElMessage.error('批量删除代理失败')
     }
   }
 }
@@ -421,13 +501,31 @@ onMounted(() => {
 
 <style scoped>
 .proxy-management {
-  padding: 20px;
+  padding: 0;
+}
+
+.proxy-management-content {
+  background: #fff;
+  border-radius: 4px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #ebeef5;
+  background: #fafafa;
+
+  span {
+    font-size: 16px;
+    font-weight: 500;
+    color: #303133;
+  }
 }
 
 .header-actions {
@@ -437,6 +535,8 @@ onMounted(() => {
 
 .stats-section {
   margin-bottom: 20px;
+  margin-left: 20px;
+  margin-right: 20px;
   padding: 16px;
   background: #f5f7fa;
   border-radius: 4px;
@@ -444,10 +544,46 @@ onMounted(() => {
 
 .filter-section {
   margin-bottom: 20px;
+  padding: 0 20px;
+}
+
+.table-section {
+  padding: 0 20px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.proxy-list :deep(.el-table) {
+  width: 100%;
+
+  .el-table__cell {
+    white-space: nowrap;
+  }
+
+  .el-table__header-wrapper {
+    background-color: #f5f7fa !important;
+  }
+
+  .el-table__header {
+    background-color: #f5f7fa !important;
+  }
+
+  .el-table__header th {
+    background-color: #f5f7fa !important;
+  }
+
+  .el-table__header-wrapper .el-table__header thead tr th {
+    background-color: #f5f7fa !important;
+  }
+
+  thead tr th.el-table__cell {
+    background-color: #f5f7fa !important;
+  }
 }
 
 .pagination {
   margin-top: 20px;
+  padding: 0 20px 20px 20px;
   text-align: right;
 }
 

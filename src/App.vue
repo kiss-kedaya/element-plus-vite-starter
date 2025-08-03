@@ -20,7 +20,7 @@ onMounted(async () => {
 
 <template>
   <div id="app" class="app-container">
-    <el-config-provider namespace="ep" :z-index="3000">
+    <el-config-provider namespace="ep">
       <router-view />
     </el-config-provider>
   </div>
@@ -40,37 +40,5 @@ onMounted(async () => {
   overflow: hidden;
 }
 
-/* 修复Element Plus MessageBox样式 - 使用ep命名空间 */
-.ep-message-box__wrapper {
-  z-index: 9999 !important;
-}
 
-.ep-message-box {
-  z-index: 10000 !important;
-  background-color: #ffffff !important;
-  border: 1px solid #dcdfe6 !important;
-  border-radius: 4px !important;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1) !important;
-}
-
-.ep-message-box__header {
-  background-color: #ffffff !important;
-  border-bottom: 1px solid #ebeef5 !important;
-}
-
-.ep-message-box__content {
-  background-color: #ffffff !important;
-  color: #606266 !important;
-}
-
-.ep-message-box__btns {
-  background-color: #ffffff !important;
-  border-top: 1px solid #ebeef5 !important;
-}
-
-/* 确保MessageBox的遮罩层样式正确 */
-.ep-overlay {
-  z-index: 9998 !important;
-  background-color: rgba(0, 0, 0, 0.5) !important;
-}
 </style>

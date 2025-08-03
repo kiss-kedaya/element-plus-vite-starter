@@ -106,13 +106,13 @@ async function removeAccount(account) {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  
+
   .nickname {
     font-weight: 500;
     color: #303133;
     font-size: 14px;
   }
-  
+
   .wxid {
     font-size: 12px;
     color: #909399;

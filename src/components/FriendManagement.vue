@@ -392,8 +392,10 @@ const contextMenu = ref({
 
 // 根据API响应数据判断用户状态
 const getUserStatus = (searchData: any): 'not-exist' | 'friend' | 'stranger' => {
-  // 首先检查Sex字段，如果为0则用户不存在
-  if (searchData.sex === 0) return 'not-exist'
+  // 检查是否有基本的用户信息（nickname和wxid）
+  if (!searchData.nickname || !searchData.wxid) {
+    return 'not-exist'
+  }
 
   // 检查AntispamTicket字段来判断是否为好友
   const antispamTicket = searchData.antispamTicket || searchData.AntispamTicket || ''
@@ -403,8 +405,8 @@ const getUserStatus = (searchData: any): 'not-exist' | 'friend' | 'stranger' => 
     return 'stranger'
   }
 
-  // 如果Sex为1且不包含@stranger，说明是好友
-  if (searchData.sex === 1) {
+  // 如果没有AntispamTicket，说明已经是好友
+  if (!antispamTicket) {
     return 'friend'
   }
 

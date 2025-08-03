@@ -3,6 +3,7 @@
     v-model="visible"
     :title="title"
     :width="width"
+    :top="top"
     :before-close="handleClose"
     :append-to-body="appendToBody"
     :close-on-click-modal="closeOnClickModal"
@@ -56,6 +57,7 @@ interface Props {
   modelValue: boolean
   title?: string
   width?: string | number
+  top?: string
   appendToBody?: boolean
   closeOnClickModal?: boolean
   closeOnPressEscape?: boolean
@@ -83,6 +85,7 @@ interface Emits {
 const props = withDefaults(defineProps<Props>(), {
   title: '',
   width: '50%',
+  top: '15vh',
   appendToBody: true,
   closeOnClickModal: true,
   closeOnPressEscape: true,
@@ -134,13 +137,57 @@ const handleConfirm = () => {
 <style lang="scss" scoped>
 .base-modal-body {
   min-height: 100px;
-  max-height: 60vh;
-  overflow-y: auto;
+  // 移除这里的滚动条，让对话框本身处理滚动
+  overflow-y: visible;
 }
 
 .base-modal-footer {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+</style>
+
+<style lang="scss">
+// 响应式对话框样式 - 优化高度计算，避免不必要的滚动条
+.el-dialog {
+  margin: 0 auto;
+
+  // 小屏幕适配
+  @media (max-width: 768px) {
+    width: 95vw !important;
+    margin: 3vh auto;
+    max-height: 94vh;
+
+    .el-dialog__body {
+      max-height: calc(94vh - 120px);
+      overflow-y: auto;
+    }
+  }
+
+  // 中等屏幕适配
+  @media (min-width: 769px) and (max-width: 1200px) {
+    width: 85vw !important;
+    max-width: 900px;
+    margin: 5vh auto;
+    max-height: 90vh;
+
+    .el-dialog__body {
+      max-height: calc(90vh - 120px);
+      overflow-y: auto;
+    }
+  }
+
+  // 大屏幕适配
+  @media (min-width: 1201px) {
+    max-width: 1000px;
+    margin: 8vh auto;
+    max-height: 84vh;
+
+    .el-dialog__body {
+      max-height: calc(84vh - 120px);
+      overflow-y: auto;
+    }
+  }
 }
 </style>

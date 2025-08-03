@@ -43,16 +43,4 @@ code {
   height: 2px;
 }
 
-// 修复账号管理模态框中下拉框层级问题
-.high-z-index-popper {
-  z-index: 3200 !important;
-}
 
-// Element Plus 下拉框全局层级修复
-.el-select-dropdown.el-popper {
-  z-index: 3200 !important;
-}
-
-.el-popper.is-pure {
-  z-index: 3200 !important;
-}
