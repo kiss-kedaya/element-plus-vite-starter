@@ -1,5 +1,5 @@
 import { ElMessage, ElMessageBox, ElNotification } from 'element-plus'
-import type { MessageOptions, NotificationOptions, MessageBoxOptions } from 'element-plus'
+import type { MessageOptions, NotificationOptions, ElMessageBoxOptions } from 'element-plus'
 
 export type NotificationType = 'success' | 'warning' | 'info' | 'error'
 

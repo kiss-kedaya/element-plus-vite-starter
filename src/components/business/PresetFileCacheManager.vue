@@ -31,10 +31,10 @@
             <el-statistic title="缓存文件总数" :value="cacheStats.size" />
           </el-col>
           <el-col :span="6">
-            <el-statistic title="初始化状态" :value="isInitialized ? '已初始化' : '未初始化'" />
+            <el-statistic title="初始化状态" :value="isInitialized ? 1 : 0" :formatter="() => isInitialized ? '已初始化' : '未初始化'" />
           </el-col>
           <el-col :span="6">
-            <el-statistic title="最后更新" :value="lastUpdateTime" />
+            <el-statistic title="最后更新" :value="Date.now()" :formatter="() => lastUpdateTime" />
           </el-col>
         </el-row>
       </div>
@@ -168,7 +168,7 @@ const refreshCache = () => {
 
       cacheStats.value = {
         size: cacheMap.size,
-        files: Array.from(cacheMap.values()).map(file => ({
+        files: Array.from(cacheMap.values()).map((file: any) => ({
           fileName: file.fileName,
           fileSize: file.fileSize,
           cacheTime: file.cacheTime

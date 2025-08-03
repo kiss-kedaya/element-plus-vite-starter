@@ -185,7 +185,7 @@ const handleFriendRequest = async (data: any, messageWxid?: string) => {
         Wxid: authStore.currentAccount.wxid
       })
 
-      if (autoAcceptResponse.Success && autoAcceptResponse.Data?.isEnabled) {
+      if (autoAcceptResponse.Success && autoAcceptResponse.Data?.enable) {
         // 自动同意好友请求
         console.log('自动同意好友请求:', request.nickname)
 

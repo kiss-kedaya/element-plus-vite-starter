@@ -66,6 +66,9 @@ export interface SearchContactResponse extends FriendResponse {
     Pyinitial?: {
       string: string
     }
+    QuanPin?: {
+      string: string
+    }
     Sex?: number
     Signature?: string
     BigHeadImgUrl?: string
@@ -73,5 +76,8 @@ export interface SearchContactResponse extends FriendResponse {
     AntispamTicket?: string
     V1?: string
     V2?: string
+    Country?: string
+    City?: string
+    VerifyFlag?: number
   }
 }

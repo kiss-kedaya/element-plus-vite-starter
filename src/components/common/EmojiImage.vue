@@ -142,7 +142,7 @@ const tryDecryptWithWeChatAPI = async (url: string): Promise<string | null> => {
     }
 
     const response = await downloadCdnImage({
-      Wxid: chatStore.currentSession?.sessionId || '',
+      Wxid: chatStore.currentSession?.id || '',
       FileAesKey: props.emojiAesKey,
       FileNo: fileNoMatch[1]
     })

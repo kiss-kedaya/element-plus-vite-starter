@@ -80,7 +80,7 @@
 
       <!-- 代理表格 -->
       <BaseTable
-        :data="proxyList"
+        :data="proxyList?.list || []"
         :columns="tableColumns"
         :loading="loading"
         :show-selection="true"
@@ -188,6 +188,17 @@ const pagination = reactive({
   total: 0
 })
 
+// 创建API适配器
+const adaptedGetProxyList = async (params: any) => {
+  const response = await proxyApi.getProxyList(params)
+  return {
+    success: true,
+    code: 200,
+    message: 'success',
+    data: response
+  }
+}
+
 // 使用分页API Hook
 const {
   data: proxyList,
@@ -199,7 +210,7 @@ const {
   refresh: refreshProxyList,
   goToPage,
   changePageSize
-} = usePaginationApi(proxyApi.getProxyList, {
+} = usePaginationApi(adaptedGetProxyList, {
   defaultPageSize: 20,
   immediate: true
 })
@@ -270,13 +281,17 @@ const tableColumns: TableColumn[] = [
 
 // 计算属性
 const countries = computed(() => {
-  return getProxyCountries(proxyList.value || [])
+  const list = proxyList.value?.list || []
+  return getProxyCountries(list)
 })
 
 // 获取状态类型
-const getStatusType = (status: string) => {
+const getStatusType = (status: string): 'success' | 'warning' | 'info' | 'primary' | 'danger' => {
   const statusInfo = proxyStatusMap[status as keyof typeof proxyStatusMap]
-  return statusInfo?.color || 'info'
+  const color = statusInfo?.color || 'info'
+  return ['success', 'warning', 'info', 'primary', 'danger'].includes(color)
+    ? color as 'success' | 'warning' | 'info' | 'primary' | 'danger'
+    : 'info'
 }
 
 // 获取状态标签

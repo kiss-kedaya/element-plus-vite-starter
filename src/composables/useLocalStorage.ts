@@ -88,7 +88,7 @@ export function useLocalStorage<T>(
   // 初始化
   read()
 
-  return [storedValue, write, remove]
+  return [storedValue as Ref<T>, write, remove]
 }
 
 // 预定义的常用存储
@@ -182,7 +182,7 @@ export function useSessionStorage<T>(
 
   read()
 
-  return [storedValue, write, remove]
+  return [storedValue as Ref<T>, write, remove]
 }
 
 // 临时数据存储

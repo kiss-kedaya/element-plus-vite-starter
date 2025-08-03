@@ -22,6 +22,8 @@ export interface ChatMessage {
   imageMd5?: string          // 图片MD5
   imageDataLen?: number      // 图片数据长度
   imageCompressType?: number // 图片压缩类型
+  imageCdnFileAesKey?: string // 图片CDN文件AES密钥
+  imageCdnFileNo?: string    // 图片CDN文件编号
   fileData?: {
     name: string
     size: number
@@ -63,6 +65,11 @@ export interface ChatMessage {
   videoThumbWidth?: number   // 视频缩略图宽度
   videoThumbHeight?: number  // 视频缩略图高度
   videoMd5?: string          // 视频MD5
+  videoDataLen?: number      // 视频数据长度
+  videoCompressType?: number // 视频压缩类型
+  videoFromUserName?: string // 视频发送者用户名
+  videoData?: string         // 视频数据
+  videoPath?: string         // 视频文件路径
   // 新增字段用于重试和撤回功能
   originalContent?: string  // 原始内容，用于重试
   canRetry?: boolean       // 是否可以重试

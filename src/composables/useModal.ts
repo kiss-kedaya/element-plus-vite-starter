@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, readonly } from 'vue'
 
 export interface ModalState {
   visible: boolean
@@ -151,7 +151,7 @@ export function useModal(options: UseModalOptions = {}) {
 
 // 多模态框管理
 export function useModalManager() {
-  const modals = ref<Map<string, ReturnType<typeof useModal>>>(new Map())
+  const modals = ref<Map<string, any>>(new Map())
 
   const createModal = (key: string, options?: UseModalOptions) => {
     const modal = useModal(options)

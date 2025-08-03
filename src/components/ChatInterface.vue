@@ -152,7 +152,7 @@ async function handlePaste(event: ClipboardEvent) {
   if (!items)
     return
 
-  for (const item of items) {
+  for (const item of Array.from(items)) {
     if (item.kind === 'file') {
       const file = item.getAsFile()
       if (file) {
@@ -984,12 +984,9 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <div
-          v-for="session in filteredSessions" :key="session.id" class="session-item"
-          :class="{ active: chatStore.currentSession?.id === session.id }"
-          @click="selectSession(session)"
-          @contextmenu="showSessionContextMenu($event, session)"
-        >
+        <div v-for="session in filteredSessions" :key="session.id" class="session-item"
+          :class="{ active: chatStore.currentSession?.id === session.id }" @click="selectSession(session)"
+          @contextmenu="showSessionContextMenu($event, session)">
           <div class="session-avatar">
             <el-avatar :src="session.avatar || ''" :size="40">
               <template #default>
@@ -1082,22 +1079,18 @@ onUnmounted(() => {
 
           <!-- 传统消息列表（暂时替换虚拟滚动） -->
           <div v-else-if="chatStore.currentSession && chatStore.currentMessages.length > 0" class="messages-list">
-            <MessageItem
-              v-for="(message, index) in chatStore.currentMessages" :key="message.id" :message="message"
+            <MessageItem v-for="(message, index) in chatStore.currentMessages" :key="message.id" :message="message"
               :show-time="showMessageTime(message, index)" :avatar="getContactAvatar(message)"
               :avatar-text="getContactAvatarText(message)" :my-avatar="props.account?.headUrl || props.account?.avatar"
               :my-avatar-text="props.account?.nickname?.charAt(0) || '我'" @retry="retryMessage"
-              @contextmenu="showContextMenu"
-            />
+              @contextmenu="showContextMenu" />
           </div>
         </div>
 
         <!-- 右键菜单 -->
         <Teleport to="body">
-          <div
-            v-if="contextMenu.visible" class="context-menu"
-            :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }" @click.stop
-          >
+          <div v-if="contextMenu.visible" class="context-menu"
+            :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }" @click.stop>
             <div class="context-menu-item" @click="recallMessage">
               <el-icon>
                 <Delete />
@@ -1108,14 +1101,8 @@ onUnmounted(() => {
         </Teleport>
 
         <!-- 输入区域 -->
-        <div
-          class="input-area"
-          @drop="handleDrop"
-          @dragover="handleDragOver"
-          @dragenter="handleDragEnter"
-          @dragleave="handleDragLeave"
-          :class="{ 'drag-over': isDragOver }"
-        >
+        <div class="input-area" @drop="handleDrop" @dragover="handleDragOver" @dragenter="handleDragEnter"
+          @dragleave="handleDragLeave" :class="{ 'drag-over': isDragOver }">
           <div class="input-toolbar">
             <el-button link class="toolbar-btn" @click="selectImageFile">
               <el-icon>
@@ -1133,10 +1120,8 @@ onUnmounted(() => {
 
           <div class="input-container">
             <div class="input-wrapper">
-              <el-input
-                v-model="messageInput" type="textarea" :rows="3" placeholder="输入消息内容，支持粘贴图片..."
-                class="message-input" @keydown.ctrl.enter="sendMessage" @paste="handlePaste"
-              />
+              <el-input v-model="messageInput" type="textarea" :rows="3" placeholder="输入消息内容，支持粘贴图片..."
+                class="message-input" @keydown.ctrl.enter="sendMessage" @paste="handlePaste" />
             </div>
             <div class="input-actions">
               <span class="input-tip">Ctrl+Enter 发送</span>
@@ -1154,54 +1139,41 @@ onUnmounted(() => {
 
     <!-- 聊天列表右键菜单 -->
     <Teleport to="body">
-      <div
-        v-if="sessionContextMenu.visible"
-        class="session-context-menu"
-        :style="{
-          left: sessionContextMenu.x + 'px',
-          top: sessionContextMenu.y + 'px'
-        }"
-        @click.stop
-      >
+      <div v-if="sessionContextMenu.visible" class="session-context-menu" :style="{
+        left: sessionContextMenu.x + 'px',
+        top: sessionContextMenu.y + 'px'
+      }" @click.stop>
         <div class="context-menu-item" @click="handleSessionContextMenuAction('remark')">
-          <el-icon><Edit /></el-icon>
+          <el-icon>
+            <Edit />
+          </el-icon>
           <span>修改备注</span>
         </div>
         <div class="context-menu-divider"></div>
         <div class="context-menu-item" @click="handleSessionContextMenuAction('deleteSession')">
-          <el-icon><ChatDotRound /></el-icon>
+          <el-icon>
+            <ChatDotRound />
+          </el-icon>
           <span>删除会话</span>
         </div>
         <div class="context-menu-item danger" @click="handleSessionContextMenuAction('deleteFriend')">
-          <el-icon><Delete /></el-icon>
+          <el-icon>
+            <Delete />
+          </el-icon>
           <span>删除好友</span>
         </div>
       </div>
 
       <!-- 右键菜单遮罩层 -->
-      <div
-        v-if="sessionContextMenu.visible"
-        class="context-menu-overlay"
-        @click="hideSessionContextMenu"
-        @contextmenu.prevent="hideSessionContextMenu"
-      ></div>
+      <div v-if="sessionContextMenu.visible" class="context-menu-overlay" @click="hideSessionContextMenu"
+        @contextmenu.prevent="hideSessionContextMenu"></div>
     </Teleport>
 
     <!-- 备注修改对话框 -->
-    <el-dialog
-      v-model="showRemarkDialog"
-      title="修改备注"
-      width="400px"
-      :before-close="cancelRemarkDialog"
-    >
+    <el-dialog v-model="showRemarkDialog" title="修改备注" width="400px" :before-close="cancelRemarkDialog">
       <el-form :model="remarkForm" label-width="80px">
         <el-form-item label="备注名称">
-          <el-input
-            v-model="remarkForm.remark"
-            placeholder="请输入备注名称"
-            maxlength="50"
-            show-word-limit
-          />
+          <el-input v-model="remarkForm.remark" placeholder="请输入备注名称" maxlength="50" show-word-limit />
         </el-form-item>
       </el-form>
 
