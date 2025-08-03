@@ -416,7 +416,7 @@ function showSessionContextMenu(event: MouseEvent, session: ChatSession) {
   let y = event.clientY
 
   const menuWidth = 150
-  const menuHeight = 100
+  const menuHeight = 140
 
   if (x + menuWidth > window.innerWidth) {
     x = window.innerWidth - menuWidth - 10
@@ -453,24 +453,52 @@ function handleSessionContextMenuAction(action: string) {
       remarkForm.value.remark = session.name || ''
       showRemarkDialog.value = true
       break
-    case 'delete':
-      // 删除好友
+    case 'deleteSession':
+      // 删除会话（只删除本地聊天记录）
       handleDeleteSession(session)
+      break
+    case 'deleteFriend':
+      // 删除好友（调用API删除好友关系）
+      handleDeleteFriend(session)
       break
   }
   hideSessionContextMenu()
 }
 
-// 删除会话
+// 删除会话（只删除本地聊天记录）
 async function handleDeleteSession(session: ChatSession) {
   try {
     await ElMessageBox.confirm(
-      `确定要删除好友 "${session.name}" 吗？这将同时删除聊天记录。`,
-      '删除好友',
+      `确定要删除与 "${session.name}" 的聊天记录吗？这不会删除好友关系。`,
+      '删除会话',
       {
         type: 'warning',
         confirmButtonText: '删除',
         cancelButtonText: '取消',
+      }
+    )
+
+    // 只删除本地会话和聊天记录
+    chatStore.removeSession(session.id)
+    ElMessage.success('聊天记录已删除')
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('删除会话失败:', error)
+    }
+  }
+}
+
+// 删除好友（调用API删除好友关系）
+async function handleDeleteFriend(session: ChatSession) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除好友 "${session.name}" 吗？这将永久删除好友关系和聊天记录。`,
+      '删除好友',
+      {
+        type: 'error',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        confirmButtonClass: 'el-button--danger',
       }
     )
 
@@ -485,7 +513,7 @@ async function handleDeleteSession(session: ChatSession) {
       ToWxid: session.id,
     })
 
-    // 删除本地会话
+    // 删除本地会话和聊天记录
     chatStore.removeSession(session.id)
     ElMessage.success('好友删除成功')
   } catch (error: any) {
