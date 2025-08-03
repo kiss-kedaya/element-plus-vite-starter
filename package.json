@@ -15,7 +15,12 @@
     "generate": "vite-ssg build",
     "lint": "echo 'ESLint disabled for development'",
     "preview": "vite preview",
-    "typecheck": "vue-tsc --noEmit --skipLibCheck"
+    "typecheck": "vue-tsc --noEmit --skipLibCheck",
+    "vercel-build": "vite build",
+    "deploy": "vercel",
+    "deploy:prod": "vercel --prod",
+    "deploy:preview": "vercel",
+    "postbuild": "echo 'Build completed successfully'"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",
