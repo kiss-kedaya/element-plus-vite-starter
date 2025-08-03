@@ -98,6 +98,9 @@
             <el-tab-pane label="聊天功能" name="chat">
               <ChatInterface :account="authStore.currentAccount" />
             </el-tab-pane>
+            <el-tab-pane label="文件缓存管理" name="fileCache">
+              <PresetFileCacheManager />
+            </el-tab-pane>
           </el-tabs>
         </div>
       </el-main>
@@ -151,6 +154,7 @@ import ChatInterface from '@/components/ChatInterface.vue'
 import AccountManager from '@/components/AccountManager.vue'
 import AccountManagementModal from '@/components/AccountManagementModal.vue'
 import FriendRequestNotification from '@/components/FriendRequestNotification.vue'
+import PresetFileCacheManager from '@/components/business/PresetFileCacheManager.vue'
 
 // Store
 const authStore = useAuthStore()
