@@ -9,8 +9,9 @@ export const WEBSOCKET_CONFIG = {
   
   // 重连配置
   RECONNECT: {
-    MAX_ATTEMPTS: 5,
-    INTERVAL: 3000,
+    MAX_ATTEMPTS: Infinity, // 无限重连
+    INTERVAL: 3000, // 基础重连间隔3秒
+    MAX_INTERVAL: 30000, // 最大重连间隔30秒
   },
   
   // 心跳配置

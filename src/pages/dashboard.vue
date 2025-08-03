@@ -18,7 +18,7 @@
     <!-- 主要内容区域 -->
     <el-container class="main-container">
       <!-- 左侧账号列表 -->
-      <el-aside width="300px" class="accounts-sidebar">
+      <el-aside class="accounts-sidebar">
         <div class="sidebar-header">
           <h3>在线账号</h3>
           <el-button type="primary" size="small" @click="showLoginDialog = true">
@@ -38,13 +38,27 @@
                class="account-item"
                :class="{ active: authStore.currentAccount?.wxid === account?.wxid }"
                @click="selectAccount(account)">
-            <el-avatar :src="account?.headUrl || account?.avatar" :size="40">
-              {{ account?.nickname?.charAt(0) || '?' }}
-            </el-avatar>
+            <!-- 头像和消息徽章 -->
+            <div class="avatar-container">
+              <el-badge
+                :value="getAccountUnreadCount(account?.wxid)"
+                :hidden="getAccountUnreadCount(account?.wxid) === 0"
+                :max="99"
+                class="account-badge"
+              >
+                <el-avatar :src="account?.headUrl || account?.avatar" :size="40">
+                  {{ account?.nickname?.charAt(0) || '?' }}
+                </el-avatar>
+              </el-badge>
+            </div>
             <div class="account-info">
               <div class="nickname">
                 {{ account?.nickname || '未知账号' }}
                 <span v-if="account?.alias" class="alias-inline">[{{ account.alias }}]</span>
+                <!-- 消息提醒图标 -->
+                <el-icon v-if="getAccountUnreadCount(account?.wxid) > 0" class="message-indicator" color="#f56c6c">
+                  <ChatDotRound />
+                </el-icon>
               </div>
               <div class="account-details">
                 <div class="account-wxid">{{ account?.wxid || '' }}</div>
@@ -145,8 +159,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { User, Plus, MoreFilled, Connection } from '@element-plus/icons-vue'
+import { User, Plus, MoreFilled, Connection, ChatDotRound } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
+import { useCrossAccountMessageStore } from '@/stores/crossAccountMessage'
 import { useRoute, useRouter } from 'vue-router'
 import { loginApi } from '@/api/auth'
 
@@ -161,6 +176,7 @@ import PresetFileCacheManager from '@/components/business/PresetFileCacheManager
 
 // Store
 const authStore = useAuthStore()
+const crossAccountMessageStore = useCrossAccountMessageStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -176,8 +192,14 @@ const onlineAccountsCount = computed(() => {
   return authStore.onlineAccounts.length
 })
 
+// 获取账号未读消息计数
+const getAccountUnreadCount = (wxid: string | undefined): number => {
+  if (!wxid) return 0
+  return authStore.getAccountUnreadCount(wxid)
+}
+
 // 方法
-const selectAccount = (account) => {
+const selectAccount = (account: any) => {
   if (!account || !account.wxid) {
     console.error('无效的账号数据:', account)
     return
@@ -186,6 +208,10 @@ const selectAccount = (account) => {
   try {
     const previousAccount = authStore.currentAccount
     authStore.setCurrentAccount(account.wxid)
+
+    // 清除当前账号的未读计数
+    authStore.clearAccountUnreadCount(account.wxid)
+    crossAccountMessageStore.clearAccountUnreadCount(account.wxid)
 
     if (previousAccount && previousAccount.wxid !== account.wxid) {
       ElMessage.success(`已切换到账号：${account.nickname}，相关数据已重置`)
@@ -338,6 +364,9 @@ onMounted(async () => {
     activeTab.value = route.query.tab as string
   }
 
+  // 初始化跨账号消息监听
+  crossAccountMessageStore.initializeCrossAccountMessaging()
+
   // 获取已登录的账号
   try {
     const accounts = await authStore.fetchLoggedAccounts()
@@ -347,7 +376,7 @@ onMounted(async () => {
     } else {
       ElMessage.info('当前没有已登录的账号')
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('获取已登录账号失败:', error)
     ElMessage.error(`获取已登录账号失败: ${error.message || '未知错误'}`)
   }
@@ -434,10 +463,24 @@ onMounted(async () => {
 }
 
 .accounts-sidebar {
+  width: 380px;
+  min-width: 350px;
+  max-width: 450px;
   background: var(--bg-glass);
   backdrop-filter: blur(20px);
   border-right: 1px solid var(--border-primary);
   position: relative;
+
+  /* 响应式设计 */
+  @media (max-width: 1200px) {
+    width: 350px;
+    min-width: 320px;
+  }
+
+  @media (max-width: 768px) {
+    width: 300px;
+    min-width: 280px;
+  }
 
   .sidebar-header {
     padding: var(--spacing-lg) var(--spacing-xl);
@@ -494,8 +537,8 @@ onMounted(async () => {
 
 .account-item {
   display: flex;
-  align-items: center;
-  padding: var(--spacing-md) var(--spacing-sm);
+  align-items: flex-start;
+  padding: var(--spacing-md);
   margin-bottom: var(--spacing-xs);
   background: var(--bg-secondary);
   backdrop-filter: blur(10px);
@@ -504,6 +547,7 @@ onMounted(async () => {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   gap: var(--spacing-md);
   border: 1px solid var(--border-primary);
+  min-height: 80px;
 
   &:hover {
     background: var(--bg-primary);
@@ -516,6 +560,24 @@ onMounted(async () => {
     background: var(--primary-light);
     border-color: var(--primary-border);
     box-shadow: var(--shadow-card);
+  }
+
+  .avatar-container {
+    position: relative;
+    flex-shrink: 0;
+    margin-top: 4px;
+
+    .account-badge {
+      :deep(.el-badge__content) {
+        background-color: #f56c6c;
+        border: 2px solid #fff;
+        font-size: 10px;
+        min-width: 16px;
+        height: 16px;
+        line-height: 12px;
+        font-weight: 600;
+      }
+    }
   }
 
   .account-info {
@@ -539,6 +601,17 @@ onMounted(async () => {
         font-family: 'Courier New', monospace;
         margin-left: 4px;
       }
+
+      .message-indicator {
+        margin-left: 8px;
+        animation: pulse 2s infinite;
+
+        @keyframes pulse {
+          0% { opacity: 1; }
+          50% { opacity: 0.5; }
+          100% { opacity: 1; }
+        }
+      }
     }
 
     .account-details {
@@ -551,10 +624,19 @@ onMounted(async () => {
       .account-device {
         font-size: var(--font-size-xs);
         color: var(--text-tertiary);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
         line-height: 1.3;
+        word-break: break-all;
+        font-family: 'Courier New', monospace;
+
+        /* 对于较长的微信号，允许换行显示 */
+        white-space: normal;
+        max-width: 100%;
+
+        /* 如果需要限制高度，可以设置最大行数 */
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
       }
     }
 
@@ -566,6 +648,17 @@ onMounted(async () => {
 
   .account-actions {
     flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    margin-top: 4px;
+
+    .el-button {
+      font-size: var(--font-size-xs);
+      padding: 4px 8px;
+      height: auto;
+      min-height: 24px;
+    }
   }
 }
 
@@ -642,7 +735,7 @@ onMounted(async () => {
   }
 }
 
-// 登录弹窗样式
+/* 登录弹窗样式 */
 .login-dialog {
   :deep(.el-dialog) {
     margin: 0 !important;

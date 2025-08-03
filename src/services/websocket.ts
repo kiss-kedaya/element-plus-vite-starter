@@ -22,11 +22,12 @@ interface AccountConnection {
 
 export class WebSocketService {
   private connections: Map<string, AccountConnection> = new Map()
-  private maxReconnectAttempts = WEBSOCKET_CONFIG.RECONNECT.MAX_ATTEMPTS
+  private maxReconnectAttempts = Infinity // 无限重连
   private reconnectInterval = WEBSOCKET_CONFIG.RECONNECT.INTERVAL
   private eventListeners: Map<string, Function[]> = new Map()
   private currentWxid: string | undefined = undefined
   private static instance: WebSocketService | null = null
+  private autoConnectAccounts: Set<string> = new Set() // 需要自动连接的账号列表
 
   // 单例模式
   static getInstance(): WebSocketService {
@@ -38,6 +39,44 @@ export class WebSocketService {
 
   private constructor() {
     // 初始化事件监听器映射
+  }
+
+  // 连接所有已登录的账号
+  async connectAllAccounts(accounts: string[]): Promise<void> {
+    console.log('开始连接所有账号的WebSocket:', accounts)
+
+    // 更新自动连接账号列表
+    this.autoConnectAccounts.clear()
+    accounts.forEach(wxid => this.autoConnectAccounts.add(wxid))
+
+    // 并发连接所有账号
+    const connectionPromises = accounts.map(async (wxid) => {
+      try {
+        await this.connect(wxid)
+        console.log(`✅ 账号 ${wxid} WebSocket连接成功`)
+      } catch (error) {
+        console.warn(`❌ 账号 ${wxid} WebSocket连接失败:`, error)
+        // 失败的连接会自动重连，不需要额外处理
+      }
+    })
+
+    await Promise.allSettled(connectionPromises)
+    console.log('所有账号WebSocket连接尝试完成')
+  }
+
+  // 添加账号到自动连接列表
+  addAutoConnectAccount(wxid: string): void {
+    this.autoConnectAccounts.add(wxid)
+    // 立即尝试连接
+    this.connect(wxid).catch(error => {
+      console.warn(`添加账号 ${wxid} 到自动连接列表后连接失败:`, error)
+    })
+  }
+
+  // 从自动连接列表移除账号
+  removeAutoConnectAccount(wxid: string): void {
+    this.autoConnectAccounts.delete(wxid)
+    this.disconnect(wxid)
   }
 
   // 事件监听器管理
@@ -141,7 +180,8 @@ export class WebSocketService {
           // 触发连接状态事件
           this.emit('connection_status', false, wxid)
 
-          if (!event.wasClean && connectionInfo.reconnectAttempts < this.maxReconnectAttempts) {
+          // 如果是自动连接的账号或者非正常关闭，则自动重连
+          if (!event.wasClean || this.autoConnectAccounts.has(wxid)) {
             this.scheduleReconnect(wxid)
           }
         }
@@ -173,6 +213,9 @@ export class WebSocketService {
       return
     }
 
+    // 从自动连接列表中移除，防止重连
+    this.autoConnectAccounts.delete(targetWxid)
+
     const connection = this.connections.get(targetWxid)
     if (connection) {
       this.stopHeartbeat(targetWxid)
@@ -192,6 +235,10 @@ export class WebSocketService {
   // 断开所有连接
   disconnectAll() {
     console.log('断开所有WebSocket连接')
+
+    // 清空自动连接列表，防止重连
+    this.autoConnectAccounts.clear()
+
     for (const [wxid, connection] of this.connections) {
       this.stopHeartbeat(wxid)
       if (connection.ws) {
@@ -845,11 +892,25 @@ export class WebSocketService {
 
     connection.reconnectAttempts++
 
+    // 计算重连延迟，使用指数退避算法，最大不超过配置的最大间隔
+    const delay = Math.min(
+      this.reconnectInterval * Math.min(connection.reconnectAttempts, 10),
+      WEBSOCKET_CONFIG.RECONNECT.MAX_INTERVAL
+    )
+
+    console.log(`账号 ${wxid} 将在 ${delay}ms 后进行第 ${connection.reconnectAttempts} 次重连`)
+
     setTimeout(() => {
-      if (connection.reconnectAttempts <= this.maxReconnectAttempts) {
-        this.connect(wxid)
+      // 检查账号是否仍在自动连接列表中，或者是否有其他原因需要重连
+      if (this.autoConnectAccounts.has(wxid) || connection.reconnectAttempts <= 3) {
+        console.log(`开始重连账号 ${wxid} (第 ${connection.reconnectAttempts} 次尝试)`)
+        this.connect(wxid).catch(error => {
+          console.warn(`账号 ${wxid} 重连失败:`, error)
+        })
+      } else {
+        console.log(`账号 ${wxid} 不在自动连接列表中，停止重连`)
       }
-    }, this.reconnectInterval * connection.reconnectAttempts)
+    }, delay)
   }
 
   // 获取连接状态（当前账号）

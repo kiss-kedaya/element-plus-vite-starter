@@ -9,33 +9,60 @@ export const useAuthStore = defineStore('auth', () => {
   const accounts = ref<LoginAccount[]>([])
   const currentAccount = ref<LoginAccount | null>(null)
   const isLoading = ref(false)
+  // 每个账号的未读消息计数
+  const accountUnreadCounts = ref<Record<string, number>>({})
 
   // 计算属性
   const isLoggedIn = computed(() => accounts.value.length > 0)
-  const onlineAccounts = computed(() => 
+  const onlineAccounts = computed(() =>
     accounts.value.filter(account => account.status === 'online')
   )
 
+  // 获取账号的未读消息总数
+  const getTotalUnreadCount = computed(() => {
+    return Object.values(accountUnreadCounts.value).reduce((total, count) => total + count, 0)
+  })
+
   // 方法
-  const addAccount = (account: LoginAccount) => {
+  const addAccount = async (account: LoginAccount) => {
     const existingIndex = accounts.value.findIndex(a => a.wxid === account.wxid)
     if (existingIndex >= 0) {
       accounts.value[existingIndex] = account
     } else {
       accounts.value.push(account)
     }
-    
+
     if (!currentAccount.value) {
       currentAccount.value = account
     }
+
+    // 如果新账号是在线状态，自动连接WebSocket
+    if (account.status === 'online' && account.wxid) {
+      try {
+        const { webSocketService } = await import('@/services/websocket')
+        webSocketService.addAutoConnectAccount(account.wxid)
+        console.log(`新账号 ${account.wxid} 已添加到自动连接列表`)
+      } catch (error) {
+        console.warn(`为新账号 ${account.wxid} 连接WebSocket失败:`, error)
+      }
+    }
   }
 
-  const removeAccount = (wxid: string) => {
+  const removeAccount = async (wxid: string) => {
     const index = accounts.value.findIndex(a => a.wxid === wxid)
     if (index >= 0) {
       accounts.value.splice(index, 1)
       if (currentAccount.value?.wxid === wxid) {
         currentAccount.value = accounts.value[0] || null
+      }
+
+      // 断开该账号的WebSocket连接
+      try {
+        const { webSocketService } = await import('@/services/websocket')
+        webSocketService.removeAutoConnectAccount(wxid)
+        console.log(`账号 ${wxid} 已从自动连接列表移除并断开连接`)
+      } catch (error) {
+        console.warn(`断开账号 ${wxid} 的WebSocket连接失败:`, error)
       }
     }
   }
@@ -63,6 +90,28 @@ export const useAuthStore = defineStore('auth', () => {
         // 各个组件可以监听这个事件来清空自己的数据
       }
     }
+  }
+
+  // 消息计数管理方法
+  const getAccountUnreadCount = (wxid: string): number => {
+    return accountUnreadCounts.value[wxid] || 0
+  }
+
+  const setAccountUnreadCount = (wxid: string, count: number) => {
+    accountUnreadCounts.value[wxid] = Math.max(0, count)
+  }
+
+  const incrementAccountUnreadCount = (wxid: string, increment: number = 1) => {
+    const currentCount = accountUnreadCounts.value[wxid] || 0
+    accountUnreadCounts.value[wxid] = currentCount + increment
+  }
+
+  const clearAccountUnreadCount = (wxid: string) => {
+    accountUnreadCounts.value[wxid] = 0
+  }
+
+  const clearAllUnreadCounts = () => {
+    accountUnreadCounts.value = {}
   }
 
   // 登录相关方法
@@ -172,6 +221,24 @@ export const useAuthStore = defineStore('auth', () => {
           fileCacheManager.setCurrentWxid(selectedAccount.wxid)
         }
       }
+
+      // 自动连接所有在线账号的WebSocket
+      if (accounts.value.length > 0) {
+        try {
+          const { webSocketService } = await import('@/services/websocket')
+          const onlineWxids = accounts.value
+            .filter(account => account.status === 'online')
+            .map(account => account.wxid)
+
+          if (onlineWxids.length > 0) {
+            console.log('开始自动连接所有在线账号的WebSocket:', onlineWxids)
+            await webSocketService.connectAllAccounts(onlineWxids)
+          }
+        } catch (error) {
+          console.warn('自动连接WebSocket失败:', error)
+        }
+      }
+
       return accounts.value
     } catch (error: unknown) {
       console.error('获取已登录账号失败:', error)
@@ -186,11 +253,13 @@ export const useAuthStore = defineStore('auth', () => {
     accounts,
     currentAccount,
     isLoading,
-    
+    accountUnreadCounts,
+
     // 计算属性
     isLoggedIn,
     onlineAccounts,
-    
+    getTotalUnreadCount,
+
     // 方法
     addAccount,
     removeAccount,
@@ -199,6 +268,13 @@ export const useAuthStore = defineStore('auth', () => {
     loginWithQRCode,
     loginWithPassword,
     checkLoginStatus,
-    fetchLoggedAccounts
+    fetchLoggedAccounts,
+
+    // 消息计数方法
+    getAccountUnreadCount,
+    setAccountUnreadCount,
+    incrementAccountUnreadCount,
+    clearAccountUnreadCount,
+    clearAllUnreadCounts,
   }
 })

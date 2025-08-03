@@ -177,6 +177,8 @@ export const useChatStore = defineStore('chat', () => {
       const authStore = useAuthStore()
       if (authStore.currentAccount?.wxid) {
         saveCachedData(authStore.currentAccount.wxid)
+        // 当用户查看会话时，清除该账号的未读计数
+        authStore.clearAccountUnreadCount(authStore.currentAccount.wxid)
       }
     }
   }
@@ -727,6 +729,10 @@ export const useChatStore = defineStore('chat', () => {
     if (newWxid) {
       loadCachedData(newWxid)
       console.log(`已切换到账号 ${newWxid}`)
+
+      // 清除新账号的未读计数（因为用户已经切换到这个账号）
+      const authStore = useAuthStore()
+      authStore.clearAccountUnreadCount(newWxid)
     }
   }
 
@@ -886,6 +892,10 @@ export const useChatStore = defineStore('chat', () => {
     // 如果提供了messageWxid，检查是否匹配当前账号
     if (messageWxid && currentAccountWxid && messageWxid !== currentAccountWxid) {
       console.log(`消息属于账号 ${messageWxid}，但当前账号是 ${currentAccountWxid}，跳过处理`)
+      // 不处理当前聊天界面，但仍需要更新未读计数
+      if (!data.fromMe) {
+        authStore.incrementAccountUnreadCount(messageWxid, 1)
+      }
       return
     }
 
