@@ -916,7 +916,6 @@ const updateRemark = async () => {
 /* 右键菜单样式 */
 .context-menu {
   position: fixed;
-  z-index: 9999;
   background: white;
   border: 1px solid #e4e7ed;
   border-radius: 8px;
@@ -965,7 +964,6 @@ const updateRemark = async () => {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 9998;
   background: transparent;
 }
 </style>

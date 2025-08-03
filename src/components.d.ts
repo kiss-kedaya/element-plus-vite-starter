@@ -69,6 +69,7 @@ declare module 'vue' {
     MessageBoxDemo: typeof import('./components/MessageBoxDemo.vue')['default']
     MessageItem: typeof import('./components/business/MessageItem.vue')['default']
     PresetFileCacheManager: typeof import('./components/business/PresetFileCacheManager.vue')['default']
+    ProxyConfigSection: typeof import('./components/ProxyConfigSection.vue')['default']
     ProxyFilter: typeof import('./components/feature/Proxy/components/ProxyFilter.vue')['default']
     ProxyManagement: typeof import('./components/business/ProxyManagement.vue')['default']
     ProxyStats: typeof import('./components/feature/Proxy/components/ProxyStats.vue')['default']

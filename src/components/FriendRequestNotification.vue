@@ -232,7 +232,6 @@ onUnmounted(() => {
   position: fixed;
   bottom: 80px;
   right: 30px;
-  z-index: 1000;
 
   .notification-badge {
     .notification-button {

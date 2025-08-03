@@ -747,7 +747,7 @@ const generateQRCode = async () => {
       // 优先使用QrBase64，不要使用QrUrl
       if (response.Data.QrBase64) {
         qrCodeUrl.value = response.Data.QrBase64
-        currentUuid.value = response.Data.Uuid || response.Data.uuid || ''
+        currentUuid.value = response.Data.Uuid || response.Data.Uuid || ''
         qrStatus.value = '请使用微信扫描二维码'
 
         // 开始检查二维码状态

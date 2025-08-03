@@ -1712,7 +1712,6 @@ onUnmounted(() => {
   border: 2px solid #409eff;
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-  z-index: 1060;
   min-width: 120px;
   overflow: hidden;
 
@@ -1776,7 +1775,6 @@ onUnmounted(() => {
       font-size: 16px;
       font-weight: 500;
       pointer-events: none;
-      z-index: 10;
       background: rgba(255, 255, 255, 0.9);
       padding: 8px 16px;
       border-radius: 4px;
@@ -1876,7 +1874,6 @@ onUnmounted(() => {
   border: 2px solid #409eff;
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-  z-index: 1060;
   min-width: 150px;
   overflow: hidden;
 
@@ -1923,7 +1920,6 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 1059;
   background: transparent;
 }
 </style>

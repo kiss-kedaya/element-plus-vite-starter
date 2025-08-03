@@ -7,22 +7,24 @@
           <el-switch v-model="autoReplyEnabled" @change="toggleAutoReply" />
         </div>
       </template>
-      
+
       <div class="reply-rules">
         <div class="rules-header">
           <h4>回复规则</h4>
           <el-button type="primary" size="small" @click="addRule">
-            <el-icon><Plus /></el-icon>
+            <el-icon>
+              <Plus />
+            </el-icon>
             添加规则
           </el-button>
         </div>
-        
+
         <div v-if="rules.length === 0" class="empty-rules">
           <el-empty description="暂无自动回复规则">
             <el-button type="primary" @click="addRule">添加第一个规则</el-button>
           </el-empty>
         </div>
-        
+
         <div v-else class="rules-list">
           <div v-for="(rule, index) in rules" :key="rule.id" class="rule-item">
             <div class="rule-content">
@@ -38,10 +40,14 @@
             <div class="rule-actions">
               <el-switch v-model="rule.enabled" size="small" />
               <el-button link size="small" @click="editRule(rule)">
-                <el-icon><Edit /></el-icon>
+                <el-icon>
+                  <Edit />
+                </el-icon>
               </el-button>
               <el-button link size="small" @click="deleteRule(index)">
-                <el-icon><Delete /></el-icon>
+                <el-icon>
+                  <Delete />
+                </el-icon>
               </el-button>
             </div>
           </div>
@@ -143,7 +149,7 @@ const deleteRule = async (index) => {
     await ElMessageBox.confirm('确定要删除这个自动回复规则吗？', '确认删除', {
       type: 'warning'
     })
-    
+
     rules.value.splice(index, 1)
     ElMessage.success('规则已删除')
   } catch {
@@ -168,7 +174,7 @@ const deleteRule = async (index) => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
-  
+
   h4 {
     margin: 0;
     color: #333;
@@ -197,17 +203,18 @@ const deleteRule = async (index) => {
 
 .rule-content {
   flex: 1;
-  
-  .rule-trigger, .rule-response {
+
+  .rule-trigger,
+  .rule-response {
     margin-bottom: 8px;
-    
+
     .label {
       font-weight: 500;
       color: #666;
       margin-right: 8px;
     }
   }
-  
+
   .response-text {
     color: #333;
   }

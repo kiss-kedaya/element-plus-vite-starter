@@ -110,9 +110,12 @@
     <el-dialog
       v-model="showLoginDialog"
       title="账号登录"
-      width="600px"
+      width="650px"
+      top="5vh"
       :close-on-click-modal="false"
       :destroy-on-close="true"
+      :modal="true"
+      class="login-dialog"
       @close="handleLoginDialogClose"
     >
       <LoginForm
@@ -378,7 +381,6 @@ onMounted(async () => {
   border-bottom: 1px solid var(--border-primary);
   box-shadow: var(--shadow-light);
   position: relative;
-  z-index: 10;
 
   .header-content {
     display: flex;
@@ -436,7 +438,6 @@ onMounted(async () => {
   backdrop-filter: blur(20px);
   border-right: 1px solid var(--border-primary);
   position: relative;
-  z-index: 5;
 
   .sidebar-header {
     padding: var(--spacing-lg) var(--spacing-xl);
@@ -638,6 +639,35 @@ onMounted(async () => {
     overflow-y: auto;
     padding: var(--spacing-xl) 0;
     background: var(--bg-primary);
+  }
+}
+
+// 登录弹窗样式
+.login-dialog {
+  :deep(.el-dialog) {
+    margin: 0 !important;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :deep(.el-dialog__header) {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid #ebeef5;
+    flex-shrink: 0;
+  }
+
+  :deep(.el-dialog__body) {
+    padding: 20px 24px;
+    flex: 1;
+    overflow-y: auto;
+    max-height: calc(90vh - 120px);
+  }
+
+  :deep(.el-dialog__footer) {
+    padding: 16px 24px 20px;
+    border-top: 1px solid #ebeef5;
+    flex-shrink: 0;
   }
 }
 </style>

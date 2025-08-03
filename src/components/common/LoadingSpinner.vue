@@ -92,7 +92,6 @@ const iconSize = computed(() => {
   bottom: 0;
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(2px);
-  z-index: 1000;
 }
 
 .spinner-fullscreen {
@@ -102,7 +101,6 @@ const iconSize = computed(() => {
   right: 0;
   bottom: 0;
   background: rgba(255, 255, 255, 0.9);
-  z-index: 9999;
 }
 
 // 尺寸变体

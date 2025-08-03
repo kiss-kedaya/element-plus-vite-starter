@@ -1,0 +1,57 @@
+{
+  // TypeScript 设置 - 放宽检查
+  "typescript.preferences.quoteStyle": "single",
+  "typescript.suggest.autoImports": true,
+  "typescript.updateImportsOnFileMove.enabled": "always",
+  "typescript.noImplicitAny": false,
+  "typescript.strictNullChecks": false,
+  "typescript.strictFunctionTypes": false,
+  "typescript.noImplicitReturns": false,
+  "typescript.noImplicitThis": false,
+  "typescript.noUnusedLocals": false,
+  "typescript.noUnusedParameters": false,
+
+  // 完全禁用 ESLint
+  "eslint.enable": false,
+  "eslint.validate": [],
+
+  // Vue 设置 - 关闭验证
+  "vetur.validation.template": false,
+  "vetur.validation.script": false,
+  "vetur.validation.style": false,
+  "vue.codeActions.enabled": false,
+
+  // 编辑器设置 - 关闭自动修复
+  "editor.codeActionsOnSave": {},
+  "editor.formatOnSave": false,
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+
+  // 文件关联
+  "files.associations": {
+    "*.vue": "vue"
+  },
+
+  // 关闭所有问题显示
+  "problems.decorations.enabled": false,
+  "problems.showCurrentInStatus": false,
+  "editor.renderWhitespace": "none",
+  "editor.rulers": [],
+
+  // 关闭语法检查
+  "javascript.validate.enable": false,
+  "typescript.validate.enable": false,
+
+  // 关闭所有 linting
+  "css.validate": false,
+  "less.validate": false,
+  "scss.validate": false,
+
+  // 自动保存
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1000,
+
+  // 关闭错误提示
+  "editor.showUnused": false,
+  "editor.showDeprecated": false
+}

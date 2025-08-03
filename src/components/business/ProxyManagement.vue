@@ -2,9 +2,27 @@
   <div class="proxy-management">
     <div class="proxy-management-content">
       <!-- 头部操作区域 -->
-      <div class="card-header">
+      <div class="card-header" v-if="showTitle">
         <span>代理管理</span>
         <div class="header-actions">
+          <el-button type="primary" @click="showImportDialog = true">
+            <el-icon><Plus /></el-icon>
+            批量导入
+          </el-button>
+          <el-button type="danger" @click="deleteSelectedProxies" :disabled="selectedProxies.length === 0">
+            <el-icon><Delete /></el-icon>
+            批量删除
+          </el-button>
+          <el-button @click="refreshProxyList">
+            <el-icon><Refresh /></el-icon>
+            刷新
+          </el-button>
+        </div>
+      </div>
+
+      <!-- 无标题时的操作按钮区域 -->
+      <div class="actions-only" v-if="!showTitle">
+        <div class="action-buttons">
           <el-button type="primary" @click="showImportDialog = true">
             <el-icon><Plus /></el-icon>
             批量导入
@@ -85,9 +103,10 @@
           @selection-change="handleSelectionChange"
           stripe
           height="450"
-          :table-layout="'auto'"
+          :table-layout="'fixed'"
           style="width: 100%"
           :header-cell-style="{ backgroundColor: '#f5f7fa', color: '#606266' }"
+          :cell-style="{ padding: '8px 12px' }"
         >
           <el-table-column type="selection" width="55" />
 
@@ -117,10 +136,12 @@
 
           <el-table-column prop="expire_date" label="过期时间" min-width="120" />
 
-          <el-table-column label="操作" width="150" fixed="right">
+          <el-table-column label="操作" width="180" fixed="right">
             <template #default="{ row }">
-              <el-button size="small" @click="testSingleProxy(row.id)">测试</el-button>
-              <el-button size="small" type="danger" @click="deleteProxy(row.id)">删除</el-button>
+              <div class="action-buttons">
+                <el-button size="small" @click="testSingleProxy(row.id)">测试</el-button>
+                <el-button size="small" type="danger" @click="deleteProxy(row.id)">删除</el-button>
+              </div>
             </template>
           </el-table-column>
         </el-table>
@@ -178,6 +199,13 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Search, Connection, Delete } from '@element-plus/icons-vue'
 import { proxyApi, type ProxyInfo, proxyStatusMap, getProxyCountries } from '@/api/proxy'
+
+// 定义 props
+const props = withDefaults(defineProps<{
+  showTitle?: boolean
+}>(), {
+  showTitle: true
+})
 
 // 定义事件
 const emit = defineEmits<{
@@ -533,6 +561,40 @@ onMounted(() => {
   gap: 8px;
 }
 
+.actions-only {
+  padding: 16px 0;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #ebeef5;
+
+  .action-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+}
+
+/* 表格操作按钮样式 */
+.action-buttons {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+
+  .el-button {
+    margin: 0 !important;
+    min-width: auto;
+    padding: 4px 8px;
+    font-size: 12px;
+
+    &.el-button--small {
+      padding: 4px 8px;
+      font-size: 12px;
+    }
+  }
+}
+
 .stats-section {
   margin-bottom: 20px;
   margin-left: 20px;
@@ -558,6 +620,12 @@ onMounted(() => {
 
   .el-table__cell {
     white-space: nowrap;
+
+    /* 操作列特殊处理 */
+    &:last-child {
+      white-space: nowrap;
+      overflow: visible;
+    }
   }
 
   .el-table__header-wrapper {
@@ -578,6 +646,12 @@ onMounted(() => {
 
   thead tr th.el-table__cell {
     background-color: #f5f7fa !important;
+  }
+
+  .el-table__fixed-right {
+    .el-table__cell {
+      padding: 8px 12px;
+    }
   }
 }
 

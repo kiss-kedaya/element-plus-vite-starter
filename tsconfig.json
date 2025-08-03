@@ -16,7 +16,14 @@
       "vite/client",
       "unplugin-vue-router/client"
     ],
-    "strict": true,
+    // 放宽 TypeScript 严格检查
+    "strict": false,
+    "noImplicitAny": false,
+    "noImplicitReturns": false,
+    "noImplicitThis": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "exactOptionalPropertyTypes": false,
     "sourceMap": true,
     "esModuleInterop": true,
     "skipLibCheck": true

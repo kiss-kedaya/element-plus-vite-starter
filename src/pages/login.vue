@@ -9,6 +9,11 @@ import type { ProxyConfig, LoginAccount } from '@/types/auth'
 import { proxyApi, type ProxyInfo, getProxyDisplayName } from '@/api/proxy'
 import { loginApi } from '@/api/auth'
 import ProxyManagement from '@/components/business/ProxyManagement.vue'
+import {
+  generateDeviceId,
+  createDefaultProxyConfig,
+  type ProxyConfig as DeviceProxyConfig
+} from '@/utils/deviceUtils'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -24,14 +29,7 @@ const qrForm = reactive({
   deviceType: 'iPad',
   deviceId: '',
   deviceName: '微信机器人',
-  proxy: {
-    ProxyIp: '',
-    ProxyUser: '',
-    ProxyPassword: '',
-    Host: '',
-    Port: 0,
-    Type: 'socks5'
-  } as ProxyConfig
+  proxy: createDefaultProxyConfig()
 })
 
 // 密码登录表单
@@ -40,14 +38,7 @@ const passwordForm = reactive({
   password: '',
   data62: '',
   deviceName: '微信机器人',
-  proxy: {
-    ProxyIp: '',
-    ProxyUser: '',
-    ProxyPassword: '',
-    Host: '',
-    Port: 0,
-    Type: 'socks5'
-  } as ProxyConfig
+  proxy: createDefaultProxyConfig()
 })
 
 const deviceTypes = [
@@ -64,10 +55,6 @@ onMounted(() => {
   // 生成随机设备ID
   qrForm.deviceId = generateDeviceId()
 })
-
-const generateDeviceId = () => {
-  return 'WX' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9)
-}
 
 const generateQRCode = async () => {
   if (!qrForm.deviceId || !qrForm.deviceName) {
@@ -414,11 +401,9 @@ const handleProxySelect = () => {
 const updateFormProxy = (proxy: ProxyInfo) => {
   const proxyConfig = {
     ProxyIp: proxy.ip,
+    ProxyPort: proxy.port,
     ProxyUser: proxy.username,
-    ProxyPassword: proxy.password,
-    Host: proxy.ip,
-    Port: proxy.port,
-    Type: 'socks5'
+    ProxyPass: proxy.password
   }
 
   // 更新当前活动标签页的表单
@@ -434,18 +419,15 @@ const refreshProxyList = () => {
   loadAvailableProxies()
 }
 
+// 清空代理配置的通用函数
+const clearProxyConfig = (proxyConfig: any) => {
+  Object.assign(proxyConfig, createDefaultProxyConfig())
+}
+
 // 处理二维码登录代理模式变化
 const handleQrProxyModeChange = () => {
   if (qrProxyMode.value === 'none') {
-    // 清空代理配置
-    Object.assign(qrForm.proxy, {
-      ProxyIp: '',
-      ProxyUser: '',
-      ProxyPassword: '',
-      Host: '',
-      Port: 0,
-      Type: 'socks5'
-    })
+    clearProxyConfig(qrForm.proxy)
   }
   selectedProxyId.value = null
   selectedProxy.value = null
@@ -454,15 +436,7 @@ const handleQrProxyModeChange = () => {
 // 处理密码登录代理模式变化
 const handlePasswordProxyModeChange = () => {
   if (passwordProxyMode.value === 'none') {
-    // 清空代理配置
-    Object.assign(passwordForm.proxy, {
-      ProxyIp: '',
-      ProxyUser: '',
-      ProxyPassword: '',
-      Host: '',
-      Port: 0,
-      Type: 'socks5'
-    })
+    clearProxyConfig(passwordForm.proxy)
   }
   selectedProxyId.value = null
   selectedProxy.value = null
@@ -841,7 +815,6 @@ onMounted(() => {
   gap: 16px;
   padding: 20px;
   border-radius: 8px;
-  z-index: 10;
   animation: fadeInScale 0.3s ease-out;
 }
 
@@ -925,7 +898,6 @@ onMounted(() => {
   gap: 20px;
   padding: 20px;
   border-radius: 8px;
-  z-index: 10;
   animation: fadeInScale 0.3s ease-out;
 }
 
