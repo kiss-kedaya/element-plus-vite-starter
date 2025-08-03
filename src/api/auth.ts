@@ -74,7 +74,7 @@ export const loginApi = {
 
   // 获取已登录账号列表
   getLoggedAccounts: async (): Promise<LoginResponse> => {
-    const response = await request.get<any>('/Login/GetLoggedAccounts', { api_key: 'api_kedaya' })
+    const response = await request.get<LoginResponse>('/Login/GetLoggedAccounts', { api_key: 'api_kedaya' })
     // response 已经是后端返回的格式 {Code, Success, Message, Data}
     return response as LoginResponse
   },
@@ -94,7 +94,7 @@ export const loginApi = {
     Data?: ProxyConfig;
   }> => {
     const response = await request.post('/Tools/getproxy', params)
-    return response as any
+    return response
   },
 
   // 测试代理连接
@@ -115,7 +115,7 @@ export const loginApi = {
     };
   }> => {
     const response = await request.post('/Tools/testproxy', params)
-    return response as any
+    return response
   },
 
   // 设备复用登录 - 生成二维码

@@ -340,14 +340,24 @@ interface SearchResult {
   avatar: string
   region: string
   signature: string
+  sex?: number
+  verifyFlag?: number
   v1?: string
   v2?: string
   antispamTicket?: string
 }
 
+// 账号类型
+interface Account {
+  wxid: string
+  nickname: string
+  avatar?: string
+  [key: string]: any
+}
+
 // Props
 const props = defineProps<{
-  account: any
+  account: Account
 }>()
 
 // Stores
@@ -391,7 +401,7 @@ const contextMenu = ref({
 
 
 // 根据API响应数据判断用户状态
-const getUserStatus = (searchData: any): 'not-exist' | 'friend' | 'stranger' => {
+const getUserStatus = (searchData: SearchResult): 'not-exist' | 'friend' | 'stranger' => {
   // 检查是否有基本的用户信息（nickname和wxid）
   if (!searchData.nickname || !searchData.wxid) {
     return 'not-exist'
@@ -415,7 +425,7 @@ const getUserStatus = (searchData: any): 'not-exist' | 'friend' | 'stranger' => 
 }
 
 // 获取状态文本
-const getStatusText = (searchData: any): string => {
+const getStatusText = (searchData: SearchResult): string => {
   switch (getUserStatus(searchData)) {
     case 'not-exist': return '用户不存在'
     case 'friend': return '已是好友'
@@ -425,7 +435,7 @@ const getStatusText = (searchData: any): string => {
 }
 
 // 获取状态标签类型
-const getStatusTagType = (searchData: any): string => {
+const getStatusTagType = (searchData: SearchResult): 'success' | 'primary' | 'warning' | 'info' | 'danger' => {
   switch (getUserStatus(searchData)) {
     case 'not-exist': return 'danger'
     case 'friend': return 'success'
@@ -465,8 +475,9 @@ const sendMessage = async () => {
     // 跳转到聊天页面，并切换到聊天标签
     await router.push('/dashboard?tab=chat')
     ElMessage.success('已打开聊天窗口')
-  } catch (error: any) {
-    ElMessage.error(error.message || '打开聊天失败')
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : '打开聊天失败'
+    ElMessage.error(errorMessage)
     console.error('打开聊天失败:', error)
   } finally {
     sendMessageLoading.value = false
@@ -500,10 +511,10 @@ const searchUser = async () => {
       console.log('搜索用户响应:', response)
       console.log('完整响应数据:', response.Data)
       console.log('可能的微信号字段:', {
-        Province: response.Data.Province,
-        City: response.Data.City,
-        Alias: response.Data.Alias,
-        QuanPin: response.Data.QuanPin?.string,
+        Province: (response.Data as any).Province,
+        City: (response.Data as any).City,
+        Alias: (response.Data as any).Alias,
+        QuanPin: (response.Data as any).QuanPin?.string,
         Pyinitial: response.Data.Pyinitial?.string,
         searchKeyword: searchForm.value.keyword
       })
@@ -512,8 +523,8 @@ const searchUser = async () => {
       let wechatAlias = ''
 
       // 检查各个可能包含微信号的字段
-      if (response.Data.Alias && response.Data.Alias.trim()) {
-        wechatAlias = response.Data.Alias
+      if ((response.Data as any).Alias && (response.Data as any).Alias.trim()) {
+        wechatAlias = (response.Data as any).Alias
       } else if (searchForm.value.type === 'wxid' && searchForm.value.keyword.trim()) {
         // 如果是通过微信号搜索的，使用搜索关键词作为微信号
         // 因为API响应中通常不包含用户设置的自定义微信号，只有系统生成的微信ID
@@ -546,8 +557,9 @@ const searchUser = async () => {
     } else {
       throw new Error(response.Message || '未找到用户')
     }
-  } catch (error: any) {
-    ElMessage.error(error.message || '搜索失败')
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : '搜索失败'
+    ElMessage.error(errorMessage)
     console.error('搜索用户失败:', error)
     searchResult.value = null
   } finally {
@@ -617,8 +629,9 @@ const confirmAddFriend = async () => {
     } else {
       throw new Error(response.Message || '发送好友请求失败')
     }
-  } catch (error: any) {
-    ElMessage.error(error.message || '添加好友失败')
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : '添加好友失败'
+    ElMessage.error(errorMessage)
     console.error('添加好友失败:', error)
   } finally {
     addFriendLoading.value = false
@@ -676,7 +689,7 @@ const getDisplayValue = (value: any): string => {
 }
 
 // 头像加载错误处理
-const handleAvatarError = (event: Event) => {
+const handleAvatarError = () => {
   console.warn('头像加载失败:', searchResult.value?.avatar)
   // 可以在这里设置默认头像或者其他处理
 }

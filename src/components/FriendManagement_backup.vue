@@ -257,10 +257,11 @@ const handleImageSelect = (event) => {
   }
 }
 
-const handlePaste = (event) => {
+const handlePaste = (event: ClipboardEvent) => {
   const items = event.clipboardData?.items
   if (items) {
-    for (let item of items) {
+    // 使用 Array.from 将 DataTransferItemList 转换为数组
+    for (let item of Array.from(items)) {
       if (item.type.indexOf('image') !== -1) {
         const file = item.getAsFile()
         if (file) {

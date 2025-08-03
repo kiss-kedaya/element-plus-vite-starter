@@ -100,7 +100,7 @@ function formatTime(timestamp: Date) {
       minute: '2-digit',
     }).format(date)
   }
-  catch (error) {
+  catch (error: unknown) {
     console.error('格式化时间失败:', error, timestamp)
     return '时间错误'
   }

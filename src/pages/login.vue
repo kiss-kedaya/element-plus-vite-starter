@@ -83,7 +83,7 @@ const generateQRCode = async () => {
     } else {
       throw new Error(response.Message || '生成二维码失败')
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('生成二维码失败:', error)
     ElMessage.error('生成二维码失败，请检查网络连接')
   } finally {
@@ -128,7 +128,7 @@ const loginWithPassword = async () => {
     } else {
       throw new Error(response.Message || '登录失败')
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('登录失败:', error)
     ElMessage.error('登录失败，请检查账号密码')
   } finally {
@@ -213,7 +213,7 @@ const startLoginStatusCheck = () => {
           console.log(`状态: ${data.status} (${data.expiredTime}秒后过期)`)
         }
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('检查登录状态失败:', error)
     }
   }, 2000) // 每2秒检查一次
@@ -295,7 +295,7 @@ const performSecondAuth = async (wxid: string) => {
     } else {
       ElMessage.warning(`账号初始化失败: ${response.Message}`)
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('二次认证失败:', error)
     ElMessage.warning('账号初始化失败，请手动重连')
   }
@@ -365,7 +365,7 @@ const loadAvailableProxies = async () => {
       })
       availableCountries.value = Array.from(countries).sort()
     }
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('获取代理列表失败:', error)
   }
 }

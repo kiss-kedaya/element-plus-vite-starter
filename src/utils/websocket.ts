@@ -41,7 +41,7 @@ export const createWebSocketConnection = async (wxid: string): Promise<WebSocket
     } else {
       throw new Error('WebSocket连接失败')
     }
-  } catch (error) {
+  } catch (error: unknown) {
     throw error
   }
 }
@@ -198,7 +198,7 @@ export const reconnectWebSocket = async (wxid: string) => {
   try {
     await createWebSocketConnection(wxid)
     ElMessage.success('WebSocket重连成功')
-  } catch (error) {
+  } catch (error: unknown) {
     ElMessage.error('WebSocket重连失败')
     throw error
   }

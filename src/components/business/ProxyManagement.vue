@@ -254,9 +254,9 @@ const countries = computed(() => {
 })
 
 // 获取状态类型
-const getStatusType = (status: string) => {
+const getStatusType = (status: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' => {
   const statusInfo = proxyStatusMap[status as keyof typeof proxyStatusMap]
-  return statusInfo?.color || 'info'
+  return (statusInfo?.color as 'primary' | 'success' | 'warning' | 'info' | 'danger') || 'info'
 }
 
 // 获取状态标签

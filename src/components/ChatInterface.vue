@@ -262,7 +262,9 @@ function handleDragLeave(event: DragEvent) {
   event.preventDefault()
   event.stopPropagation()
   // 只有当离开整个拖拽区域时才设置为false
-  if (!event.currentTarget?.contains(event.relatedTarget as Node)) {
+  const currentTarget = event.currentTarget as Element
+  const relatedTarget = event.relatedTarget as Node
+  if (!currentTarget?.contains(relatedTarget)) {
     isDragOver.value = false
   }
 }
