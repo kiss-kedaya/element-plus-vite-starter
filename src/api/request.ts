@@ -161,7 +161,7 @@ class ApiRequest {
         ...config
       })
       return response as ApiResponse<T>
-    } catch (error) {
+    } catch (error: unknown) {
       if (config?.showError !== false) {
         ElMessage.error((error as Error).message)
       }
@@ -174,7 +174,7 @@ class ApiRequest {
     try {
       const response = await this.instance.post(url, data, config)
       return response as ApiResponse<T>
-    } catch (error) {
+    } catch (error: unknown) {
       if (config?.showError !== false) {
         ElMessage.error((error as Error).message)
       }
@@ -187,7 +187,7 @@ class ApiRequest {
     try {
       const response = await this.instance.put(url, data, config)
       return response as ApiResponse<T>
-    } catch (error) {
+    } catch (error: unknown) {
       if (config?.showError !== false) {
         ElMessage.error((error as Error).message)
       }
@@ -200,7 +200,7 @@ class ApiRequest {
     try {
       const response = await this.instance.delete(url, config)
       return response as ApiResponse<T>
-    } catch (error) {
+    } catch (error: unknown) {
       if (config?.showError !== false) {
         ElMessage.error((error as Error).message)
       }
@@ -221,7 +221,7 @@ class ApiRequest {
         ...config
       })
       return response as ApiResponse<T>
-    } catch (error) {
+    } catch (error: unknown) {
       if (config?.showError !== false) {
         ElMessage.error((error as Error).message)
       }
@@ -246,7 +246,7 @@ class ApiRequest {
       link.click()
       document.body.removeChild(link)
       window.URL.revokeObjectURL(downloadUrl)
-    } catch (error) {
+    } catch (error: unknown) {
       if (config?.showError !== false) {
         ElMessage.error((error as Error).message)
       }

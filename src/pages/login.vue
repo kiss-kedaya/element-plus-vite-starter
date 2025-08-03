@@ -101,7 +101,7 @@ const loginWithPassword = async () => {
   try {
     // 调用真实的62数据登录API
     const response = await loginApi.loginWithData62({
-      Username: passwordForm.username,
+      UserName: passwordForm.username,
       Password: passwordForm.password,
       Data62: passwordForm.data62,
       DeviceName: qrForm.deviceName || 'Device_Login',
@@ -550,13 +550,13 @@ onMounted(() => {
                       <el-input v-model="qrForm.proxy.ProxyIp" placeholder="代理服务器IP" />
                     </el-form-item>
                     <el-form-item label="代理端口">
-                      <el-input-number v-model="qrForm.proxy.Port" placeholder="代理端口" />
+                      <el-input-number v-model="qrForm.proxy.ProxyPort" placeholder="代理端口" />
                     </el-form-item>
                     <el-form-item label="用户名">
                       <el-input v-model="qrForm.proxy.ProxyUser" placeholder="代理用户名（可选）" />
                     </el-form-item>
                     <el-form-item label="密码">
-                      <el-input v-model="qrForm.proxy.ProxyPassword" type="password" placeholder="代理密码（可选）" />
+                      <el-input v-model="qrForm.proxy.ProxyPass" type="password" placeholder="代理密码（可选）" />
                     </el-form-item>
                   </template>
                 </el-collapse-item>
@@ -681,13 +681,13 @@ onMounted(() => {
                       <el-input v-model="passwordForm.proxy.ProxyIp" placeholder="代理服务器IP" />
                     </el-form-item>
                     <el-form-item label="代理端口">
-                      <el-input-number v-model="passwordForm.proxy.Port" placeholder="代理端口" />
+                      <el-input-number v-model="passwordForm.proxy.ProxyPort" placeholder="代理端口" />
                     </el-form-item>
                     <el-form-item label="用户名">
                       <el-input v-model="passwordForm.proxy.ProxyUser" placeholder="代理用户名（可选）" />
                     </el-form-item>
                     <el-form-item label="密码">
-                      <el-input v-model="passwordForm.proxy.ProxyPassword" type="password" placeholder="代理密码（可选）" />
+                      <el-input v-model="passwordForm.proxy.ProxyPass" type="password" placeholder="代理密码（可选）" />
                     </el-form-item>
                   </template>
                 </el-collapse-item>

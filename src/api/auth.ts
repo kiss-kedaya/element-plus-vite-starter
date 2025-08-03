@@ -27,63 +27,63 @@ export const loginApi = {
     const endpoint = endpoints[deviceType] || endpoints.iPad
     const response = await request.post<QRCodeResponse>(endpoint, params)
     // response 已经是后端返回的格式 {Code, Success, Message, Data}
-    return response as QRCodeResponse
+    return response.data || response as any
   },
 
   // 62数据登录
   loginWithData62: async (params: Data62LoginRequest): Promise<LoginResponse> => {
     const response = await request.post<LoginResponse>('/Login/Data62Login', params)
     // response 已经是后端返回的格式 {Code, Success, Message, Data}
-    return response as LoginResponse
+    return response.data || response as any
   },
 
   // A16登录
   loginWithA16: async (params: A16LoginRequest): Promise<LoginResponse> => {
     const response = await request.post<LoginResponse>('/Login/A16Data', params)
     // response 已经是后端返回的格式 {Code, Success, Message, Data}
-    return response as LoginResponse
+    return response.data || response as any
   },
 
   // 检查二维码状态
   checkQRCodeStatus: async (params: { Uuid: string }): Promise<LoginResponse> => {
     const response = await request.post<LoginResponse>(`/Login/LoginCheckQR?uuid=${encodeURIComponent(params.Uuid)}`)
     // response 已经是后端返回的格式 {Code, Success, Message, Data}
-    return response as LoginResponse
+    return response.data || response as any
   },
 
   // 执行二次登录（自动心跳）
   performSecondAuth: async (wxid: string): Promise<LoginResponse> => {
     const response = await request.post<LoginResponse>(`/Login/LoginTwiceAutoAuth?wxid=${encodeURIComponent(wxid)}`)
     // response 已经是后端返回的格式 {Code, Success, Message, Data}
-    return response as LoginResponse
+    return response.data || response as any
   },
 
   // 开启自动心跳
   autoHeartBeat: async (wxid: string): Promise<LoginResponse> => {
     const response = await request.post<LoginResponse>(`/Login/AutoHeartBeat?wxid=${encodeURIComponent(wxid)}`)
     // response 已经是后端返回的格式 {Code, Success, Message, Data}
-    return response as LoginResponse
+    return response.data || response as any
   },
 
   // 退出登录
   logout: async (wxid: string): Promise<LoginResponse> => {
     const response = await request.post<LoginResponse>('/Login/Logout', { Wxid: wxid })
     // response 已经是后端返回的格式 {Code, Success, Message, Data}
-    return response as LoginResponse
+    return response.data || response as any
   },
 
   // 获取已登录账号列表
   getLoggedAccounts: async (): Promise<LoginResponse> => {
     const response = await request.get<LoginResponse>('/Login/GetLoggedAccounts', { api_key: 'api_kedaya' })
     // response 已经是后端返回的格式 {Code, Success, Message, Data}
-    return response as LoginResponse
+    return response.data || response as any
   },
 
   // 设置代理
   setProxy: async (params: SetProxyRequest): Promise<LoginResponse> => {
     const response = await request.post<LoginResponse>('/Tools/setproxy', params)
     // response 已经是后端返回的格式 {Code, Success, Message, Data}
-    return response as LoginResponse
+    return response.data || response as any
   },
 
   // 获取已设置的代理
@@ -122,6 +122,6 @@ export const loginApi = {
   getQRCodeForDeviceReuse: async (params: QRCodeLoginRequest): Promise<QRCodeResponse> => {
     const response = await request.post<QRCodeResponse>('/Login/LoginGetQRCar', params)
     // response 已经是后端返回的格式 {Code, Success, Message, Data}
-    return response as QRCodeResponse
+    return response.data || response as any
   },
 }

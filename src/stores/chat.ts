@@ -37,7 +37,7 @@ export const useChatStore = defineStore('chat', () => {
       })
       localStorage.setItem(cacheKey, serializedData)
     }
-    catch (error) {
+    catch (error: unknown) {
       console.error('保存缓存失败:', error)
     }
   }
@@ -63,7 +63,7 @@ export const useChatStore = defineStore('chat', () => {
         })
       }
     }
-    catch (error) {
+    catch (error: unknown) {
       console.error('加载缓存失败:', error)
     }
     return null
@@ -86,7 +86,7 @@ export const useChatStore = defineStore('chat', () => {
         })
       }
     }
-    catch (error) {
+    catch (error: unknown) {
       console.error('清除缓存失败:', error)
     }
   }
@@ -117,7 +117,7 @@ export const useChatStore = defineStore('chat', () => {
     const cachedMessages = loadFromCache(CACHE_KEYS.MESSAGES, wxid)
     if (cachedMessages && typeof cachedMessages === 'object') {
       messages.value = cachedMessages
-      const messageCount = Object.values(cachedMessages).reduce((total, msgs) => total + (msgs as any[]).length, 0)
+      const messageCount = Object.values(cachedMessages).reduce((total, msgs) => total + (Array.isArray(msgs) ? msgs.length : 0), 0)
       console.log(`加载了 ${messageCount} 条缓存消息`)
     }
 
@@ -148,7 +148,7 @@ export const useChatStore = defineStore('chat', () => {
 
       console.log(`账号 ${wxid} 的数据已保存到缓存`)
     }
-    catch (error) {
+    catch (error: unknown) {
       console.error('保存缓存数据失败:', error)
     }
   }
@@ -979,7 +979,7 @@ export const useChatStore = defineStore('chat', () => {
                   name: contactInfo.isGroup 
                     ? (contactInfo.nickname || sessionId)
                     : (contactInfo.remark || contactInfo.nickname || contactInfo.alias || sessionId),
-                  type: contactInfo.isGroup ? 'group' : 'friend',
+                  type: (contactInfo.isGroup ? 'group' : 'friend') as 'friend' | 'group',
                   avatar: contactInfo.avatar || ''
                 }
                 

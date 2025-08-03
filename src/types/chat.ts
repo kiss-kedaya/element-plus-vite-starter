@@ -15,7 +15,7 @@ export interface ChatMessage {
   timestamp: Date
   fromMe: boolean
   type: 'text' | 'image' | 'file' | 'video' | 'system' | 'emoji'
-  status?: 'sending' | 'sent' | 'failed'
+  status?: 'sending' | 'sent' | 'failed' | 'received'
   imageData?: string
   imagePath?: string         // 图片文件路径
   imageAesKey?: string       // 图片AES密钥

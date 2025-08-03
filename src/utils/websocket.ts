@@ -37,7 +37,7 @@ export const createWebSocketConnection = async (wxid: string): Promise<WebSocket
         readyState: WebSocket.OPEN,
         close: () => webSocketService.disconnect(),
         send: (data: string) => webSocketService.send(JSON.parse(data))
-      } as WebSocket
+      } as unknown as WebSocket
     } else {
       throw new Error('WebSocket连接失败')
     }
@@ -69,7 +69,7 @@ const handleWeChatMessage = (wxid: string, data: WeChatMessage) => {
 
   console.log(`收到 ${data.count} 条微信消息`)
 
-  data.messages.forEach(msg => {
+  data.messages.forEach((msg: any) => {
     // 转换为聊天消息格式
     const chatMessage: ChatMessage = {
       id: msg.id || `msg_${Date.now()}_${Math.random()}`,

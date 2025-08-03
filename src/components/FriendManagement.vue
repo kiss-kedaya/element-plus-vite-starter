@@ -408,7 +408,7 @@ const getUserStatus = (searchData: SearchResult): 'not-exist' | 'friend' | 'stra
   }
 
   // 检查AntispamTicket字段来判断是否为好友
-  const antispamTicket = searchData.antispamTicket || searchData.AntispamTicket || ''
+  const antispamTicket = searchData.antispamTicket || (searchData as any).AntispamTicket || ''
 
   // 如果AntispamTicket包含@stranger，说明是陌生人
   if (antispamTicket.includes('@stranger')) {

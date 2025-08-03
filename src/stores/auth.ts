@@ -102,7 +102,7 @@ export const useAuthStore = defineStore('auth', () => {
       // const result = await loginApi.checkStatus(wxid)
       // return result
       return true
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('检查登录状态失败:', error)
       return false
     }
@@ -122,8 +122,8 @@ export const useAuthStore = defineStore('auth', () => {
       if (response && Array.isArray(response.Data)) {
         accountsData = response.Data
         // 使用 response.Data 数据
-      } else if (response && Array.isArray(response.data)) {
-        accountsData = response.data
+      } else if (response && Array.isArray(response.Data)) {
+        accountsData = response.Data
         // 使用 response.data 数据
       } else if (Array.isArray(response)) {
         accountsData = response
@@ -141,7 +141,7 @@ export const useAuthStore = defineStore('auth', () => {
           nickname: account.nickname || '',
           avatar: account.headUrl || account.avatar || '',
           headUrl: account.headUrl || account.avatar || '',
-          status: account.status === 'online' ? 'online' : 'offline',
+          status: (account.status === 'online' ? 'online' : 'offline') as 'online' | 'offline' | 'connecting',
           deviceType: account.deviceType || 'Unknown',
           deviceId: account.deviceId || account.imei || '',
           deviceName: account.deviceName || '',
@@ -173,7 +173,7 @@ export const useAuthStore = defineStore('auth', () => {
         }
       }
       return accounts.value
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('获取已登录账号失败:', error)
       return []
     } finally {
