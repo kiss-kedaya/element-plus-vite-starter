@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import App from './App.vue'
 import { pinia } from './stores'
+import { cleanOldAccountBasedCache } from '@/utils/fileCache'
 // 暂时注释掉懒加载相关导入，避免启动错误
 // import { lazy, lazyContainer } from './directives/lazy'
 // import { componentPreloader, smartPreloader } from './utils/lazyLoad'
@@ -79,6 +80,9 @@ const app = createApp(App)
 // 暂时注释掉全局指令注册
 // app.directive('lazy', lazy)
 // app.directive('lazy-container', lazyContainer)
+
+// 清理旧的文件缓存
+cleanOldAccountBasedCache()
 
 app.use(pinia)
 app.use(router)

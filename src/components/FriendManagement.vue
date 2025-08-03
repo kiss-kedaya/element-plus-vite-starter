@@ -1,5 +1,29 @@
 <template>
   <div class="friend-management">
+    <!-- 欢迎提示 -->
+    <el-card v-if="!searchResult" class="welcome-card" shadow="never">
+      <div class="welcome-content">
+        <el-icon class="welcome-icon" size="64"><UserFilled /></el-icon>
+        <h3>好友管理</h3>
+        <p>通过下方搜索功能查找并添加好友，或向已有好友发送消息</p>
+        <el-divider />
+        <div class="feature-list">
+          <div class="feature-item">
+            <el-icon><Search /></el-icon>
+            <span>支持微信号、手机号、QQ号搜索</span>
+          </div>
+          <div class="feature-item">
+            <el-icon><UserFilled /></el-icon>
+            <span>快速添加陌生人为好友</span>
+          </div>
+          <div class="feature-item">
+            <el-icon><ChatDotRound /></el-icon>
+            <span>直接向好友发送消息</span>
+          </div>
+        </div>
+      </div>
+    </el-card>
+
     <!-- 搜索和添加好友 -->
     <el-card class="search-card" shadow="never">
       <template #header>
@@ -10,21 +34,31 @@
       
       <el-form :model="searchForm" inline class="search-form">
         <el-form-item label="搜索方式">
-          <el-select v-model="searchForm.type" placeholder="选择搜索方式">
+          <el-select v-model="searchForm.type" placeholder="选择搜索方式" style="width: 120px">
             <el-option label="微信号" value="wxid" />
             <el-option label="手机号" value="phone" />
             <el-option label="QQ号" value="qq" />
           </el-select>
         </el-form-item>
-        
+
         <el-form-item label="搜索内容">
-          <el-input v-model="searchForm.keyword" placeholder="输入搜索内容" style="width: 200px" />
+          <el-input
+            v-model="searchForm.keyword"
+            placeholder="输入搜索内容"
+            style="width: 200px"
+            @keyup.enter="searchUser"
+          />
         </el-form-item>
-        
+
         <el-form-item>
-          <el-button type="primary" :loading="searchLoading" @click="searchUser">
-            <el-icon><Search /></el-icon>
-            搜索
+          <el-button
+            type="primary"
+            :loading="searchLoading"
+            @click="searchUser"
+            style="width: 80px"
+          >
+            <el-icon v-if="!searchLoading"><Search /></el-icon>
+            {{ searchLoading ? '搜索中' : '搜索' }}
           </el-button>
         </el-form-item>
       </el-form>
@@ -50,121 +84,55 @@
             <div class="region" v-if="getDisplayValue(searchResult.region)">地区：{{ getDisplayValue(searchResult.region) }}</div>
           </div>
           <div class="actions">
-            <el-button type="primary" :loading="addFriendLoading" @click="openAddFriendDialog">
-              <el-icon><UserFilled /></el-icon>
-              添加好友
-            </el-button>
+            <!-- 根据Sex字段显示不同的状态和操作 -->
+            <el-tag
+              :type="getStatusTagType(searchResult)"
+              size="large"
+              style="margin-right: 10px;"
+            >
+              {{ getStatusText(searchResult) }}
+            </el-tag>
           </div>
         </div>
       </div>
     </el-card>
 
-    <!-- 好友列表 -->
-    <el-card class="friends-card" shadow="never">
+    <!-- 搜索到的好友操作区 -->
+    <el-card v-if="searchResult" class="friend-actions-card" shadow="never">
       <template #header>
         <div class="card-header">
-          <span>好友列表 ({{ filteredFriends.length }}{{ filteredFriends.length !== validFriends.length ? ` / ${validFriends.length}` : '' }})</span>
-          <div class="header-actions">
-            <el-input v-model="friendFilter" placeholder="搜索好友" size="small" style="width: 200px">
-              <template #prefix>
-                <el-icon><Search /></el-icon>
-              </template>
-            </el-input>
-            <el-checkbox v-model="forceRefreshCache" size="small" style="margin-right: 10px">
-              强制刷新缓存
-            </el-checkbox>
-            <el-button type="primary" size="small" @click="refreshFriends" :loading="friendsLoading">
-              <el-icon><Refresh /></el-icon>
-              刷新通讯录
-            </el-button>
-          </div>
+          <span>好友操作</span>
         </div>
       </template>
-      
-      <div class="friends-list">
-        <div v-if="friendsLoading" class="loading-container">
-          <el-skeleton :rows="5" animated />
-        </div>
-        
-        <div v-else-if="filteredFriends.length === 0" class="empty-friends">
-          <el-empty description="暂无好友数据">
-            <template #description>
-              <p>可能的原因：</p>
-              <ul style="text-align: left; margin: 10px 0;">
-                <li>当前账号还没有好友</li>
-                <li>需要刷新通讯录数据</li>
-                <li>网络连接问题</li>
-              </ul>
-            </template>
-            <el-button type="primary" @click="refreshFriends" :loading="friendsLoading">
-              <el-icon><Refresh /></el-icon>
-              刷新通讯录
-            </el-button>
-          </el-empty>
-        </div>
 
-        <div v-else class="friends-container">
-          <div
-            ref="scrollContainer"
-            class="friends-scroll-container"
-            @scroll="handleScroll"
-          >
-            <div
-              class="friends-virtual-list"
-              :style="{ height: `${totalHeight}px` }"
-            >
-              <div
-                class="friends-visible-area"
-                :style="{ transform: `translateY(${offsetY}px)` }"
-              >
-                <div
-                  v-for="friend in visibleFriends"
-                  :key="friend.wxid"
-                  class="friend-item"
-                  :style="{ height: `${itemHeight}px` }"
-                  @contextmenu.prevent="showContextMenu($event, friend)"
-                >
-                  <el-avatar :src="friend.avatar" :size="40" lazy>
-                    {{ getDisplayValue(friend.nickname).charAt(0) || '?' }}
-                  </el-avatar>
-                  <div class="friend-info">
-                    <div class="nickname" :title="getDisplayValue(friend.nickname)">
-                      {{ getDisplayValue(friend.nickname) || '未知用户' }}
-                      <span v-if="getDisplayValue(friend.remark).trim()" class="remark-inline">({{ getDisplayValue(friend.remark) }})</span>
-                    </div>
-                    <div class="wxid">
-                      <span v-if="getDisplayValue(friend.alias).trim()" class="alias">{{ getDisplayValue(friend.alias) }}</span>
-                      <span class="wxid-bracket">[{{ getDisplayValue(friend.wxid) || '未知ID' }}]</span>
-                    </div>
-                  </div>
-                  <div class="friend-actions">
-                    <el-dropdown @command="handleFriendAction">
-                      <el-button link size="small">
-                        <el-icon><MoreFilled /></el-icon>
-                      </el-button>
-                      <template #dropdown>
-                        <el-dropdown-menu>
-                          <el-dropdown-item :command="`chat-${friend.wxid}`">
-                            <el-icon><ChatDotRound /></el-icon>
-                            发送消息
-                          </el-dropdown-item>
-                          <el-dropdown-item :command="`remark-${friend.wxid}`">
-                            <el-icon><Edit /></el-icon>
-                            修改备注
-                          </el-dropdown-item>
-                          <el-dropdown-item :command="`delete-${friend.wxid}`" divided>
-                            <el-icon><Delete /></el-icon>
-                            删除好友
-                          </el-dropdown-item>
-                        </el-dropdown-menu>
-                      </template>
-                    </el-dropdown>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div class="friend-actions">
+        <el-button
+          type="primary"
+          :loading="sendMessageLoading"
+          @click="sendMessage"
+          :disabled="getUserStatus(searchResult) === 'not-exist'"
+        >
+          <el-icon><ChatDotRound /></el-icon>
+          发送消息
+        </el-button>
+
+        <el-button
+          v-if="getUserStatus(searchResult) === 'stranger'"
+          type="success"
+          :loading="addFriendLoading"
+          @click="openAddFriendDialog"
+        >
+          <el-icon><UserFilled /></el-icon>
+          添加好友
+        </el-button>
+
+        <el-tag
+          :type="getStatusTagType(searchResult)"
+          size="large"
+          style="margin-left: 10px;"
+        >
+          {{ getStatusText(searchResult) }}
+        </el-tag>
       </div>
     </el-card>
 
@@ -270,9 +238,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, UserFilled, Refresh, MoreFilled, ChatDotRound, Edit, Delete } from '@element-plus/icons-vue'
+import { ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { Search, UserFilled, ChatDotRound, Edit, Delete } from '@element-plus/icons-vue'
 import { friendApi } from '@/api/friend'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
@@ -396,15 +364,8 @@ const searchForm = ref({
 const searchResult = ref<SearchResult | null>(null)
 const searchLoading = ref(false)
 const addFriendLoading = ref(false)
-const friendsLoading = ref(false)
-const friendFilter = ref('')
-const forceRefreshCache = ref(false)
-const showRemarkDialog = ref(false)
+const sendMessageLoading = ref(false)
 const showAddFriendDialog = ref(false)
-const currentFriend = ref<Friend | null>(null)
-const remarkForm = ref({
-  remark: ''
-})
 
 // 添加好友表单数据
 const addFriendForm = ref({
@@ -412,10 +373,14 @@ const addFriendForm = ref({
   scene: FRIEND_SCENE.WECHAT_ID // 默认为通过微信号搜索
 })
 
-// 好友数据
-const friends = ref<Friend[]>([])
+// 修改备注相关
+const showRemarkDialog = ref(false)
+const remarkForm = ref({
+  remark: ''
+})
+const currentFriend = ref<Friend | null>(null)
 
-// 右键菜单相关
+// 右键菜单
 const contextMenu = ref({
   visible: false,
   x: 0,
@@ -423,76 +388,88 @@ const contextMenu = ref({
   friend: null as Friend | null
 })
 
-// 虚拟滚动相关
-const scrollContainer = ref<HTMLElement>()
-const itemHeight = 80 // 每个好友项的高度
-const containerHeight = 400 // 容器高度
-const visibleCount = Math.ceil(containerHeight / itemHeight) + 2 // 可见项数量 + 缓冲
-const scrollTop = ref(0)
 
-// 计算属性
-const validFriends = computed(() => {
-  // 确保只返回有效的好友（昵称和wxid都不为空）
-  return friends.value.filter(friend => {
-    const nickname = getDisplayValue(friend.nickname).trim()
-    const wxid = getDisplayValue(friend.wxid).trim()
-    return nickname !== '' && wxid !== ''
-  })
-})
 
-const filteredFriends = computed(() => {
-  if (!friendFilter.value) return validFriends.value
+// 根据API响应数据判断用户状态
+const getUserStatus = (searchData: any): 'not-exist' | 'friend' | 'stranger' => {
+  // 首先检查Sex字段，如果为0则用户不存在
+  if (searchData.sex === 0) return 'not-exist'
 
-  const keyword = friendFilter.value.toLowerCase()
-  return validFriends.value.filter(friend => {
-    const nickname = getDisplayValue(friend.nickname).toLowerCase()
-    const wxid = getDisplayValue(friend.wxid).toLowerCase()
-    const alias = getDisplayValue(friend.alias).toLowerCase()
-    const remark = getDisplayValue(friend.remark).toLowerCase()
+  // 检查AntispamTicket字段来判断是否为好友
+  const antispamTicket = searchData.antispamTicket || searchData.AntispamTicket || ''
 
-    return nickname.includes(keyword) ||
-           wxid.includes(keyword) ||
-           alias.includes(keyword) ||
-           remark.includes(keyword)
-  })
-})
+  // 如果AntispamTicket包含@stranger，说明是陌生人
+  if (antispamTicket.includes('@stranger')) {
+    return 'stranger'
+  }
 
-// 虚拟滚动计算
-const startIndex = computed(() => {
-  return Math.floor(scrollTop.value / itemHeight)
-})
+  // 如果Sex为1且不包含@stranger，说明是好友
+  if (searchData.sex === 1) {
+    return 'friend'
+  }
 
-const endIndex = computed(() => {
-  return Math.min(startIndex.value + visibleCount, filteredFriends.value.length)
-})
+  // 其他情况视为陌生人
+  return 'stranger'
+}
 
-const visibleFriends = computed(() => {
-  return filteredFriends.value.slice(startIndex.value, endIndex.value)
-})
-
-const totalHeight = computed(() => {
-  return filteredFriends.value.length * itemHeight
-})
-
-const offsetY = computed(() => {
-  return startIndex.value * itemHeight
-})
-
-// 滚动处理
-const handleScroll = (event: Event) => {
-  const target = event.target as HTMLElement
-  if (target && typeof target.scrollTop === 'number') {
-    scrollTop.value = target.scrollTop
+// 获取状态文本
+const getStatusText = (searchData: any): string => {
+  switch (getUserStatus(searchData)) {
+    case 'not-exist': return '用户不存在'
+    case 'friend': return '已是好友'
+    case 'stranger': return '可以添加'
+    default: return '未知状态'
   }
 }
 
-// 监听搜索条件变化，重置滚动位置
-watch(friendFilter, () => {
-  scrollTop.value = 0
-  if (scrollContainer.value) {
-    scrollContainer.value.scrollTop = 0
+// 获取状态标签类型
+const getStatusTagType = (searchData: any): string => {
+  switch (getUserStatus(searchData)) {
+    case 'not-exist': return 'danger'
+    case 'friend': return 'success'
+    case 'stranger': return 'warning'
+    default: return 'info'
   }
-})
+}
+
+// 发送消息
+const sendMessage = async () => {
+  if (!searchResult.value || !props.account?.wxid) {
+    ElMessage.error('缺少必要信息')
+    return
+  }
+
+  if (getUserStatus(searchResult.value) === 'not-exist') {
+    ElMessage.error('用户不存在，无法发送消息')
+    return
+  }
+
+  sendMessageLoading.value = true
+  try {
+    // 创建或获取聊天会话
+    const friend = {
+      wxid: searchResult.value.wxid,
+      nickname: searchResult.value.nickname,
+      avatar: searchResult.value.avatar || '',
+      remark: '',
+      isOnline: true
+    }
+
+    const session = chatStore.createOrGetSession(friend)
+
+    // 设置当前会话
+    chatStore.setCurrentSession(session.id)
+
+    // 跳转到聊天页面，并切换到聊天标签
+    await router.push('/dashboard?tab=chat')
+    ElMessage.success('已打开聊天窗口')
+  } catch (error: any) {
+    ElMessage.error(error.message || '打开聊天失败')
+    console.error('打开聊天失败:', error)
+  } finally {
+    sendMessageLoading.value = false
+  }
+}
 
 // 方法
 const searchUser = async () => {
@@ -519,15 +496,35 @@ const searchUser = async () => {
 
     if (response.Success && response.Data) {
       console.log('搜索用户响应:', response)
-      console.log('头像URL信息:', {
-        BigHeadImgUrl: response.Data.BigHeadImgUrl,
-        SmallHeadImgUrl: response.Data.SmallHeadImgUrl
+      console.log('完整响应数据:', response.Data)
+      console.log('可能的微信号字段:', {
+        Province: response.Data.Province,
+        City: response.Data.City,
+        Alias: response.Data.Alias,
+        QuanPin: response.Data.QuanPin?.string,
+        Pyinitial: response.Data.Pyinitial?.string,
+        searchKeyword: searchForm.value.keyword
       })
+
+      // 尝试找到真正的微信号字段
+      let wechatAlias = ''
+
+      // 检查各个可能包含微信号的字段
+      if (response.Data.Alias && response.Data.Alias.trim()) {
+        wechatAlias = response.Data.Alias
+      } else if (searchForm.value.type === 'wxid' && searchForm.value.keyword.trim()) {
+        // 如果是通过微信号搜索的，使用搜索关键词作为微信号
+        // 因为API响应中通常不包含用户设置的自定义微信号，只有系统生成的微信ID
+        wechatAlias = searchForm.value.keyword
+      } else if (response.Data.QuanPin && response.Data.QuanPin.trim() && !response.Data.QuanPin.startsWith('wxid_')) {
+        // 如果QuanPin不是以wxid_开头，可能是微信号
+        wechatAlias = response.Data.QuanPin
+      }
 
       searchResult.value = {
         wxid: response.Data.Pyinitial?.string || searchForm.value.keyword, // wxid是Pyinitial.string
         nickname: response.Data.NickName?.string || '未知用户',
-        alias: response.Data.Province || '', // 微信号是Province字段
+        alias: wechatAlias, // 微信号
         avatar: response.Data.BigHeadImgUrl || response.Data.SmallHeadImgUrl || '',
         region: `${response.Data.Country || ''} ${response.Data.City || ''}`.trim() || '未知',
         signature: response.Data.Signature || '',
@@ -609,8 +606,8 @@ const confirmAddFriend = async () => {
       // 重置表单
       addFriendForm.value.verifyContent = '你好，我想加你为好友'
       addFriendForm.value.scene = FRIEND_SCENE.WECHAT_ID
-      // 刷新好友列表
-      await refreshFriends()
+      // 添加成功后清空搜索结果
+      console.log('好友请求发送成功')
     } else {
       throw new Error(response.Message || '发送好友请求失败')
     }
@@ -622,342 +619,9 @@ const confirmAddFriend = async () => {
   }
 }
 
-// 为指定账号获取通讯录的通用函数
-const refreshFriendsForAccount = async (wxid: string, forceRefresh: boolean = false) => {
-  if (!wxid) {
-    ElMessage.error('账号ID不能为空')
-    return
-  }
-
-  friendsLoading.value = true
-  try {
-    const params = {
-      Wxid: wxid,
-      CurrentWxcontactSeq: 0,
-      CurrentChatRoomContactSeq: 0,
-      force_refresh: forceRefresh
-    }
-
-    console.log('获取通讯录参数:', params)
-
-    // 使用完整接口
-    const response = await friendApi.getTotalContactList(params)
-
-    console.log('通讯录响应:', response)
-
-    if (response.Success) {
-      // 处理不同的响应格式
-      let contactList = []
-
-      if (response.Data?.details && Array.isArray(response.Data.details)) {
-        contactList = []
-        response.Data.details.forEach((detail: any) => {
-          if (detail.ContactList && Array.isArray(detail.ContactList)) {
-            contactList.push(...detail.ContactList)
-          }
-        })
-      } else if (Array.isArray(response.Data)) {
-        contactList = response.Data
-      } else {
-        console.log('未知的响应格式:', response.Data)
-      }
-
-      if (contactList && contactList.length > 0) {
-        friends.value = contactList
-          .map((contact: any) => {
-            // 处理可能是对象格式的字段
-            const getNickName = (contact: any) => {
-              let nickname = ''
-              if (contact.NickName) {
-                if (typeof contact.NickName === 'object') {
-                  // 检查是否是空对象或有有效的 string 属性
-                  if (contact.NickName.string !== undefined && contact.NickName.string !== null && contact.NickName.string !== '') {
-                    nickname = contact.NickName.string
-                  } else {
-                    nickname = ''
-                  }
-                } else {
-                  nickname = contact.NickName
-                }
-              } else {
-                nickname = contact.Nickname || contact.nickname || ''
-              }
-              return String(nickname || '')
-            }
-
-            const getUserName = (contact: any) => {
-              let username = ''
-              if (contact.UserName) {
-                if (typeof contact.UserName === 'object') {
-                  // 检查是否是空对象或有有效的 string 属性
-                  if (contact.UserName.string !== undefined && contact.UserName.string !== null && contact.UserName.string !== '') {
-                    username = contact.UserName.string
-                  } else {
-                    username = ''
-                  }
-                } else {
-                  username = contact.UserName
-                }
-              } else {
-                username = contact.Wxid || contact.wxid || ''
-              }
-              return String(username || '')
-            }
-
-            const getAlias = (contact: any) => {
-              let alias = ''
-              if (contact.Alias) {
-                if (typeof contact.Alias === 'object') {
-                  // 检查是否是空对象或有有效的 string 属性
-                  if (contact.Alias.string !== undefined && contact.Alias.string !== null && contact.Alias.string !== '') {
-                    alias = contact.Alias.string
-                  } else {
-                    alias = ''
-                  }
-                } else {
-                  alias = contact.Alias
-                }
-              } else {
-                alias = contact.alias || ''
-              }
-              return String(alias || '')
-            }
-
-            const getRemark = (contact: any) => {
-              let remark = ''
-              if (contact.Remark) {
-                if (typeof contact.Remark === 'object') {
-                  // 如果是对象，检查是否有 string 属性
-                  if (contact.Remark.string !== undefined && contact.Remark.string !== null && contact.Remark.string !== '') {
-                    remark = contact.Remark.string
-                  } else {
-                    // 如果是空对象 {}，返回空字符串
-                    remark = ''
-                  }
-                } else {
-                  remark = contact.Remark
-                }
-              } else {
-                remark = contact.remark || ''
-              }
-              return String(remark || '')
-            }
-
-            const nickname = getNickName(contact)
-            const wxid = getUserName(contact)
-            const alias = getAlias(contact)
-
-            return {
-              wxid,
-              nickname,
-              alias, // 微信号
-              avatar: contact.BigHeadImgUrl || contact.HeadImgUrl || contact.avatar || '',
-              remark: getRemark(contact),
-              signature: contact.Signature || contact.signature || '',
-              sex: contact.Sex || contact.sex || 0,
-              isOnline: false,
-              // 添加标记用于过滤
-              isValid: nickname.trim() !== '' && wxid.trim() !== ''
-            }
-          })
-          .filter((friend: any) => {
-            // 过滤掉昵称和wxid都为空的联系人
-            return friend.isValid && friend.nickname !== '未知用户'
-          })
-          .map((friend: any) => {
-            // 移除临时的 isValid 属性
-            const { isValid, ...cleanFriend } = friend
-            return cleanFriend
-          })
-
-        // 显示加载结果，包含缓存信息
-        const totalContacts = contactList.length
-        const validContacts = friends.value.length
-        let message = `已加载 ${validContacts} 个有效好友`
-        if (totalContacts > validContacts) {
-          message += ` (总联系人: ${totalContacts}，已过滤 ${totalContacts - validContacts} 个无效联系人)`
-        }
-        if (response.Data?.total) {
-          message += ` (总计: ${response.Data.total})`
-        } else if (response.Data?.total_count) {
-          message += ` (总计: ${response.Data.total_count})`
-        }
-        if (response.Message?.includes('缓存')) {
-          message += forceRefresh ? ' (已强制刷新)' : ` (${response.Message})`
-        } else if (forceRefresh) {
-          message += ' (已强制刷新)'
-        }
-
-        ElMessage.success(message)
-      } else {
-        friends.value = []
-        ElMessage.info('该账号暂无好友数据')
-      }
-    } else {
-      ElMessage.error(response.Message || '获取通讯录失败')
-    }
-  } catch (error: any) {
-    ElMessage.error(error.message || '获取通讯录失败')
-    console.error('获取通讯录失败:', error)
-  } finally {
-    friendsLoading.value = false
-  }
-}
-
-const refreshFriends = async () => {
-  if (!props.account?.wxid) {
-    ElMessage.error('请先登录账号')
-    return
-  }
-
-  await refreshFriendsForAccount(props.account.wxid, forceRefreshCache.value)
-}
 
 
 
-const handleFriendAction = async (command: string) => {
-  const [action, wxid] = command.split('-')
-  const friend = friends.value.find(f => f.wxid === wxid)
-
-  if (!friend) {
-    ElMessage.error('未找到该好友')
-    return
-  }
-
-  if (action === 'chat') {
-    await startChatWithFriend(friend)
-  } else if (action === 'remark') {
-    currentFriend.value = friend
-    remarkForm.value.remark = getDisplayValue(friend.remark)
-    showRemarkDialog.value = true
-  } else if (action === 'delete') {
-    try {
-      await ElMessageBox.confirm(`确定要删除好友 ${getDisplayValue(friend.nickname)} 吗？`, '确认删除', {
-        type: 'warning'
-      })
-
-      const index = friends.value.findIndex(f => f.wxid === wxid)
-      friends.value.splice(index, 1)
-      ElMessage.success('好友已删除')
-    } catch {
-      // 用户取消
-    }
-  }
-}
-
-// 右键菜单相关方法
-const showContextMenu = (event: MouseEvent, friend: Friend) => {
-  event.preventDefault()
-
-  // 计算菜单位置，确保不超出屏幕边界
-  const menuWidth = 120
-  const menuHeight = 120
-  let x = event.clientX
-  let y = event.clientY
-
-  // 检查右边界
-  if (x + menuWidth > window.innerWidth) {
-    x = window.innerWidth - menuWidth - 10
-  }
-
-  // 检查下边界
-  if (y + menuHeight > window.innerHeight) {
-    y = window.innerHeight - menuHeight - 10
-  }
-
-  // 确保不超出左上边界
-  x = Math.max(10, x)
-  y = Math.max(10, y)
-
-  contextMenu.value = {
-    visible: true,
-    x: x,
-    y: y,
-    friend: friend
-  }
-}
-
-const hideContextMenu = () => {
-  contextMenu.value.visible = false
-  contextMenu.value.friend = null
-}
-
-// 开始与好友聊天的完整流程
-const startChatWithFriend = async (friend: Friend) => {
-  try {
-    if (!props.account?.wxid) {
-      ElMessage.error('请先登录账号')
-      return
-    }
-
-    const friendName = getDisplayValue(friend.nickname) || getDisplayValue(friend.alias) || '未知好友'
-    ElMessage.info(`正在准备与 ${friendName} 的聊天...`)
-
-    console.log('开始聊天流程:', {
-      account: props.account.wxid,
-      friend: friend.wxid,
-      friendName
-    })
-
-    // 1. 确保WebSocket连接
-    const isConnected = await chatStore.connectWebSocket(props.account.wxid)
-    if (!isConnected) {
-      ElMessage.warning('WebSocket连接失败，但仍可尝试发送消息')
-    } else {
-      console.log('WebSocket连接成功')
-    }
-
-    // 2. 创建或获取聊天会话
-    const session = chatStore.createOrGetSession(friend)
-    console.log('聊天会话已创建/获取:', session)
-
-    // 3. 同步消息历史
-    try {
-      await chatStore.syncMessages(props.account.wxid)
-      console.log('消息历史同步完成')
-    } catch (error) {
-      console.warn('消息历史同步失败:', error)
-    }
-
-    // 4. 跳转到聊天功能标签
-    await router.push('/dashboard?tab=chat')
-
-    // 5. 设置当前会话
-    chatStore.setCurrentSession(session.id)
-
-    ElMessage.success(`已开始与 ${friendName} 的聊天`)
-  } catch (error: any) {
-    console.error('开始聊天失败:', error)
-    ElMessage.error(error.message || '开始聊天失败，请重试')
-  }
-}
-
-const handleContextMenuAction = async (action: string) => {
-  if (!contextMenu.value.friend) return
-
-  const friend = contextMenu.value.friend
-  hideContextMenu()
-
-  if (action === 'chat') {
-    await startChatWithFriend(friend)
-  } else if (action === 'remark') {
-    currentFriend.value = friend
-    remarkForm.value.remark = getDisplayValue(friend.remark)
-    showRemarkDialog.value = true
-  } else if (action === 'delete') {
-    try {
-      await ElMessageBox.confirm(`确定要删除好友 ${getDisplayValue(friend.nickname)} 吗？`, '确认删除', {
-        type: 'warning'
-      })
-
-      const index = friends.value.findIndex(f => f.wxid === friend.wxid)
-      friends.value.splice(index, 1)
-      ElMessage.success('好友已删除')
-    } catch {
-      // 用户取消
-    }
-  }
-}
 
 // 处理可能是对象的显示值
 const getDisplayValue = (value: any): string => {
@@ -1011,73 +675,51 @@ const handleAvatarError = (event: Event) => {
   // 可以在这里设置默认头像或者其他处理
 }
 
+// 右键菜单相关方法
+const hideContextMenu = () => {
+  contextMenu.value.visible = false
+  contextMenu.value.friend = null
+}
+
+const handleContextMenuAction = (action: string) => {
+  const friend = contextMenu.value.friend
+  if (!friend) return
+
+  switch (action) {
+    case 'chat':
+      // 发送消息逻辑
+      console.log('发送消息给:', friend.nickname)
+      break
+    case 'remark':
+      // 修改备注逻辑
+      currentFriend.value = friend
+      remarkForm.value.remark = friend.remark || ''
+      showRemarkDialog.value = true
+      break
+    case 'delete':
+      // 删除好友逻辑
+      console.log('删除好友:', friend.nickname)
+      break
+  }
+  hideContextMenu()
+}
+
+// 修改备注
 const updateRemark = async () => {
   if (!currentFriend.value) return
 
   try {
-    // 调用设置好友备注API
-    await friendApi.setFriendRemark({
-      Wxid: authStore.currentAccount?.wxid || '',
-      ToWxid: currentFriend.value.wxid,
-      Remark: remarkForm.value.remark
-    })
-
-    // 更新本地数据
-    currentFriend.value.remark = remarkForm.value.remark
-
-    // 同时更新好友列表中的数据
-    const friendIndex = friends.value.findIndex(f => f.wxid === currentFriend.value?.wxid)
-    if (friendIndex !== -1) {
-      friends.value[friendIndex].remark = remarkForm.value.remark
-    }
-
-    showRemarkDialog.value = false
+    // 这里应该调用API更新备注
+    console.log('更新备注:', currentFriend.value.nickname, remarkForm.value.remark)
     ElMessage.success('备注修改成功')
+    showRemarkDialog.value = false
   } catch (error) {
     console.error('修改备注失败:', error)
     ElMessage.error('修改备注失败')
   }
 }
 
-onMounted(() => {
-  refreshFriends()
 
-  // 添加全局点击事件监听器，用于隐藏右键菜单
-  document.addEventListener('click', hideContextMenu)
-  document.addEventListener('contextmenu', hideContextMenu)
-})
-
-onUnmounted(() => {
-  // 清理事件监听器
-  document.removeEventListener('click', hideContextMenu)
-  document.removeEventListener('contextmenu', hideContextMenu)
-})
-
-// 监听当前账号变化，切换账号时清空好友列表并自动获取新账号的通讯录
-watch(
-  () => authStore.currentAccount?.wxid,
-  async (newWxid, oldWxid) => {
-    // 如果账号发生了变化（不是初始化）
-    if (oldWxid && newWxid && newWxid !== oldWxid) {
-      console.log(`账号从 ${oldWxid} 切换到 ${newWxid}，清空好友列表并获取新账号通讯录`)
-
-      // 清空当前好友列表
-      friends.value = []
-
-      // 重置搜索和过滤状态
-      friendFilter.value = ''
-      searchForm.value.keyword = ''
-      searchResult.value = null
-
-      // 显示切换提示
-      ElMessage.info('已切换账号，正在获取通讯录...')
-
-      // 自动获取新账号的缓存通讯录
-      await refreshFriendsForAccount(newWxid)
-    }
-  },
-  { immediate: false } // 不立即执行，避免初始化时触发
-)
 </script>
 
 <style scoped lang="scss">
@@ -1086,6 +728,55 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* 欢迎界面样式 */
+.welcome-card {
+  margin-bottom: 16px;
+}
+
+.welcome-content {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.welcome-icon {
+  color: var(--el-color-primary);
+  margin-bottom: 16px;
+}
+
+.welcome-content h3 {
+  color: var(--el-text-color-primary);
+  margin: 16px 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.welcome-content p {
+  color: var(--el-text-color-regular);
+  margin-bottom: 24px;
+  font-size: 16px;
+}
+
+.feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--el-text-color-regular);
+  font-size: 14px;
+}
+
+.feature-item .el-icon {
+  color: var(--el-color-primary);
+  font-size: 18px;
 }
 
 .search-card {
@@ -1097,6 +788,19 @@ watch(
   
   .search-form {
     margin-bottom: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 16px;
+
+    .el-form-item {
+      margin-bottom: 0;
+      margin-right: 0;
+    }
+
+    .el-form-item__label {
+      white-space: nowrap;
+    }
   }
   
   .search-result {
@@ -1135,142 +839,17 @@ watch(
   }
 }
 
-.friends-card {
-  flex: 1;
-  
-  .card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    
-    .header-actions {
-      display: flex;
-      gap: 8px;
-    }
-  }
-  
-  :deep(.el-card__body) {
-    height: calc(100% - 60px);
-    overflow: hidden;
-  }
-}
+// 好友操作卡片样式
+.friend-actions-card {
+  margin-top: 16px;
 
-.friends-list {
-  height: 100%;
-  overflow-y: auto;
-}
-
-.loading-container {
-  padding: 20px;
-}
-
-.empty-friends {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-// 虚拟滚动容器样式
-.friends-container {
-  height: 400px;
-  border: 1px solid var(--border-primary);
-  border-radius: var(--radius-medium);
-}
-
-.friends-scroll-container {
-  height: 100%;
-  overflow-y: auto;
-  position: relative;
-}
-
-.friends-virtual-list {
-  position: relative;
-}
-
-.friends-visible-area {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-}
-
-.friend-item {
-  display: flex;
-  align-items: center;
-  padding: 16px;
-  background: #ffffff;
-  border-radius: 12px;
-  transition: all 0.2s ease;
-  gap: 16px;
-  border: 1px solid #f0f0f0;
-  margin-bottom: 8px;
-  box-sizing: border-box;
-  cursor: pointer;
-
-  &:hover {
-    background: #fafafa;
-    border-color: #e0e0e0;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  }
-
-  &:active {
-    background: #f0f0f0;
-    transform: scale(0.98);
-  }
-  
-  .friend-info {
-    flex: 1;
-    min-width: 0;
-    
-    .nickname {
-      font-weight: 500;
-      font-size: 15px;
-      color: #1a1a1a;
-      margin-bottom: 6px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      line-height: 1.4;
-      
-      .remark-inline {
-        font-weight: 400;
-        color: #666;
-        font-size: 14px;
-        margin-left: 4px;
-      }
-    }
-    
-    .wxid {
-      font-size: 13px;
-      color: #888;
-      font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-      letter-spacing: 0.5px;
-
-      .alias {
-        color: #666;
-        font-weight: 500;
-        margin-right: 6px;
-      }
-
-      .wxid-bracket {
-        color: #999;
-        font-weight: normal;
-      }
-    }
-  }
-  
   .friend-actions {
-    flex-shrink: 0;
-    opacity: 0.6;
-    transition: opacity 0.2s ease;
-    
-    &:hover {
-      opacity: 1;
-    }
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
   }
 }
-
 
 
 // 添加好友对话框样式

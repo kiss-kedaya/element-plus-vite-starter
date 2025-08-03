@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-// import { useAuthStore } from '@/stores/auth'
+import { useAuthStore } from '@/stores/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Picture, User, Setting, Monitor, Refresh } from '@element-plus/icons-vue'
+import { Picture, User, Setting, Monitor, Refresh, Iphone, CircleClose } from '@element-plus/icons-vue'
 import QRCode from 'qrcode'
 import type { ProxyConfig, LoginAccount } from '@/types/auth'
 import { proxyApi, type ProxyInfo, getProxyDisplayName } from '@/api/proxy'
@@ -11,7 +11,7 @@ import { loginApi } from '@/api/auth'
 import ProxyManagement from '@/components/business/ProxyManagement.vue'
 
 const router = useRouter()
-// const authStore = useAuthStore()
+const authStore = useAuthStore()
 
 const activeTab = ref('qrcode')
 const isLoading = ref(false)
@@ -121,7 +121,21 @@ const loginWithPassword = async () => {
       Proxy: passwordForm.proxy
     })
 
-    if (response.Success) {
+    if (response.Success && response.Data?.wxid) {
+      // 保存登录账号信息到store
+      const accountData = {
+        wxid: response.Data.wxid,
+        nickname: response.Data.nickname || passwordForm.username,
+        avatar: response.Data.avatar || '',
+        status: 'online' as const,
+        deviceType: 'Data62',
+        deviceId: generateDeviceId(),
+        deviceName: qrForm.deviceName || 'Device_Login',
+        loginTime: new Date(),
+        proxy: passwordForm.proxy.ProxyIp ? passwordForm.proxy : undefined
+      }
+      authStore.addAccount(accountData)
+
       ElMessage.success('登录成功')
       router.push('/dashboard')
     } else {
@@ -153,29 +167,170 @@ const startLoginStatusCheck = () => {
       const response = await loginApi.checkQRCodeStatus({ Uuid: currentUuid.value })
 
       if (response.Success && response.Message === "登录成功") {
+        // 登录成功
         clearInterval(statusCheckTimer!)
         statusCheckTimer = null
-        ElMessage.success('扫码登录成功')
-        router.push('/dashboard')
+
+        ElMessage.success('扫码登录成功！正在初始化...')
+
+        // 执行二次登录（自动心跳）
+        if (response.Data && response.Data.wxid) {
+          await performSecondAuth(response.Data.wxid)
+
+          // 保存登录账号信息到store
+          const accountData = {
+            wxid: response.Data.wxid,
+            nickname: response.Data.nickname || qrForm.deviceName,
+            avatar: response.Data.avatar || '',
+            status: 'online' as const,
+            deviceType: 'Car', // 车载版设备类型
+            deviceId: qrForm.deviceId,
+            deviceName: qrForm.deviceName,
+            loginTime: new Date(),
+            proxy: passwordForm.proxy.ProxyIp ? passwordForm.proxy : undefined
+          }
+          authStore.addAccount(accountData)
+        }
+
+        // 延迟跳转，给用户看到成功提示
+        setTimeout(() => {
+          router.push('/dashboard')
+        }, 2000)
+
       } else if (response.Success && response.Data) {
         const data = response.Data
+
         if (data.expiredTime <= 0) {
+          // 二维码已过期
           clearInterval(statusCheckTimer!)
           statusCheckTimer = null
           ElMessage.error('二维码已过期，请重新生成')
           resetQRCode()
+
+        } else if (data.status === 0) {
+          // 等待扫码
+          console.log(`等待扫码... (${data.expiredTime}秒后过期)`)
+
+        } else if (data.status === 1) {
+          // 已扫码，显示用户信息覆盖层
+          showUserScannedInfo(data)
+
         } else if (data.status === 4) {
+          // 用户取消登录
           clearInterval(statusCheckTimer!)
           statusCheckTimer = null
-          ElMessage.warning('用户取消登录')
-          resetQRCode()
+          showQRCodeCancelled(data)
+
+        } else {
+          // 其他状态
+          console.log(`状态: ${data.status} (${data.expiredTime}秒后过期)`)
         }
-        // 其他状态继续轮询
       }
     } catch (error) {
       console.error('检查登录状态失败:', error)
     }
   }, 2000) // 每2秒检查一次
+}
+
+// 显示用户扫码信息覆盖层
+const showUserScannedInfo = (data: any) => {
+  const qrcodeDisplay = document.querySelector('.qrcode-display')
+  if (!qrcodeDisplay) return
+
+  // 移除之前的覆盖层
+  const existingOverlay = qrcodeDisplay.querySelector('.user-scanned-overlay')
+  if (existingOverlay) {
+    existingOverlay.remove()
+  }
+
+  // 创建用户信息覆盖层
+  const userOverlay = document.createElement('div')
+  userOverlay.className = 'user-scanned-overlay'
+  userOverlay.innerHTML = `
+    <div class="user-info">
+      <img src="${data.headImgUrl}"
+           alt="用户头像"
+           class="user-avatar"
+           onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+      <div class="avatar-fallback" style="display: none; width: 80px; height: 80px; border-radius: 50%; background: var(--el-color-primary); color: white; align-items: center; justify-content: center; font-size: 24px; font-weight: 600;">
+        ${data.nickName ? data.nickName.charAt(0).toUpperCase() : '?'}
+      </div>
+      <div class="user-details">
+        <div class="user-nickname">${data.nickName}</div>
+        <div class="scan-status">已扫码，请确认登录</div>
+      </div>
+    </div>
+    <div class="confirm-hint">
+      <el-icon><Iphone /></el-icon>
+      请在手机上确认登录
+    </div>
+  `
+
+  qrcodeDisplay.appendChild(userOverlay)
+}
+
+// 显示取消登录覆盖层
+const showQRCodeCancelled = (data: any) => {
+  const qrcodeDisplay = document.querySelector('.qrcode-display')
+  if (!qrcodeDisplay) return
+
+  // 移除之前的覆盖层
+  const existingOverlay = qrcodeDisplay.querySelector('.user-scanned-overlay')
+  if (existingOverlay) {
+    existingOverlay.remove()
+  }
+
+  // 创建取消登录覆盖层
+  const cancelOverlay = document.createElement('div')
+  cancelOverlay.className = 'qrcode-cancelled-overlay'
+  cancelOverlay.innerHTML = `
+    <div class="cancel-info">
+      <el-icon><CircleClose /></el-icon>
+      <div class="cancel-message">用户取消登录</div>
+      ${data.nickName ? `<div class="cancel-user">${data.nickName} 取消了登录</div>` : ''}
+    </div>
+    <button class="el-button el-button--primary" onclick="location.reload()">
+      <el-icon><Refresh /></el-icon>
+      重新获取二维码
+    </button>
+  `
+
+  qrcodeDisplay.appendChild(cancelOverlay)
+}
+
+// 执行二次登录（自动心跳）
+const performSecondAuth = async (wxid: string) => {
+  try {
+    const response = await loginApi.performSecondAuth(wxid)
+
+    if (response.Success) {
+      ElMessage.success('账号初始化成功！')
+    } else {
+      ElMessage.warning(`账号初始化失败: ${response.Message}`)
+    }
+  } catch (error) {
+    console.error('二次认证失败:', error)
+    ElMessage.warning('账号初始化失败，请手动重连')
+  }
+}
+
+// 测试方法
+const testScanned = () => {
+  const testData = {
+    headImgUrl: 'https://thirdwx.qlogo.cn/mmopen/vi_32/Q0j4TwGTfTKVUskibDnhMt5MCIJ8227HHkibIhkKRkjZuEQoVy9KKIZqmMUz8gWxj2LjQQp8QJiciaKnFSJwQzTtJg/132',
+    nickName: '可达鸭',
+    status: 1,
+    expiredTime: 227
+  }
+  showUserScannedInfo(testData)
+}
+
+const testCancelled = () => {
+  const testData = {
+    nickName: '可达鸭',
+    status: 4
+  }
+  showQRCodeCancelled(testData)
 }
 
 // 重置二维码
@@ -443,9 +598,11 @@ onMounted(() => {
               </div>
               
               <div v-else class="qrcode-display">
-                <img :src="qrCodeUrl" alt="登录二维码" />
-                <p>请使用微信扫描二维码登录</p>
-                <el-button @click="resetQRCode" link>重新生成</el-button>
+                <div class="qrcode-content">
+                  <img :src="qrCodeUrl" alt="登录二维码" />
+                  <p>请使用微信扫描二维码登录</p>
+                  <el-button @click="resetQRCode" link>重新生成</el-button>
+                </div>
               </div>
             </div>
             
@@ -637,15 +794,183 @@ onMounted(() => {
   color: #999;
 }
 
-.qrcode-display img {
+.qrcode-display {
+  width: 280px;
+  height: 280px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #f9f9f9;
+  margin: 0 auto;
+  position: relative; /* 确保覆盖层能正确定位 */
+}
+
+.qrcode-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.qrcode-content img {
   max-width: 200px;
   border-radius: 10px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
-.qrcode-display p {
+.qrcode-content p {
   margin: 1rem 0;
   color: #666;
+}
+
+/* 用户扫码后的覆盖层样式 */
+.user-scanned-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 8px;
+  z-index: 10;
+  animation: fadeInScale 0.3s ease-out;
+}
+
+.user-scanned-overlay .user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-scanned-overlay .user-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  aspect-ratio: 1;
+  border: 3px solid var(--el-color-primary);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.2);
+}
+
+.user-scanned-overlay .avatar-fallback {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--el-color-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 600;
+  border: 3px solid var(--el-color-primary);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.2);
+}
+
+.user-scanned-overlay .user-details {
+  text-align: center;
+}
+
+.user-scanned-overlay .user-nickname {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.user-scanned-overlay .scan-status {
+  font-size: 14px;
+  color: var(--el-color-success);
+  font-weight: 500;
+}
+
+.user-scanned-overlay .confirm-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #666;
+  font-size: 14px;
+  text-align: center;
+}
+
+.user-scanned-overlay .confirm-hint i {
+  font-size: 24px;
+  color: var(--el-color-primary);
+}
+
+/* 取消登录覆盖层样式 */
+.qrcode-cancelled-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 20px;
+  border-radius: 8px;
+  z-index: 10;
+  animation: fadeInScale 0.3s ease-out;
+}
+
+.qrcode-cancelled-overlay .cancel-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.qrcode-cancelled-overlay .cancel-info i {
+  font-size: 48px;
+  color: var(--el-color-danger);
+  margin-bottom: 8px;
+}
+
+.qrcode-cancelled-overlay .cancel-message {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--el-color-danger);
+  margin-bottom: 4px;
+}
+
+.qrcode-cancelled-overlay .cancel-user {
+  font-size: 14px;
+  color: #666;
+}
+
+.qrcode-cancelled-overlay .el-button {
+  margin-top: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+}
+
+/* 动画效果 */
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .login-button {

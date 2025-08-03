@@ -654,11 +654,6 @@ async function refreshContactInfo() {
 
 // 监听账号变化
 watch(() => props.account?.wxid, async (newWxid, oldWxid) => {
-  // 只有当wxid真正改变时才重新连接
-  if (oldWxid && oldWxid !== newWxid) {
-
-  }
-
   if (newWxid && newWxid !== oldWxid) {
     // 使用新的账号切换功能，自动保存旧账号数据并加载新账号缓存
     chatStore.switchAccount(newWxid, oldWxid)
@@ -668,11 +663,11 @@ watch(() => props.account?.wxid, async (newWxid, oldWxid) => {
       await loadFriendsAsSessions()
     }
 
-    // 尝试建立 WebSocket 连接（静默失败）
+    // 尝试建立或切换 WebSocket 连接（不断开其他账号的连接）
     try {
       const connected = await chatStore.connectWebSocket(newWxid)
       if (connected) {
-
+        console.log(`WebSocket已连接到账号: ${newWxid}`)
       }
       else {
         console.warn(`WebSocket连接失败: ${newWxid}，将使用离线模式`)

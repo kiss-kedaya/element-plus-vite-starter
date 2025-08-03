@@ -3,21 +3,21 @@
     <div v-if="type === 'default'" class="spinner-default">
       <div class="spinner-circle"></div>
     </div>
-    
+
     <div v-else-if="type === 'dots'" class="spinner-dots">
       <div class="dot"></div>
       <div class="dot"></div>
       <div class="dot"></div>
     </div>
-    
+
     <div v-else-if="type === 'pulse'" class="spinner-pulse">
       <div class="pulse-circle"></div>
     </div>
-    
+
     <el-icon v-else-if="type === 'element'" class="spinner-element" :size="iconSize">
       <Loading />
     </el-icon>
-    
+
     <div v-if="text" class="spinner-text" :style="{ color: textColor }">
       {{ text }}
     </div>
@@ -53,15 +53,15 @@ const props = withDefaults(defineProps<Props>(), {
 
 const spinnerClass = computed(() => {
   const classes = [`spinner-${props.size}`]
-  
+
   if (props.overlay) {
     classes.push('spinner-overlay')
   }
-  
+
   if (props.fullscreen) {
     classes.push('spinner-fullscreen')
   }
-  
+
   return classes.join(' ')
 })
 
@@ -111,7 +111,7 @@ const iconSize = computed(() => {
     width: 16px;
     height: 16px;
   }
-  
+
   .spinner-text {
     font-size: 12px;
   }
@@ -122,7 +122,7 @@ const iconSize = computed(() => {
     width: 24px;
     height: 24px;
   }
-  
+
   .spinner-text {
     font-size: 14px;
   }
@@ -133,7 +133,7 @@ const iconSize = computed(() => {
     width: 32px;
     height: 32px;
   }
-  
+
   .spinner-text {
     font-size: 16px;
   }
@@ -153,17 +153,25 @@ const iconSize = computed(() => {
 .spinner-dots {
   display: flex;
   gap: 4px;
-  
+
   .dot {
     width: 6px;
     height: 6px;
     background: v-bind(color);
     border-radius: 50%;
     animation: dot-pulse 1.4s ease-in-out infinite both;
-    
-    &:nth-child(1) { animation-delay: -0.32s; }
-    &:nth-child(2) { animation-delay: -0.16s; }
-    &:nth-child(3) { animation-delay: 0s; }
+
+    &:nth-child(1) {
+      animation-delay: -0.32s;
+    }
+
+    &:nth-child(2) {
+      animation-delay: -0.16s;
+    }
+
+    &:nth-child(3) {
+      animation-delay: 0s;
+    }
   }
 }
 
@@ -192,15 +200,24 @@ const iconSize = computed(() => {
 
 // 动画定义
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes dot-pulse {
-  0%, 80%, 100% {
+
+  0%,
+  80%,
+  100% {
     transform: scale(0);
     opacity: 0.5;
   }
+
   40% {
     transform: scale(1);
     opacity: 1;
@@ -212,6 +229,7 @@ const iconSize = computed(() => {
     transform: scale(0);
     opacity: 1;
   }
+
   100% {
     transform: scale(1);
     opacity: 0;

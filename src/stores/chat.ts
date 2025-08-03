@@ -733,15 +733,25 @@ export const useChatStore = defineStore('chat', () => {
   // WebSocket连接管理
   const connectWebSocket = async (wxid: string): Promise<boolean> => {
     try {
-      // 清除之前的事件监听器
-      webSocketService.off('chat_message', handleChatMessage)
-      webSocketService.off('system_message', handleSystemMessage)
+      // 检查是否已经连接到该账号
+      if (webSocketService.isAccountConnected(wxid)) {
+        console.log(`账号 ${wxid} 已有WebSocket连接，切换到该账号`)
+        webSocketService.switchCurrentAccount(wxid)
+        return true
+      }
 
-      // 设置事件监听器
-      webSocketService.on('chat_message', handleChatMessage)
-      webSocketService.on('system_message', handleSystemMessage)
+      // 设置事件监听器（只需要设置一次）
+      if (!webSocketService.hasEventListeners()) {
+        webSocketService.on('chat_message', handleChatMessage)
+        webSocketService.on('system_message', handleSystemMessage)
+      }
 
-      return await webSocketService.connect(wxid)
+      // 建立新的连接
+      const connected = await webSocketService.connect(wxid)
+      if (connected) {
+        console.log(`成功建立账号 ${wxid} 的WebSocket连接`)
+      }
+      return connected
     }
     catch (error) {
       console.error('WebSocket连接失败:', error)

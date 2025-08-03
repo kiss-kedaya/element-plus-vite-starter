@@ -79,49 +79,133 @@
       <el-card class="proxy-card" shadow="never">
         <template #header>
           <div class="card-header">
-            <span>代理设置</span>
-            <el-switch v-model="proxyEnabled" @change="handleProxyToggle" :loading="proxyLoading" />
+            <div class="header-left">
+              <span>代理设置</span>
+              <el-tag v-if="proxyEnabled && proxyStatus" :type="getProxyStatusType(proxyStatus)" size="small" class="status-tag">
+                {{ getProxyStatusLabel(proxyStatus) }}
+              </el-tag>
+            </div>
+            <div class="header-right">
+              <el-button v-if="proxyEnabled" @click="testProxyConnection" :loading="proxyTesting" size="small" type="primary" plain>
+                <el-icon><Connection /></el-icon>
+                测试连接
+              </el-button>
+              <el-switch v-model="proxyEnabled" @change="handleProxyToggle" :loading="proxyLoading" />
+            </div>
           </div>
         </template>
 
         <div v-if="proxyEnabled" class="proxy-form">
-          <!-- 快速预设 -->
-          <div class="proxy-presets">
-            <div class="preset-label">快速设置</div>
-            <div class="preset-buttons">
-              <el-button v-for="preset in proxyPresets" :key="preset.name" size="small" @click="applyPreset(preset)"
-                plain>
-                {{ preset.name }}
-              </el-button>
-            </div>
+          <!-- 代理配置方式选择 -->
+          <div class="proxy-mode-selection">
+            <div class="mode-label">代理配置方式</div>
+            <el-radio-group v-model="proxyMode" @change="handleProxyModeChange" class="mode-radios">
+              <el-radio value="preset">选择已有代理</el-radio>
+              <el-radio value="manual">手动配置</el-radio>
+            </el-radio-group>
           </div>
 
-          <!-- 代理配置 -->
-          <div class="proxy-input-group">
-            <div class="proxy-type">
-              <el-select v-model="proxyForm.Type" placeholder="代理类型" size="large">
-                <el-option label="SOCKS5" value="SOCKS5" />
-                <el-option label="HTTP" value="HTTP" />
-                <el-option label="HTTPS" value="HTTPS" />
-              </el-select>
+          <!-- 选择已有代理 -->
+          <template v-if="proxyMode === 'preset'">
+            <div class="proxy-preset-section">
+              <el-form-item label="地区筛选">
+                <el-select
+                  v-model="selectedCountry"
+                  placeholder="选择地区"
+                  clearable
+                  @change="filterProxiesByCountry"
+                  size="large"
+                  :popper-options="{ strategy: 'fixed' }"
+                  popper-class="high-z-index-popper"
+                >
+                  <el-option label="全部地区" value="" />
+                  <el-option v-for="country in availableCountries" :key="country" :label="country" :value="country" />
+                </el-select>
+              </el-form-item>
+
+              <el-form-item label="选择代理">
+                <el-select
+                  v-model="selectedProxyId"
+                  placeholder="选择一个可用的代理"
+                  filterable
+                  @change="handleProxySelect"
+                  size="large"
+                  style="width: 100%"
+                  :popper-options="{ strategy: 'fixed' }"
+                  popper-class="high-z-index-popper"
+                >
+                  <el-option
+                    v-for="proxy in filteredProxies"
+                    :key="proxy.id"
+                    :label="getProxyDisplayName(proxy)"
+                    :value="proxy.id"
+                    :disabled="proxy.status !== 'active'"
+                  />
+                </el-select>
+              </el-form-item>
+
+              <el-form-item v-if="selectedProxy">
+                <el-alert
+                  :title="`已选择代理: ${selectedProxy.ip}:${selectedProxy.port} [${selectedProxy.country || '未知地区'}]`"
+                  type="success"
+                  :closable="false"
+                  show-icon
+                />
+              </el-form-item>
+
+              <div class="proxy-preset-actions">
+                <el-button size="small" @click="refreshProxyList">
+                  <el-icon><Refresh /></el-icon>
+                  刷新列表
+                </el-button>
+                <el-button size="small" type="primary" @click="showProxyManagement = true">
+                  <el-icon><Setting /></el-icon>
+                  管理代理
+                </el-button>
+              </div>
+            </div>
+          </template>
+
+          <!-- 手动配置代理 -->
+          <template v-if="proxyMode === 'manual'">
+            <!-- 快速预设 -->
+            <div class="proxy-presets">
+              <div class="preset-label">快速设置</div>
+              <div class="preset-buttons">
+                <el-button v-for="preset in proxyPresets" :key="preset.name" size="small" @click="applyPreset(preset)"
+                  plain>
+                  {{ preset.name }}
+                </el-button>
+              </div>
             </div>
 
-            <div class="proxy-address">
-              <el-input v-model="proxyForm.Host" placeholder="如: 127.0.0.1" size="large" />
+            <!-- 代理配置 -->
+            <div class="proxy-input-group">
+              <div class="proxy-type">
+                <el-select v-model="proxyForm.Type" placeholder="代理类型" size="large">
+                  <el-option label="SOCKS5" value="SOCKS5" />
+                  <el-option label="HTTP" value="HTTP" />
+                  <el-option label="HTTPS" value="HTTPS" />
+                </el-select>
+              </div>
+
+              <div class="proxy-address">
+                <el-input v-model="proxyForm.Host" placeholder="如: 127.0.0.1" size="large" />
+              </div>
+
+              <div class="proxy-port">
+                <el-input-number v-model="proxyForm.Port" :min="1" :max="65535" placeholder="端口" size="large"
+                  controls-position="right" />
+              </div>
             </div>
 
-            <div class="proxy-port">
-              <el-input-number v-model="proxyForm.Port" :min="1" :max="65535" placeholder="端口" size="large"
-                controls-position="right" />
+            <!-- 认证信息 -->
+            <div class="proxy-auth">
+              <el-input v-model="proxyForm.ProxyUser" placeholder="用户名 (可选)" size="large" />
+              <el-input v-model="proxyForm.ProxyPassword" type="password" placeholder="密码 (可选)" size="large"
+                show-password />
             </div>
-          </div>
-
-          <!-- 认证信息 -->
-          <div class="proxy-auth" v-if="needAuth">
-            <el-input v-model="proxyForm.ProxyUser" placeholder="用户名 (可选)" size="large" />
-            <el-input v-model="proxyForm.ProxyPassword" type="password" placeholder="密码 (可选)" size="large"
-              show-password />
-          </div>
+          </template>
 
           <!-- 操作按钮 -->
           <div class="proxy-actions">
@@ -144,6 +228,25 @@
         <template #header>
           <span>账号操作</span>
         </template>
+
+        <!-- 自动同意好友设置 -->
+        <div class="auto-accept-section">
+          <div class="setting-item">
+            <div class="setting-label">
+              <span>自动同意好友请求</span>
+              <el-tooltip content="开启后将自动同意所有好友请求" placement="top">
+                <el-icon class="info-icon"><QuestionFilled /></el-icon>
+              </el-tooltip>
+            </div>
+            <el-switch
+              v-model="autoAcceptFriend"
+              :loading="autoAcceptLoading"
+              @change="handleAutoAcceptChange"
+              active-text="开启"
+              inactive-text="关闭"
+            />
+          </div>
+        </div>
 
         <div class="action-buttons">
           <el-button v-if="account.status === 'offline'" type="primary" @click="showReloginDialog = true"
@@ -182,7 +285,7 @@
   </BaseModal>
 
   <!-- 重新登录对话框 - 移到外层避免嵌套 -->
-  <BaseModal v-model="showReloginDialog" title="设备复用重新登录" width="400px" append-to-body>
+  <BaseModal v-model="showReloginDialog" title="设备复用重新登录" width="400px" append-to-body custom-class="relogin-modal">
     <div v-if="qrCodeUrl" class="qr-login">
       <div class="qr-container">
         <img :src="qrCodeUrl" alt="登录二维码" class="qr-image" />
@@ -204,18 +307,33 @@
       <el-button @click="showReloginDialog = false">取消</el-button>
     </template>
   </BaseModal>
+
+  <!-- 代理管理对话框 -->
+  <el-dialog
+    v-model="showProxyManagement"
+    title="代理管理"
+    width="80%"
+    top="5vh"
+    :z-index="4000"
+    append-to-body
+  >
+    <ProxyManagement @proxy-updated="refreshProxyList" />
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { ref, computed, watch, onUnmounted, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import BaseModal from '@/components/common/BaseModal.vue'
-import { Refresh, SwitchButton, Delete, Timer } from '@element-plus/icons-vue'
+import { Refresh, SwitchButton, Delete, Timer, QuestionFilled, Connection, Setting } from '@element-plus/icons-vue'
 import type { LoginAccount, ProxyConfig } from '@/types/auth'
 import { loginApi } from '@/api/auth'
+import { friendApi } from '@/api/friend'
+import { proxyApi, type ProxyInfo, getProxyDisplayName } from '@/api/proxy'
 import { useAuthStore } from '@/stores/auth'
 import { useTimerManager } from '@/utils/timerManager'
 import { useQRCodeManager } from '@/utils/qrCodeManager'
+import ProxyManagement from '@/components/business/ProxyManagement.vue'
 
 // Props
 const props = defineProps<{
@@ -254,6 +372,26 @@ const qrCheckTimer = ref<NodeJS.Timeout | null>(null)
 const qrTimeoutTimer = ref<NodeJS.Timeout | null>(null)
 const currentUuid = ref('')
 
+// 自动同意好友相关状态
+const autoAcceptFriend = ref(false)
+const autoAcceptLoading = ref(false)
+
+// 代理连接状态
+const proxyStatus = ref<string>('')
+const proxyTesting = ref(false)
+
+// 代理配置模式
+const proxyMode = ref('manual') // 'preset' | 'manual'
+
+// 代理管理相关
+const availableProxies = ref<ProxyInfo[]>([])
+const filteredProxies = ref<ProxyInfo[]>([])
+const availableCountries = ref<string[]>([])
+const selectedCountry = ref('')
+const selectedProxyId = ref<number | null>(null)
+const selectedProxy = ref<ProxyInfo | null>(null)
+const showProxyManagement = ref(false)
+
 // 代理预设配置
 const proxyPresets = [
   { name: 'V2Ray', Type: 'SOCKS5', Host: '127.0.0.1', Port: 1080 },
@@ -261,11 +399,6 @@ const proxyPresets = [
   { name: 'SSR', Type: 'SOCKS5', Host: '127.0.0.1', Port: 1086 },
   { name: 'HTTP代理', Type: 'HTTP', Host: '127.0.0.1', Port: 8080 }
 ]
-
-// 是否需要认证
-const needAuth = computed(() => {
-  return proxyForm.value.ProxyUser || proxyForm.value.ProxyPassword
-})
 
 // 应用预设配置
 const applyPreset = (preset) => {
@@ -275,6 +408,91 @@ const applyPreset = (preset) => {
   // 清空认证信息
   proxyForm.value.ProxyUser = ''
   proxyForm.value.ProxyPassword = ''
+}
+
+// 获取可用代理列表
+const loadAvailableProxies = async () => {
+  try {
+    const response = await proxyApi.getAvailableProxies()
+    if (response.code === 0) {
+      availableProxies.value = response.data.list
+      filteredProxies.value = response.data.list
+
+      // 提取地区列表
+      const countries = new Set<string>()
+      response.data.list.forEach(proxy => {
+        if (proxy.country) {
+          countries.add(proxy.country)
+        }
+      })
+      availableCountries.value = Array.from(countries).sort()
+    }
+  } catch (error) {
+    console.error('获取代理列表失败:', error)
+  }
+}
+
+// 根据地区筛选代理
+const filterProxiesByCountry = () => {
+  if (selectedCountry.value) {
+    filteredProxies.value = availableProxies.value.filter(proxy =>
+      proxy.country === selectedCountry.value
+    )
+  } else {
+    filteredProxies.value = availableProxies.value
+  }
+  selectedProxyId.value = null
+  selectedProxy.value = null
+}
+
+// 选择代理
+const handleProxySelect = () => {
+  if (selectedProxyId.value) {
+    selectedProxy.value = availableProxies.value.find(proxy =>
+      proxy.id === selectedProxyId.value
+    ) || null
+
+    if (selectedProxy.value) {
+      // 更新表单数据
+      updateFormProxy(selectedProxy.value)
+    }
+  }
+}
+
+// 更新表单代理配置
+const updateFormProxy = (proxy: ProxyInfo) => {
+  proxyForm.value = {
+    Type: 'SOCKS5',
+    Host: proxy.ip,
+    Port: proxy.port,
+    ProxyIp: proxy.ip,
+    ProxyUser: proxy.username,
+    ProxyPassword: proxy.password
+  }
+}
+
+// 刷新代理列表
+const refreshProxyList = () => {
+  loadAvailableProxies()
+}
+
+// 处理代理模式变化
+const handleProxyModeChange = () => {
+  if (proxyMode.value === 'manual') {
+    // 清空选择的代理
+    selectedProxyId.value = null
+    selectedProxy.value = null
+  } else if (proxyMode.value === 'preset') {
+    // 清空手动配置
+    proxyForm.value = {
+      Type: 'SOCKS5',
+      Host: '',
+      Port: 1080,
+      ProxyIp: '',
+      ProxyUser: '',
+      ProxyPassword: ''
+    }
+  }
 }
 
 const proxyForm = ref<ProxyConfig>({
@@ -287,13 +505,76 @@ const proxyForm = ref<ProxyConfig>({
 })
 
 // 监听账号变化，初始化代理设置
-watch(() => props.account, (newAccount) => {
+watch(() => props.account, async (newAccount) => {
   if (newAccount) {
-    if (newAccount.proxy) {
+    // 先尝试从服务器获取已设置的代理
+    await loadAccountProxy(newAccount.wxid)
+  }
+}, { immediate: true })
+
+// 加载账号的代理设置
+const loadAccountProxy = async (wxid: string) => {
+  try {
+    const response = await loginApi.getProxy({ Wxid: wxid })
+    if (response.Success && response.Data) {
+      // 服务器有代理配置
       proxyEnabled.value = true
-      proxyForm.value = { ...newAccount.proxy }
+      proxyForm.value = { ...response.Data }
+      proxyStatus.value = 'inactive' // 重置为未测试状态
+
+      // 判断是否是预设代理（通过ProxyIp字段判断）
+      if (response.Data.ProxyIp && response.Data.ProxyIp !== response.Data.Host) {
+        proxyMode.value = 'preset'
+        // 尝试找到对应的预设代理
+        const matchedProxy = availableProxies.value.find(proxy =>
+          proxy.ip === response.Data.ProxyIp
+        )
+        if (matchedProxy) {
+          selectedProxy.value = matchedProxy
+          selectedProxyId.value = matchedProxy.id
+        }
+      } else {
+        proxyMode.value = 'manual'
+      }
+    } else {
+      // 服务器没有代理配置，检查本地存储
+      if (props.account?.proxy) {
+        proxyEnabled.value = true
+        proxyForm.value = { ...props.account.proxy }
+        proxyStatus.value = 'inactive'
+        proxyMode.value = 'manual'
+      } else {
+        // 完全没有代理配置
+        proxyEnabled.value = false
+        proxyStatus.value = ''
+        proxyMode.value = 'manual'
+        proxyForm.value = {
+          Type: 'SOCKS5',
+          Host: '',
+          Port: 1080,
+          ProxyIp: '',
+          ProxyUser: '',
+          ProxyPassword: ''
+        }
+      }
+    }
+  } catch (error: any) {
+    console.error('获取代理设置失败:', error)
+    // 如果是404错误，说明后端接口还没有实现，暂时跳过
+    if (error.message?.includes('404') || error.message?.includes('不存在')) {
+      console.log('代理查询接口暂未实现，使用本地存储的代理配置')
+    }
+
+    // 降级到本地存储
+    if (props.account?.proxy) {
+      proxyEnabled.value = true
+      proxyForm.value = { ...props.account.proxy }
+      proxyStatus.value = 'inactive'
+      proxyMode.value = 'manual'
     } else {
       proxyEnabled.value = false
+      proxyStatus.value = ''
+      proxyMode.value = 'manual'
       proxyForm.value = {
         Type: 'SOCKS5',
         Host: '',
@@ -304,7 +585,14 @@ watch(() => props.account, (newAccount) => {
       }
     }
   }
-}, { immediate: true })
+}
+
+// 监听代理表单变化，重置状态
+watch(() => [proxyForm.value.Host, proxyForm.value.Port, proxyForm.value.Type], () => {
+  if (proxyEnabled.value && proxyStatus.value !== 'testing') {
+    proxyStatus.value = 'inactive'
+  }
+})
 
 // 方法
 const formatTime = (time: string | Date | undefined) => {
@@ -367,6 +655,7 @@ const clearProxy = async () => {
     if (response.Success) {
       ElMessage.success('代理设置已清除')
       proxyEnabled.value = false
+      proxyStatus.value = ''
       proxyForm.value = {
         Type: 'SOCKS5',
         Host: '',
@@ -389,6 +678,75 @@ const clearProxy = async () => {
   } finally {
     proxyLoading.value = false
   }
+}
+
+// 测试代理连接
+const testProxyConnection = async () => {
+  if (!props.account || !proxyForm.value.Host || !proxyForm.value.Port) {
+    ElMessage.warning('请先配置代理信息')
+    return
+  }
+
+  proxyTesting.value = true
+  proxyStatus.value = 'testing'
+
+  try {
+    const response = await loginApi.testProxy({
+      Type: proxyForm.value.Type,
+      Host: proxyForm.value.Host,
+      Port: proxyForm.value.Port,
+      ProxyUser: proxyForm.value.ProxyUser || '',
+      ProxyPassword: proxyForm.value.ProxyPassword || ''
+    })
+
+    if (response.Success && response.Data) {
+      if (response.Data.status === 'success') {
+        proxyStatus.value = 'active'
+        const responseTime = response.Data.responseTime ? ` (${response.Data.responseTime}ms)` : ''
+        ElMessage.success(`代理连接测试成功${responseTime}`)
+      } else {
+        proxyStatus.value = 'error'
+        ElMessage.error(`代理连接测试失败: ${response.Data.error || '未知错误'}`)
+      }
+    } else {
+      proxyStatus.value = 'error'
+      ElMessage.error(response.Message || '代理连接测试失败')
+    }
+  } catch (error: any) {
+    proxyStatus.value = 'error'
+    // 如果是404错误，说明后端接口还没有实现
+    if (error.message?.includes('404') || error.message?.includes('不存在')) {
+      ElMessage.warning('代理测试接口暂未实现，请手动验证代理配置')
+      console.log('代理测试接口暂未实现')
+    } else {
+      ElMessage.error('代理连接测试失败')
+      console.error('代理连接测试失败:', error)
+    }
+  } finally {
+    proxyTesting.value = false
+  }
+}
+
+// 获取代理状态类型
+const getProxyStatusType = (status: string) => {
+  const statusMap = {
+    'active': 'success',
+    'testing': 'warning',
+    'error': 'danger',
+    'inactive': 'info'
+  }
+  return statusMap[status as keyof typeof statusMap] || 'info'
+}
+
+// 获取代理状态标签
+const getProxyStatusLabel = (status: string) => {
+  const statusMap = {
+    'active': '连接正常',
+    'testing': '测试中',
+    'error': '连接失败',
+    'inactive': '未测试'
+  }
+  return statusMap[status as keyof typeof statusMap] || '未知'
 }
 
 const generateQRCode = async () => {
@@ -680,6 +1038,70 @@ watch(visible, (show) => {
   }
 })
 
+// 自动同意好友相关方法
+const loadAutoAcceptStatus = async () => {
+  if (!props.account?.wxid) return
+
+  try {
+    const response = await friendApi.getAutoAcceptFriendStatus({
+      Wxid: props.account.wxid
+    })
+
+    if (response.Success && response.Data) {
+      // 后端返回的数据结构中使用的是 enable 字段
+      autoAcceptFriend.value = response.Data.enable || false
+    }
+  } catch (error) {
+    console.error('获取自动同意好友状态失败:', error)
+  }
+}
+
+const handleAutoAcceptChange = async (enabled: boolean) => {
+  if (!props.account?.wxid) return
+
+  autoAcceptLoading.value = true
+  try {
+    const response = await friendApi.setAutoAcceptFriendStatus({
+      Wxid: props.account.wxid,
+      Enable: enabled
+    })
+
+    if (response.Success) {
+      ElMessage.success(enabled ? '已开启自动同意好友' : '已关闭自动同意好友')
+    } else {
+      // 如果设置失败，恢复原状态
+      autoAcceptFriend.value = !enabled
+      ElMessage.error(response.Message || '设置失败')
+    }
+  } catch (error: any) {
+    // 如果设置失败，恢复原状态
+    autoAcceptFriend.value = !enabled
+    ElMessage.error(error.message || '设置失败')
+    console.error('设置自动同意好友状态失败:', error)
+  } finally {
+    autoAcceptLoading.value = false
+  }
+}
+
+// 监听账号变化，加载自动同意状态
+watch(() => props.account, (newAccount) => {
+  if (newAccount && visible.value) {
+    loadAutoAcceptStatus()
+  }
+}, { immediate: true })
+
+// 监听模态框打开，加载自动同意状态
+watch(visible, (show) => {
+  if (show && props.account) {
+    loadAutoAcceptStatus()
+  }
+})
+
+// 组件挂载时加载代理列表
+onMounted(() => {
+  loadAvailableProxies()
+})
+
 // 组件卸载时清理定时器
 onUnmounted(() => {
   console.log('AccountManagementModal 组件卸载，清理所有定时器')
@@ -711,6 +1133,22 @@ onUnmounted(() => {
     font-size: 14px;
     font-weight: 500;
     color: #1a1a1a;
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+
+      .status-tag {
+        margin-left: 8px;
+      }
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
   }
 
   .account-details {
@@ -750,6 +1188,40 @@ onUnmounted(() => {
   }
 
   .proxy-form {
+    .proxy-mode-selection {
+      margin-bottom: var(--spacing-lg);
+      padding: var(--spacing-md);
+      background: var(--bg-secondary);
+      border-radius: var(--radius-medium);
+      border: 1px solid var(--border-light);
+
+      .mode-label {
+        font-size: var(--font-size-sm);
+        color: var(--text-secondary);
+        margin-bottom: var(--spacing-sm);
+        font-weight: 500;
+      }
+
+      .mode-radios {
+        display: flex;
+        gap: var(--spacing-lg);
+      }
+    }
+
+    .proxy-preset-section {
+      margin-bottom: var(--spacing-lg);
+
+      .el-form-item {
+        margin-bottom: var(--spacing-md);
+      }
+
+      .proxy-preset-actions {
+        display: flex;
+        gap: var(--spacing-sm);
+        margin-top: var(--spacing-md);
+      }
+    }
+
     .proxy-presets {
       margin-bottom: var(--spacing-lg);
 
@@ -806,6 +1278,38 @@ onUnmounted(() => {
     .disabled-text {
       color: #8a8a8a;
       font-size: 14px;
+    }
+  }
+
+  .auto-accept-section {
+    margin: var(--spacing-lg) 0;
+    padding: var(--spacing-md);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-medium);
+    border: 1px solid var(--border-light);
+
+    .setting-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      .setting-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 500;
+        color: var(--text-primary);
+
+        .info-icon {
+          color: var(--text-tertiary);
+          cursor: help;
+          font-size: 14px;
+
+          &:hover {
+            color: var(--primary-color);
+          }
+        }
+      }
     }
   }
 
@@ -910,6 +1414,36 @@ onUnmounted(() => {
       }
     }
   }
+}
+
+// 重新登录模态框层级设置
+:deep(.relogin-modal) {
+  z-index: 3500 !important;
+}
+
+// 账号管理模态框内的下拉框层级设置
+:deep(.account-management-modal) {
+  .el-select-dropdown {
+    z-index: 3200 !important;
+  }
+
+  .el-popper {
+    z-index: 3200 !important;
+  }
+}
+
+// 全局下拉框层级设置（针对账号管理模态框）
+.el-select-dropdown.el-popper[data-popper-placement] {
+  z-index: 3200 !important;
+}
+
+.el-popper.is-pure {
+  z-index: 3200 !important;
+}
+
+// 高层级下拉框样式
+.high-z-index-popper {
+  z-index: 3200 !important;
 }
 
 .qr-loading {

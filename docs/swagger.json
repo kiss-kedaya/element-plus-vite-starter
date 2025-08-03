@@ -2912,6 +2912,173 @@
                 }
             }
         },
+        "/Proxy/ClearProxies": {
+            "post": {
+                "tags": [
+                    "Proxy"
+                ],
+                "description": "清空所有代理数据\n\u003cbr\u003e",
+                "operationId": "ProxyController.清空所有代理",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/comm.BaseResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/Proxy/DeleteProxy/{id}": {
+            "delete": {
+                "tags": [
+                    "Proxy"
+                ],
+                "description": "删除指定的代理\n\u003cbr\u003e",
+                "operationId": "ProxyController.删除代理",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "description": "代理ID",
+                        "required": true,
+                        "type": "integer",
+                        "format": "int64"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/comm.BaseResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/Proxy/GetProxyList": {
+            "get": {
+                "tags": [
+                    "Proxy"
+                ],
+                "description": "获取代理列表，支持分页和筛选\n\u003cbr\u003e",
+                "operationId": "ProxyController.获取代理列表",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "page",
+                        "description": "default(1)",
+                        "type": "integer",
+                        "format": "int64",
+                        "default": "false"
+                    },
+                    {
+                        "in": "query",
+                        "name": "page_size",
+                        "description": "default(20)",
+                        "type": "integer",
+                        "format": "int64",
+                        "default": "false"
+                    },
+                    {
+                        "in": "query",
+                        "name": "status",
+                        "description": "状态筛选",
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "keyword",
+                        "description": "关键词搜索",
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/Proxy.ProxyListResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/Proxy/GetProxyStats": {
+            "get": {
+                "tags": [
+                    "Proxy"
+                ],
+                "description": "获取代理统计信息\n\u003cbr\u003e",
+                "operationId": "ProxyController.获取代理统计",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/Proxy.ProxyStatsResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/Proxy/ImportProxies": {
+            "post": {
+                "tags": [
+                    "Proxy"
+                ],
+                "description": "批量导入SOCKS5代理列表\n\u003cbr\u003e",
+                "operationId": "ProxyController.批量导入代理",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "description": "代理导入请求",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/Proxy.ProxyImportRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/comm.BaseResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "{object} comm.BaseResponse"
+                    }
+                }
+            }
+        },
+        "/Proxy/TestProxies": {
+            "post": {
+                "tags": [
+                    "Proxy"
+                ],
+                "description": "测试指定代理的连接状态\n\u003cbr\u003e",
+                "operationId": "ProxyController.测试代理连接",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "description": "代理测试请求",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/Proxy.ProxyTestRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/comm.BaseResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/QWContact/QWApplyAddContact": {
             "post": {
                 "tags": [
@@ -3764,6 +3931,30 @@
                 }
             }
         },
+        "/Tools/getproxy": {
+            "post": {
+                "tags": [
+                    "Tools"
+                ],
+                "summary": "获取已设置的代理IP",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "description": "微信ID",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/Tools.GetProxyParam"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/Tools/setproxy": {
             "post": {
                 "tags": [
@@ -3778,6 +3969,30 @@
                         "required": true,
                         "schema": {
                             "$ref": "#/definitions/Tools.SetProxyParam"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/Tools/testproxy": {
+            "post": {
+                "tags": [
+                    "Tools"
+                ],
+                "summary": "测试代理连接",
+                "parameters": [
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "description": "代理测试参数",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/Tools.TestProxyParam"
                         }
                     }
                 ],
@@ -5477,6 +5692,173 @@
             "title": "ParseMessageRequest",
             "type": "object"
         },
+        "Proxy.ProxyData": {
+            "title": "ProxyData",
+            "type": "object",
+            "properties": {
+                "list": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/Proxy.ProxyInfo"
+                    }
+                },
+                "page": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "page_size": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "total": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "total_pages": {
+                    "type": "integer",
+                    "format": "int64"
+                }
+            }
+        },
+        "Proxy.ProxyImportRequest": {
+            "title": "ProxyImportRequest",
+            "type": "object",
+            "properties": {
+                "format": {
+                    "description": "格式：ip|port|username|password|expire",
+                    "type": "string"
+                },
+                "proxy_list": {
+                    "description": "代理列表文本",
+                    "type": "string"
+                }
+            }
+        },
+        "Proxy.ProxyInfo": {
+            "title": "ProxyInfo",
+            "type": "object",
+            "properties": {
+                "country": {
+                    "type": "string"
+                },
+                "create_time": {
+                    "type": "string",
+                    "format": "datetime"
+                },
+                "expire_date": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "ip": {
+                    "type": "string"
+                },
+                "last_test": {
+                    "type": "string",
+                    "format": "datetime"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "port": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "response_time": {
+                    "description": "响应时间(ms)",
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "status": {
+                    "description": "active, inactive, testing, error",
+                    "type": "string"
+                },
+                "update_time": {
+                    "type": "string",
+                    "format": "datetime"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "Proxy.ProxyListResponse": {
+            "title": "ProxyListResponse",
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "data": {
+                    "$ref": "#/definitions/Proxy.ProxyData"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "Proxy.ProxyStats": {
+            "title": "ProxyStats",
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "error": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "inactive": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "testing": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "total": {
+                    "type": "integer",
+                    "format": "int64"
+                }
+            }
+        },
+        "Proxy.ProxyStatsResponse": {
+            "title": "ProxyStatsResponse",
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "data": {
+                    "$ref": "#/definitions/Proxy.ProxyStats"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "Proxy.ProxyTestRequest": {
+            "title": "ProxyTestRequest",
+            "type": "object",
+            "properties": {
+                "proxy_ids": {
+                    "description": "要测试的代理ID列表",
+                    "type": "array",
+                    "items": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
+                }
+            }
+        },
         "QWContact.AddWxAppRecordParam": {
             "title": "AddWxAppRecordParam",
             "type": "object",
@@ -5864,6 +6246,15 @@
                 }
             }
         },
+        "Tools.GetProxyParam": {
+            "title": "GetProxyParam",
+            "type": "object",
+            "properties": {
+                "Wxid": {
+                    "type": "string"
+                }
+            }
+        },
         "Tools.OauthSdkAppParam": {
             "title": "OauthSdkAppParam",
             "type": "object",
@@ -5928,6 +6319,28 @@
                     "format": "int64"
                 },
                 "Wxid": {
+                    "type": "string"
+                }
+            }
+        },
+        "Tools.TestProxyParam": {
+            "title": "TestProxyParam",
+            "type": "object",
+            "properties": {
+                "Host": {
+                    "type": "string"
+                },
+                "Port": {
+                    "type": "integer",
+                    "format": "int64"
+                },
+                "ProxyPassword": {
+                    "type": "string"
+                },
+                "ProxyUser": {
+                    "type": "string"
+                },
+                "Type": {
                     "type": "string"
                 }
             }
@@ -6336,6 +6749,10 @@
                 }
             }
         },
+        "comm.BaseResponse": {
+            "title": "BaseResponse",
+            "type": "object"
+        },
         "models.ProxyInfo": {
             "title": "ProxyInfo",
             "type": "object",
@@ -6533,6 +6950,10 @@
         {
             "name": "Config",
             "description": "ConfigController 配置管理控制器\n负责处理系统配置文件的读取和修改操作\n继承自BaseController，具备统一的错误处理和响应格式化能力\n"
+        },
+        {
+            "name": "Proxy",
+            "description": "ProxyController 代理管理控制器\n"
         }
     ]
 }

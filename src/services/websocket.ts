@@ -9,15 +9,21 @@ export interface WebSocketEvents {
   chat_message: (data: any) => void
   system_message: (data: any) => void
   connection_status: (connected: boolean) => void
+  friend_request: (data: any) => void
+}
+
+// 单个账号的WebSocket连接信息
+interface AccountConnection {
+  ws: WebSocket
+  reconnectAttempts: number
+  heartbeatInterval: number | null
+  isConnecting: boolean
 }
 
 export class WebSocketService {
-  private ws: WebSocket | null = null
-  private reconnectAttempts = 0
+  private connections: Map<string, AccountConnection> = new Map()
   private maxReconnectAttempts = WEBSOCKET_CONFIG.RECONNECT.MAX_ATTEMPTS
   private reconnectInterval = WEBSOCKET_CONFIG.RECONNECT.INTERVAL
-  private heartbeatInterval: number | null = null
-  private isConnecting = false
   private eventListeners: Map<string, Function[]> = new Map()
   private currentWxid: string | undefined = undefined
   private static instance: WebSocketService | null = null
@@ -62,93 +68,154 @@ export class WebSocketService {
   // 连接WebSocket
   connect(wxid?: string): Promise<boolean> {
     return new Promise((resolve, reject) => {
-      if (this.isConnecting) {
+      if (!wxid) {
+        reject(new Error('wxid不能为空'))
+        return
+      }
+
+      // 检查是否已经有该账号的连接
+      const existingConnection = this.connections.get(wxid)
+      if (existingConnection && existingConnection.ws.readyState === WebSocket.OPEN) {
+        console.log(`WebSocket已连接到 ${wxid}，复用现有连接`)
+        this.currentWxid = wxid
+        fileCacheManager.setCurrentWxid(wxid)
+        resolve(true)
+        return
+      }
+
+      // 检查是否正在连接中
+      if (existingConnection && existingConnection.isConnecting) {
         console.log('WebSocket正在连接中，等待完成...')
         reject(new Error('WebSocket正在连接中'))
         return
       }
 
-      // 如果已经连接到相同的wxid，直接返回成功
-      if (this.ws && this.ws.readyState === WebSocket.OPEN && this.currentWxid === wxid) {
-        console.log(`WebSocket已连接到 ${wxid}，复用现有连接`)
-        resolve(true)
-        return
-      }
-
-      // 如果连接到不同的wxid，先断开当前连接
-      if (this.ws && this.currentWxid !== wxid) {
-        console.log(`切换WebSocket连接从 ${this.currentWxid} 到 ${wxid}`)
-        this.disconnect()
-      }
-
-      this.isConnecting = true
+      // 设置当前账号
       this.currentWxid = wxid
+      fileCacheManager.setCurrentWxid(wxid)
 
-      // 设置文件缓存管理器的当前微信账号
-      if (wxid) {
-        fileCacheManager.setCurrentWxid(wxid)
+      // 创建新的连接信息
+      const connectionInfo: AccountConnection = {
+        ws: null as any, // 稍后设置
+        reconnectAttempts: 0,
+        heartbeatInterval: null,
+        isConnecting: true
       }
 
       try {
         // WebSocket服务器地址，包含wxid参数
         const wsUrl = WEBSOCKET_CONFIG.getUrl(wxid)
-        this.ws = new WebSocket(wsUrl)
+        const ws = new WebSocket(wsUrl)
+        connectionInfo.ws = ws
 
-        this.ws.onopen = () => {
-          console.log(`WebSocket连接已建立 (wxid: ${wxid || '未指定'})`)
-          this.isConnecting = false
-          this.reconnectAttempts = 0
-          this.startHeartbeat()
+        ws.onopen = () => {
+          console.log(`WebSocket连接已建立 (wxid: ${wxid})`)
+          connectionInfo.isConnecting = false
+          connectionInfo.reconnectAttempts = 0
+          this.startHeartbeat(wxid)
 
           // 触发连接状态事件
           this.emit('connection_status', true)
           resolve(true)
         }
 
-        this.ws.onmessage = (event) => {
-          this.handleMessage(event.data)
+        ws.onmessage = (event) => {
+          this.handleMessage(event.data, wxid)
         }
 
-        this.ws.onclose = (event) => {
-          console.log('WebSocket连接已关闭', event.code, event.reason)
-          this.isConnecting = false
-          this.stopHeartbeat()
+        ws.onclose = (event) => {
+          console.log(`WebSocket连接已关闭 (wxid: ${wxid})`, event.code, event.reason)
+          connectionInfo.isConnecting = false
+          this.stopHeartbeat(wxid)
 
           // 触发连接状态事件
           this.emit('connection_status', false)
 
-          if (!event.wasClean && this.reconnectAttempts < this.maxReconnectAttempts) {
-            this.scheduleReconnect()
+          if (!event.wasClean && connectionInfo.reconnectAttempts < this.maxReconnectAttempts) {
+            this.scheduleReconnect(wxid)
           }
         }
 
-        this.ws.onerror = (error) => {
-          console.warn('WebSocket连接失败，将在模拟模式下运行')
-          this.isConnecting = false
+        ws.onerror = (error) => {
+          console.warn(`WebSocket连接失败 (wxid: ${wxid})，将在模拟模式下运行`)
+          connectionInfo.isConnecting = false
           reject(error)
         }
+
+        // 保存连接信息
+        this.connections.set(wxid, connectionInfo)
       }
       catch (error) {
-        this.isConnecting = false
         console.error('创建WebSocket连接失败:', error)
         reject(error)
       }
     })
   }
 
-  // 断开连接
-  disconnect() {
-    this.stopHeartbeat()
-    if (this.ws) {
-      this.ws.close(1000, '主动断开连接')
-      this.ws = null
+  // 断开连接（可以指定wxid，如果不指定则断开当前账号）
+  disconnect(wxid?: string) {
+    const targetWxid = wxid || this.currentWxid
+    if (!targetWxid) {
+      console.log('没有指定要断开的账号')
+      return
     }
-    this.reconnectAttempts = 0
+
+    const connection = this.connections.get(targetWxid)
+    if (connection) {
+      this.stopHeartbeat(targetWxid)
+      if (connection.ws) {
+        connection.ws.close(1000, '主动断开连接')
+      }
+      this.connections.delete(targetWxid)
+      console.log(`已断开账号 ${targetWxid} 的WebSocket连接`)
+    }
+
+    // 如果断开的是当前账号，清除当前账号
+    if (targetWxid === this.currentWxid) {
+      this.currentWxid = undefined
+    }
+  }
+
+  // 断开所有连接
+  disconnectAll() {
+    console.log('断开所有WebSocket连接')
+    for (const [wxid, connection] of this.connections) {
+      this.stopHeartbeat(wxid)
+      if (connection.ws) {
+        connection.ws.close(1000, '主动断开所有连接')
+      }
+    }
+    this.connections.clear()
     this.currentWxid = undefined
   }
 
+  // 切换当前账号（不断开连接）
+  switchCurrentAccount(wxid: string) {
+    if (this.connections.has(wxid)) {
+      console.log(`切换当前账号到: ${wxid}`)
+      this.currentWxid = wxid
+      fileCacheManager.setCurrentWxid(wxid)
+      return true
+    } else {
+      console.warn(`账号 ${wxid} 没有WebSocket连接`)
+      return false
+    }
+  }
+
+  // 获取所有已连接的账号
+  getConnectedAccounts(): string[] {
+    return Array.from(this.connections.keys()).filter(wxid =>
+      this.isAccountConnected(wxid)
+    )
+  }
+
+  // 检查是否已设置事件监听器
+  hasEventListeners(): boolean {
+    return this.eventListeners.size > 0
+  }
+
   // 处理接收到的消息
-  private handleMessage(data: string) {
+  private handleMessage(data: string, wxid: string) {
     try {
       const message = JSON.parse(data)
 
@@ -354,8 +421,16 @@ export class WebSocketService {
 
       // 处理链接/小程序/文件消息 (msgType: 49)
       if (msg.msgType === 49) {
+        console.log('处理msgType 49消息:', {
+          contentType: msg.contentType,
+          extraData: msg.extraData,
+          content: msg.content,
+          msgTypeDesc: msg.msgTypeDesc
+        })
+
         // 检查是否是文件消息
         if (msg.contentType === 'file' || (msg.extraData && msg.extraData.type === 'file')) {
+          console.log('识别为文件消息，开始解析文件信息')
           // 解析文件信息
           const fileName = msg.extraData?.title || '未知文件'
           const fileExt = msg.extraData?.fileExt || ''
@@ -406,6 +481,26 @@ export class WebSocketService {
             originalContent: msg.originalContent
           }
           chatMessage.content = `[文件: ${fileName}]`
+
+          console.log('文件消息解析完成:', {
+            fileName,
+            fileSize,
+            fileExt,
+            attachId: attachId.substring(0, 50) + '...',
+            cdnUrl: cdnUrl.substring(0, 50) + '...',
+            messageType: chatMessage.type,
+            messageContent: chatMessage.content
+          })
+
+          console.log('文件消息解析完成:', {
+            fileName,
+            fileSize,
+            fileExt,
+            attachId: attachId.substring(0, 50) + '...',
+            cdnUrl: cdnUrl.substring(0, 50) + '...',
+            messageType: chatMessage.type,
+            messageContent: chatMessage.content
+          })
 
           // 将文件信息添加到缓存
           if (fileName && fileSize > 0 && attachId && msg.originalContent) {
@@ -557,6 +652,51 @@ export class WebSocketService {
 
 
 
+      // 处理好友请求消息
+      if (msg.msgType === 37) {
+        console.log('收到好友请求消息:', msg)
+
+        // 解析XML内容获取好友请求信息
+        if (msg.originalContent) {
+          try {
+            const parser = new DOMParser()
+            const xmlDoc = parser.parseFromString(msg.originalContent, 'text/xml')
+            const msgElement = xmlDoc.querySelector('msg')
+
+            if (msgElement) {
+              const friendRequestData = {
+                fromUserName: msgElement.getAttribute('fromusername') || '',
+                fromNickName: msgElement.getAttribute('fromnickname') || '',
+                content: msgElement.getAttribute('content') || '',
+                alias: msgElement.getAttribute('alias') || '',
+                bigHeadImgUrl: msgElement.getAttribute('bigheadimgurl') || '',
+                smallHeadImgUrl: msgElement.getAttribute('smallheadimgurl') || '',
+                ticket: msgElement.getAttribute('ticket') || '',
+                sex: msgElement.getAttribute('sex') || '0',
+                province: msgElement.getAttribute('province') || '',
+                city: msgElement.getAttribute('city') || '',
+                country: msgElement.getAttribute('country') || ''
+              }
+
+              console.log('解析的好友请求数据:', friendRequestData)
+
+              // 发送好友请求事件
+              this.emit('friend_request', {
+                type: 'friend_request',
+                data: friendRequestData,
+                timestamp: new Date(),
+                wxid: data.wxid
+              })
+            }
+          } catch (error) {
+            console.error('解析好友请求XML失败:', error)
+          }
+        }
+
+        // 不继续处理为普通聊天消息
+        return
+      }
+
       // 处理系统消息（撤回消息已在前面处理）
       if (msg.msgType === 10000) {
         // 使用originalContent作为系统消息内容，如果没有则使用content
@@ -581,6 +721,11 @@ export class WebSocketService {
     // 过滤状态通知消息
     if (msg.msgType === 51 || msg.contentType === 'status') {
       return true
+    }
+
+    // 好友请求消息需要特殊处理，不过滤
+    if (msg.msgType === 37) {
+      return false
     }
 
     // 过滤其他不需要显示的消息类型
@@ -625,46 +770,69 @@ export class WebSocketService {
   }
 
   // 开始心跳
-  private startHeartbeat() {
-    this.heartbeatInterval = window.setInterval(() => {
-      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+  private startHeartbeat(wxid: string) {
+    const connection = this.connections.get(wxid)
+    if (!connection) return
+
+    connection.heartbeatInterval = window.setInterval(() => {
+      if (connection.ws && connection.ws.readyState === WebSocket.OPEN) {
         const heartbeat = {
           type: 'heartbeat',
           timestamp: Date.now(),
+          wxid: wxid
         }
-        this.ws.send(JSON.stringify(heartbeat))
+        connection.ws.send(JSON.stringify(heartbeat))
       }
     }, WEBSOCKET_CONFIG.HEARTBEAT.INTERVAL)
   }
 
   // 停止心跳
-  private stopHeartbeat() {
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval)
-      this.heartbeatInterval = null
+  private stopHeartbeat(wxid: string) {
+    const connection = this.connections.get(wxid)
+    if (connection && connection.heartbeatInterval) {
+      clearInterval(connection.heartbeatInterval)
+      connection.heartbeatInterval = null
     }
   }
 
   // 安排重连
-  private scheduleReconnect() {
-    this.reconnectAttempts++
+  private scheduleReconnect(wxid: string) {
+    const connection = this.connections.get(wxid)
+    if (!connection) return
+
+    connection.reconnectAttempts++
 
     setTimeout(() => {
-      if (this.reconnectAttempts <= this.maxReconnectAttempts) {
-        this.connect(this.currentWxid)
+      if (connection.reconnectAttempts <= this.maxReconnectAttempts) {
+        this.connect(wxid)
       }
-    }, this.reconnectInterval * this.reconnectAttempts)
+    }, this.reconnectInterval * connection.reconnectAttempts)
   }
 
-  // 获取连接状态
+  // 获取连接状态（当前账号）
   get isConnected(): boolean {
-    return this.ws !== null && this.ws.readyState === WebSocket.OPEN
+    if (!this.currentWxid) return false
+    const connection = this.connections.get(this.currentWxid)
+    return connection !== undefined && connection.ws.readyState === WebSocket.OPEN
   }
 
-  // 发送消息到WebSocket
+  // 获取指定账号的连接状态
+  isAccountConnected(wxid: string): boolean {
+    const connection = this.connections.get(wxid)
+    return connection !== undefined && connection.ws.readyState === WebSocket.OPEN
+  }
+
+  // 发送消息到WebSocket（当前账号）
   send(message: any): boolean {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(message))
+    if (!this.currentWxid) return false
+    return this.sendToAccount(this.currentWxid, message)
+  }
+
+  // 发送消息到指定账号的WebSocket
+  sendToAccount(wxid: string, message: any): boolean {
+    const connection = this.connections.get(wxid)
+    if (connection && connection.ws.readyState === WebSocket.OPEN) {
+      connection.ws.send(JSON.stringify(message))
       return true
     }
     return false

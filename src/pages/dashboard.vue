@@ -57,6 +57,14 @@
             </div>
             <div class="account-actions">
               <el-button
+                type="success"
+                size="small"
+                @click.stop="reconnectAccount(account.wxid, 'heartbeat')"
+                title="开启心跳"
+              >
+                <el-icon><Connection /></el-icon>
+              </el-button>
+              <el-button
                 type="primary"
                 size="small"
                 @click.stop="openAccountManagement(account)"
@@ -122,15 +130,19 @@
       :account="selectedAccountForManagement"
       @account-updated="handleAccountUpdated"
     />
+
+    <!-- 好友请求通知 -->
+    <FriendRequestNotification />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { User, Plus, MoreFilled } from '@element-plus/icons-vue'
+import { User, Plus, MoreFilled, Connection } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRoute, useRouter } from 'vue-router'
+import { loginApi } from '@/api/auth'
 
 // 组件导入
 import LoginForm from '@/components/LoginForm.vue'
@@ -138,6 +150,7 @@ import FriendManagement from '@/components/FriendManagement.vue'
 import ChatInterface from '@/components/ChatInterface.vue'
 import AccountManager from '@/components/AccountManager.vue'
 import AccountManagementModal from '@/components/AccountManagementModal.vue'
+import FriendRequestNotification from '@/components/FriendRequestNotification.vue'
 
 // Store
 const authStore = useAuthStore()
@@ -180,14 +193,72 @@ const selectAccount = (account) => {
 
 const handleLoginSuccess = (accountData) => {
   authStore.addAccount(accountData)
-  handleLoginDialogClose()
-  ElMessage.success('登录成功！')
+
+  // 延迟关闭对话框，给用户看到成功提示
+  setTimeout(() => {
+    handleLoginDialogClose()
+    ElMessage.success('登录成功！')
+
+    // 刷新页面数据
+    nextTick(() => {
+      // 这里可以添加刷新逻辑，比如重新加载账号列表等
+      console.log('账号列表已更新')
+    })
+  }, 2000)
 }
 
 const handleLoginDialogClose = () => {
   showLoginDialog.value = false
   // 确保组件被完全销毁，清理所有定时器
   console.log('登录对话框关闭，组件将被销毁')
+}
+
+// 重连账号（心跳、初始化等）
+const reconnectAccount = async (wxid: string, type: string) => {
+  let apiUrl = ''
+  let buttonText = ''
+
+  switch (type) {
+    case 'auto':
+      apiUrl = '/Login/LoginTwiceAutoAuth'
+      buttonText = '自动重连'
+      break
+    case 'awaken':
+      apiUrl = '/Login/LoginAwaken'
+      buttonText = '唤醒登录'
+      break
+    case 'heartbeat':
+      apiUrl = '/Login/AutoHeartBeat'
+      buttonText = '开启心跳'
+      break
+    case 'init':
+      apiUrl = '/Login/Newinit'
+      buttonText = '重新初始化'
+      break
+    default:
+      ElMessage.error('未知的重连类型')
+      return
+  }
+
+  try {
+    ElMessage.info(`正在执行${buttonText}...`)
+
+    const response = await loginApi.autoHeartBeat(wxid)
+
+    if (response.Success) {
+      ElMessage.success(`${buttonText}成功！`)
+      // 延迟刷新账号状态
+      setTimeout(() => {
+        // 这里可以添加刷新账号状态的逻辑
+        console.log('账号状态已刷新')
+      }, 2000)
+    } else {
+      ElMessage.error(`${buttonText}失败: ${response.Message}`)
+    }
+  } catch (error) {
+    console.error(`${buttonText}失败:`, error)
+    ElMessage.error(`${buttonText}失败: ${error.message}`)
+  }
 }
 
 const openAccountManagement = (account) => {

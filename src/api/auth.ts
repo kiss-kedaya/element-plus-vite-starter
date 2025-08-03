@@ -51,6 +51,20 @@ export const loginApi = {
     return response as LoginResponse
   },
 
+  // 执行二次登录（自动心跳）
+  performSecondAuth: async (wxid: string): Promise<LoginResponse> => {
+    const response = await request.post<LoginResponse>(`/Login/LoginTwiceAutoAuth?wxid=${encodeURIComponent(wxid)}`)
+    // response 已经是后端返回的格式 {Code, Success, Message, Data}
+    return response as LoginResponse
+  },
+
+  // 开启自动心跳
+  autoHeartBeat: async (wxid: string): Promise<LoginResponse> => {
+    const response = await request.post<LoginResponse>(`/Login/AutoHeartBeat?wxid=${encodeURIComponent(wxid)}`)
+    // response 已经是后端返回的格式 {Code, Success, Message, Data}
+    return response as LoginResponse
+  },
+
   // 退出登录
   logout: async (wxid: string): Promise<LoginResponse> => {
     const response = await request.post<LoginResponse>('/Login/Logout', { Wxid: wxid })
@@ -70,6 +84,38 @@ export const loginApi = {
     const response = await request.post<LoginResponse>('/Tools/setproxy', params)
     // response 已经是后端返回的格式 {Code, Success, Message, Data}
     return response as LoginResponse
+  },
+
+  // 获取已设置的代理
+  getProxy: async (params: { Wxid: string }): Promise<{
+    Code: number;
+    Success: boolean;
+    Message: string;
+    Data?: ProxyConfig;
+  }> => {
+    const response = await request.post('/Tools/getproxy', params)
+    return response as any
+  },
+
+  // 测试代理连接
+  testProxy: async (params: {
+    Type: string;
+    Host: string;
+    Port: number;
+    ProxyUser?: string;
+    ProxyPassword?: string;
+  }): Promise<{
+    Code: number;
+    Success: boolean;
+    Message: string;
+    Data?: {
+      status: string;
+      responseTime?: number;
+      error?: string;
+    };
+  }> => {
+    const response = await request.post('/Tools/testproxy', params)
+    return response as any
   },
 
   // 设备复用登录 - 生成二维码

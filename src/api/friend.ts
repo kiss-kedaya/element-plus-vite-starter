@@ -38,6 +38,40 @@ export const friendApi = {
     return api.post("/Friend/PassVerify", params);
   },
 
+  // 获取自动同意好友状态
+  getAutoAcceptFriendStatus: (params: {
+    Wxid: string;
+  }): Promise<{
+    Code: number;
+    Success: boolean;
+    Message: string;
+    Data: {
+      wxid: string;
+      enable: boolean;
+      status: {
+        code: number;
+        description: string;
+      };
+      source: string;
+      updated_at?: string;
+      updated_by?: string;
+    };
+  }> => {
+    return api.get(`/Friend/AutoAcceptFriendGetStatus?wxid=${params.Wxid}`);
+  },
+
+  // 设置自动同意好友状态
+  setAutoAcceptFriendStatus: (params: {
+    Wxid: string;
+    Enable: boolean;
+  }): Promise<{
+    Code: number;
+    Success: boolean;
+    Message: string;
+  }> => {
+    return api.get(`/Friend/AutoAcceptFriendSetStatus?wxid=${params.Wxid}&enable=${params.Enable}`);
+  },
+
   // 删除好友
   deleteFriend: (params: {
     Wxid: string;

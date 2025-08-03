@@ -9,6 +9,10 @@
               <el-icon><Plus /></el-icon>
               批量导入
             </el-button>
+            <el-button type="warning" @click="updateProxyCountries">
+              <el-icon><Location /></el-icon>
+              更新地区
+            </el-button>
             <el-button @click="refreshProxyList">
               <el-icon><Refresh /></el-icon>
               刷新
@@ -165,7 +169,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh, Search, Connection } from '@element-plus/icons-vue'
+import { Plus, Refresh, Search, Connection, Location } from '@element-plus/icons-vue'
 import { proxyApi, type ProxyInfo, proxyStatusMap, getProxyCountries } from '@/api/proxy'
 
 // 响应式数据
@@ -373,6 +377,37 @@ const deleteProxy = async (id: number) => {
     if (error !== 'cancel') {
       console.error('删除代理失败:', error)
       ElMessage.error('删除代理失败')
+    }
+  }
+}
+
+// 批量更新代理地区信息
+const updateProxyCountries = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '此操作将为所有没有地区信息的代理自动识别地区，可能需要一些时间。是否继续？',
+      '确认更新',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    const response = await proxyApi.updateProxyCountries()
+    if (response.code === 0) {
+      ElMessage.success('地区信息更新已开始，请稍后刷新查看结果')
+      // 延迟刷新，给后端一些处理时间
+      setTimeout(() => {
+        refreshProxyList()
+      }, 3000)
+    } else {
+      ElMessage.error(response.message || '更新失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('更新地区信息失败:', error)
+      ElMessage.error('更新地区信息失败')
     }
   }
 }

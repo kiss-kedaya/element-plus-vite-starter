@@ -18,17 +18,20 @@ class FileCacheManager {
   private cache = new Map<string, CachedFileInfo>()
   private readonly CACHE_EXPIRE_TIME = 7 * 24 * 60 * 60 * 1000 // 7天过期
   private readonly MAX_CACHE_SIZE = 500 // 最大缓存数量
-  private readonly STORAGE_KEY = 'wechat_file_cache' // localStorage键名
-  private currentWxid: string = '' // 当前微信账号
+  private readonly STORAGE_KEY = 'wechat_file_cache' // localStorage键名（全局缓存）
+  private currentWxid: string = '' // 当前微信账号（仅用于日志记录）
 
   // 设置当前微信账号
   setCurrentWxid(wxid: string): void {
     console.log('设置当前微信账号:', { from: this.currentWxid, to: wxid })
 
     if (this.currentWxid !== wxid) {
-      console.log('切换微信账号，重新加载缓存:', { from: this.currentWxid, to: wxid })
+      console.log('切换微信账号，使用全局文件缓存:', { from: this.currentWxid, to: wxid })
       this.currentWxid = wxid
-      this.loadCacheFromStorage()
+      // 只在首次设置或缓存为空时加载
+      if (this.cache.size === 0) {
+        this.loadCacheFromStorage()
+      }
     } else if (this.currentWxid === wxid && this.cache.size === 0) {
       console.log('相同账号但缓存为空，尝试重新加载:', { wxid })
       this.loadCacheFromStorage()
@@ -40,9 +43,9 @@ class FileCacheManager {
     return `${fileName}_${fileSize}`
   }
 
-  // 生成存储键（包含微信账号）
+  // 生成存储键（全局缓存，不区分账号）
   private generateStorageKey(): string {
-    return `${this.STORAGE_KEY}_${this.currentWxid}`
+    return this.STORAGE_KEY
   }
 
   // 计算文件哈希值（简单实现）
@@ -313,6 +316,27 @@ export function debugLocalStorageCache() {
   })
 
   console.log('=== 调试信息结束 ===')
+}
+
+// 清理旧的按账号分别保存的缓存
+export function cleanOldAccountBasedCache() {
+  console.log('=== 清理旧的按账号分别保存的缓存 ===')
+
+  const allKeys = Object.keys(localStorage)
+  const oldCacheKeys = allKeys.filter(key => key.startsWith('wechat_file_cache_') && key !== 'wechat_file_cache')
+
+  console.log('发现旧的缓存键:', oldCacheKeys)
+
+  oldCacheKeys.forEach(key => {
+    try {
+      localStorage.removeItem(key)
+      console.log(`已删除旧缓存键: ${key}`)
+    } catch (error) {
+      console.error(`删除旧缓存键 ${key} 失败:`, error)
+    }
+  })
+
+  console.log('=== 旧缓存清理完成 ===')
 }
 
 // 在全局暴露调试函数

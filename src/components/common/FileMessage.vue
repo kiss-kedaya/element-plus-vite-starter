@@ -29,7 +29,7 @@
         </el-button>
         <!-- 有CDN信息可以下载 -->
         <el-button
-          v-else-if="cdnUrl && !fromMe"
+          v-else-if="cdnUrl && aesKey && attachId && !fromMe"
           type="warning"
           size="small"
           @click="downloadCdnFile"
@@ -37,6 +37,16 @@
         >
           <el-icon><Download /></el-icon>
           下载
+        </el-button>
+        <!-- 接收到的文件但缺少下载信息 -->
+        <el-button
+          v-else-if="!fromMe"
+          type="info"
+          size="small"
+          disabled
+        >
+          <el-icon><Document /></el-icon>
+          文件已接收
         </el-button>
         <!-- 自己发送的消息，根据状态显示 -->
         <el-button
@@ -110,6 +120,17 @@ interface Props {
 const props = defineProps<Props>()
 
 const downloading = ref(false)
+
+// 调试信息
+console.log('FileMessage组件接收到的props:', {
+  fileName: props.fileName,
+  fileSize: props.fileSize,
+  cdnUrl: props.cdnUrl ? props.cdnUrl.substring(0, 50) + '...' : 'undefined',
+  aesKey: props.aesKey ? props.aesKey.substring(0, 20) + '...' : 'undefined',
+  attachId: props.attachId ? props.attachId.substring(0, 50) + '...' : 'undefined',
+  fromMe: props.fromMe,
+  messageStatus: props.messageStatus
+})
 
 // 获取store实例
 const chatStore = useChatStore()

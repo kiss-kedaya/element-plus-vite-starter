@@ -253,50 +253,89 @@ const startLoginCheck = (deviceId: string) => {
         Uuid: deviceId
       })
 
-      if (response.Success && response.Data?.wxid) {
+      if (response.Success && response.Message === "登录成功") {
         clearInterval(countdownTimer!)
 
-        // 如果使用了代理，登录成功后自动设置代理
-        if (qrForm.value.proxy.ProxyIp) {
+        ElMessage.success('扫码登录成功！正在初始化...')
+
+        // 执行二次登录（自动心跳）
+        if (response.Data && response.Data.wxid) {
           try {
-            console.log('登录成功，正在设置代理...', qrForm.value.proxy)
-            const proxyResponse = await loginApi.setProxy({
-              Wxid: response.Data.wxid,
-              Type: 'SOCKS5', // 默认使用SOCKS5
-              Host: qrForm.value.proxy.ProxyIp,
-              Port: qrForm.value.proxy.Port,
-              User: qrForm.value.proxy.ProxyUser || '',
-              Password: qrForm.value.proxy.ProxyPassword || ''
-            })
-
-            if (proxyResponse.Success) {
-              console.log('代理设置成功:', proxyResponse)
-              ElMessage.success('登录成功，代理已自动配置')
-            } else {
-              console.warn('代理设置失败:', proxyResponse.Message)
-              ElMessage.warning(`登录成功，但代理设置失败: ${proxyResponse.Message}`)
-            }
+            await loginApi.performSecondAuth(response.Data.wxid)
+            ElMessage.success('账号初始化成功！')
           } catch (error) {
-            console.error('设置代理时发生错误:', error)
-            ElMessage.warning('登录成功，但代理设置失败')
+            console.error('二次认证失败:', error)
+            ElMessage.warning('账号初始化失败，请手动重连')
           }
-        } else {
-          ElMessage.success('登录成功')
-        }
 
-        const accountData = {
-          wxid: response.Data.wxid,
-          nickname: response.Data.nickname || qrForm.value.deviceName,
-          avatar: response.Data.avatar || '',
-          status: 'online' as const,
-          deviceType: 'Car', // 车载版设备类型
-          deviceId: qrForm.value.deviceId,
-          deviceName: qrForm.value.deviceName,
-          loginTime: new Date(),
-          proxy: qrForm.value.proxy.ProxyIp ? qrForm.value.proxy : undefined
+          // 如果使用了代理，登录成功后自动设置代理
+          if (qrForm.value.proxy.ProxyIp) {
+            try {
+              console.log('登录成功，正在设置代理...', qrForm.value.proxy)
+              const proxyResponse = await loginApi.setProxy({
+                Wxid: response.Data.wxid,
+                Type: 'SOCKS5', // 默认使用SOCKS5
+                Host: qrForm.value.proxy.ProxyIp,
+                Port: qrForm.value.proxy.Port,
+                User: qrForm.value.proxy.ProxyUser || '',
+                Password: qrForm.value.proxy.ProxyPassword || ''
+              })
+
+              if (proxyResponse.Success) {
+                console.log('代理设置成功:', proxyResponse)
+                ElMessage.success('代理已自动配置')
+              } else {
+                console.warn('代理设置失败:', proxyResponse.Message)
+                ElMessage.warning(`代理设置失败: ${proxyResponse.Message}`)
+              }
+            } catch (error) {
+              console.error('设置代理时发生错误:', error)
+              ElMessage.warning('代理设置失败')
+            }
+          }
+
+          const accountData = {
+            wxid: response.Data.wxid,
+            nickname: response.Data.nickname || qrForm.value.deviceName,
+            avatar: response.Data.avatar || '',
+            status: 'online' as const,
+            deviceType: 'Car', // 车载版设备类型
+            deviceId: qrForm.value.deviceId,
+            deviceName: qrForm.value.deviceName,
+            loginTime: new Date(),
+            proxy: qrForm.value.proxy.ProxyIp ? qrForm.value.proxy : undefined
+          }
+          emit('login-success', accountData)
         }
-        emit('login-success', accountData)
         return
+      } else if (response.Success && response.Data) {
+        const data = response.Data
+
+        if (data.expiredTime <= 0) {
+          // 二维码已过期
+          clearInterval(countdownTimer!)
+          ElMessage.error('二维码已过期，请重新生成')
+          resetQRCode()
+
+        } else if (data.status === 0) {
+          // 等待扫码
+          console.log(`等待扫码... (${data.expiredTime}秒后过期)`)
+
+        } else if (data.status === 1) {
+          // 已扫码，等待确认
+          const userName = data.nickName || '用户'
+          ElMessage.info(`${userName}已扫码，请在手机上确认登录`)
+
+        } else if (data.status === 4) {
+          // 用户取消登录
+          clearInterval(countdownTimer!)
+          ElMessage.warning('用户取消登录')
+          resetQRCode()
+
+        } else {
+          // 其他状态
+          console.log(`状态: ${data.status} (${data.expiredTime}秒后过期)`)
+        }
       }
     } catch (error) {
       console.error('检查登录状态失败:', error)

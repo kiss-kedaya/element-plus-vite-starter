@@ -102,6 +102,11 @@ export const proxyApi = {
     return api.post('/Proxy/ClearProxies')
   },
 
+  // 批量更新代理地区信息
+  updateProxyCountries: (): Promise<BaseResponse> => {
+    return api.post('/Proxy/UpdateProxyCountries')
+  },
+
   // 获取可用代理列表（用于账号添加时选择）
   getAvailableProxies: (country?: string): Promise<ProxyListResponse> => {
     return api.get('/Proxy/GetProxyList', {
