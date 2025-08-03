@@ -3,6 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import App from './App.vue'
 import { pinia } from './stores'
 import { cleanOldAccountBasedCache } from '@/utils/fileCache'
+import { initPresetFileCache } from '@/utils/presetFileCache'
 // 暂时注释掉懒加载相关导入，避免启动错误
 // import { lazy, lazyContainer } from './directives/lazy'
 // import { componentPreloader, smartPreloader } from './utils/lazyLoad'
@@ -88,6 +89,14 @@ app.use(pinia)
 app.use(router)
 
 app.mount('#app')
+
+// 初始化预置文件缓存
+try {
+  initPresetFileCache()
+  console.log('预置文件缓存初始化完成')
+} catch (error) {
+  console.error('预置文件缓存初始化失败:', error)
+}
 
 // 暂时注释掉智能预加载
 // setTimeout(() => {
