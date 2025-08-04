@@ -853,14 +853,17 @@ export const useChatStore = defineStore('chat', () => {
   // WebSocket连接管理
   const connectWebSocket = async (wxid: string): Promise<boolean> => {
     try {
+      console.log(`🔌 ChatStore尝试连接WebSocket: ${wxid}`)
       const { webSocketService } = await import('@/services/websocket')
 
       // 检查是否已经连接到该账号
       if (webSocketService.isAccountConnected(wxid)) {
-        console.log(`账号 ${wxid} 已有WebSocket连接，切换到该账号`)
+        console.log(`✅ 账号 ${wxid} 已有WebSocket连接，切换到该账号`)
         webSocketService.switchCurrentAccount(wxid)
         return true
       }
+
+      console.log(`🔗 账号 ${wxid} 尚未连接，开始建立新连接`)
 
       // 设置事件监听器（强制重新设置以确保正确绑定）
       webSocketService.on('chat_message', handleChatMessage)
@@ -869,12 +872,14 @@ export const useChatStore = defineStore('chat', () => {
       // 建立新的连接
       const connected = await webSocketService.connect(wxid)
       if (connected) {
-        console.log(`成功建立账号 ${wxid} 的WebSocket连接`)
+        console.log(`✅ 成功建立账号 ${wxid} 的WebSocket连接`)
+      } else {
+        console.warn(`❌ 建立账号 ${wxid} 的WebSocket连接失败`)
       }
       return connected
     }
     catch (error) {
-      console.error('WebSocket连接失败:', error)
+      console.error(`❌ WebSocket连接失败 (${wxid}):`, error)
       return false
     }
   }

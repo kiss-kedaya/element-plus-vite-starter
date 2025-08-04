@@ -872,12 +872,21 @@ watch(() => props.account?.wxid, async (newWxid, oldWxid) => {
 
     // 尝试建立或切换 WebSocket 连接（不断开其他账号的连接）
     try {
-      const connected = await chatStore.connectWebSocket(newWxid)
-      if (connected) {
-        console.log(`WebSocket已连接到账号: ${newWxid}`)
-      }
-      else {
-        console.warn(`WebSocket连接失败: ${newWxid}，将使用离线模式`)
+      const { webSocketService } = await import('@/services/websocket')
+
+      if (webSocketService.isAccountConnected(newWxid)) {
+        // 如果已经连接，只需要切换当前账号
+        console.log(`账号 ${newWxid} 已有WebSocket连接，切换到该账号`)
+        webSocketService.switchCurrentAccount(newWxid)
+      } else {
+        // 如果没有连接，尝试建立新连接
+        console.log(`账号 ${newWxid} 尚未连接WebSocket，尝试建立连接`)
+        const connected = await chatStore.connectWebSocket(newWxid)
+        if (connected) {
+          console.log(`WebSocket已连接到账号: ${newWxid}`)
+        } else {
+          console.warn(`WebSocket连接失败: ${newWxid}，将使用离线模式`)
+        }
       }
     }
     catch (error) {
@@ -957,14 +966,21 @@ onMounted(async () => {
       await loadFriendsAsSessions()
     }
 
-    // 尝试建立 WebSocket 连接（静默失败）
+    // 检查WebSocket是否已经连接，如果没有连接才尝试连接
     try {
-      const connected = await chatStore.connectWebSocket(props.account.wxid)
-      if (connected) {
+      const { webSocketService } = await import('@/services/websocket')
 
-      }
-      else {
-        console.warn('WebSocket连接失败，将使用离线模式')
+      if (!webSocketService.isAccountConnected(props.account.wxid)) {
+        console.log(`账号 ${props.account.wxid} 尚未连接WebSocket，尝试建立连接`)
+        const connected = await chatStore.connectWebSocket(props.account.wxid)
+        if (connected) {
+          console.log(`WebSocket连接成功: ${props.account.wxid}`)
+        } else {
+          console.warn('WebSocket连接失败，将使用离线模式')
+        }
+      } else {
+        console.log(`账号 ${props.account.wxid} 已有WebSocket连接，切换到该账号`)
+        webSocketService.switchCurrentAccount(props.account.wxid)
       }
     }
     catch (error) {

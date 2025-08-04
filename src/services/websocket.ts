@@ -43,14 +43,30 @@ export class WebSocketService {
 
   // 连接所有已登录的账号
   async connectAllAccounts(accounts: string[]): Promise<void> {
-    console.log('开始连接所有账号的WebSocket:', accounts)
+    console.log('🚀 开始批量连接所有账号的WebSocket:', accounts)
+
+    // 过滤掉已经连接的账号
+    const accountsToConnect = accounts.filter(wxid => {
+      const isConnected = this.isAccountConnected(wxid)
+      if (isConnected) {
+        console.log(`⏭️ 账号 ${wxid} 已连接，跳过`)
+      }
+      return !isConnected
+    })
+
+    if (accountsToConnect.length === 0) {
+      console.log('✅ 所有账号都已连接，无需重复连接')
+      return
+    }
+
+    console.log('📋 需要连接的账号:', accountsToConnect)
 
     // 更新自动连接账号列表
     this.autoConnectAccounts.clear()
     accounts.forEach(wxid => this.autoConnectAccounts.add(wxid))
 
     // 并发连接所有账号
-    const connectionPromises = accounts.map(async (wxid) => {
+    const connectionPromises = accountsToConnect.map(async (wxid) => {
       try {
         await this.connect(wxid)
         console.log(`✅ 账号 ${wxid} WebSocket连接成功`)
@@ -61,7 +77,7 @@ export class WebSocketService {
     })
 
     await Promise.allSettled(connectionPromises)
-    console.log('所有账号WebSocket连接尝试完成')
+    console.log('🎉 所有账号WebSocket连接尝试完成')
   }
 
   // 添加账号到自动连接列表
@@ -112,10 +128,12 @@ export class WebSocketService {
         return
       }
 
+      console.log(`🔄 尝试连接WebSocket: ${wxid}`)
+
       // 检查是否已经有该账号的连接
       const existingConnection = this.connections.get(wxid)
       if (existingConnection && existingConnection.ws.readyState === WebSocket.OPEN) {
-        console.log(`WebSocket已连接到 ${wxid}，复用现有连接`)
+        console.log(`✅ WebSocket已连接到 ${wxid}，复用现有连接`)
         this.currentWxid = wxid
         fileCacheManager.setCurrentWxid(wxid)
         resolve(true)
@@ -124,13 +142,13 @@ export class WebSocketService {
 
       // 如果连接存在但已断开，清理旧连接
       if (existingConnection && existingConnection.ws.readyState !== WebSocket.OPEN) {
-        console.log(`清理账号 ${wxid} 的旧连接，状态: ${existingConnection.ws.readyState}`)
+        console.log(`🧹 清理账号 ${wxid} 的旧连接，状态: ${existingConnection.ws.readyState}`)
         this.connections.delete(wxid)
       }
 
       // 检查是否正在连接中
       if (existingConnection && existingConnection.isConnecting) {
-        console.log('WebSocket正在连接中，等待完成...')
+        console.log(`⏳ WebSocket正在连接中: ${wxid}，拒绝重复连接`)
         reject(new Error('WebSocket正在连接中'))
         return
       }
