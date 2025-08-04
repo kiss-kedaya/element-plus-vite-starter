@@ -197,10 +197,25 @@ export const useCrossAccountMessageStore = defineStore('crossAccountMessage', ()
     if (accountStats.value[wxid]) {
       accountStats.value[wxid].unreadCount = 0
     }
-    
+
     // 同时清除auth store中的计数
     const authStore = useAuthStore()
     authStore.clearAccountUnreadCount(wxid)
+  }
+
+  // 清除账号的跨账号消息（在消息同步到聊天界面后调用）
+  const clearAccountMessages = (wxid: string) => {
+    if (accountMessages.value[wxid]) {
+      console.log(`清除账号 ${wxid} 的 ${accountMessages.value[wxid].length} 条跨账号消息`)
+      accountMessages.value[wxid] = []
+    }
+
+    // 重置统计信息
+    if (accountStats.value[wxid]) {
+      accountStats.value[wxid].unreadCount = 0
+      accountStats.value[wxid].lastMessage = undefined
+      accountStats.value[wxid].lastMessageTime = undefined
+    }
   }
 
   // 获取账号的消息列表
@@ -242,6 +257,7 @@ export const useCrossAccountMessageStore = defineStore('crossAccountMessage', ()
     getAccountUnreadCount,
     getAccountLastMessage,
     clearAccountUnreadCount,
+    clearAccountMessages,
     getAccountMessages,
     clearAllData,
     destroy

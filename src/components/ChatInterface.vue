@@ -27,6 +27,7 @@ import { useNotification } from '@/composables'
 import { useChatStore } from '@/stores/chat'
 import { useFriendStore } from '@/stores/friend'
 import { useAuthStore } from '@/stores/auth'
+import { useContactStore } from '@/stores/contact'
 
 // Props
 const props = defineProps<{
@@ -37,6 +38,7 @@ const props = defineProps<{
 const chatStore = useChatStore()
 const friendStore = useFriendStore()
 const authStore = useAuthStore()
+const contactStore = useContactStore()
 
 // Composables
 const { showError, showSuccess, confirmDelete } = useNotification()
@@ -413,6 +415,8 @@ function showSessionContextMenu(event: MouseEvent, session: ChatSession) {
   event.preventDefault()
   event.stopPropagation()
 
+  console.log('显示右键菜单:', session.name, { x: event.clientX, y: event.clientY })
+
   // 计算菜单位置，确保不超出视口
   let x = event.clientX
   let y = event.clientY
@@ -434,6 +438,8 @@ function showSessionContextMenu(event: MouseEvent, session: ChatSession) {
     y,
     session,
   }
+
+  console.log('菜单已设置为可见:', sessionContextMenu.value)
 }
 
 // 隐藏聊天列表右键菜单
@@ -444,8 +450,14 @@ function hideSessionContextMenu() {
 
 // 处理聊天列表右键菜单操作
 function handleSessionContextMenuAction(action: string) {
+  console.log('菜单项被点击:', action)
   const session = sessionContextMenu.value.session
-  if (!session) return
+  if (!session) {
+    console.error('没有选中的会话')
+    return
+  }
+
+  console.log('处理会话操作:', action, session.name)
 
   switch (action) {
     case 'remark':
@@ -835,6 +847,18 @@ async function refreshContactInfo() {
   }
 }
 
+// 自动更新消息发送者信息
+const autoUpdateSenderInfo = async (sessionId: string) => {
+  if (!props.account?.wxid) return
+
+  try {
+    // 异步更新发送者信息，不阻塞消息显示
+    await chatStore.updateSessionContactInfo(props.account.wxid, sessionId, false)
+  } catch (error) {
+    console.error('自动更新发送者信息失败:', error)
+  }
+}
+
 // 监听账号变化
 watch(() => props.account?.wxid, async (newWxid, oldWxid) => {
   if (newWxid && newWxid !== oldWxid) {
@@ -862,6 +886,21 @@ watch(() => props.account?.wxid, async (newWxid, oldWxid) => {
     }
   }
 })
+
+// 监听消息变化，自动更新发送者信息
+watch(() => chatStore.currentMessages, (newMessages, oldMessages) => {
+  if (!props.account?.wxid || !newMessages || !oldMessages) return
+
+  // 检查是否有新消息
+  if (newMessages.length > oldMessages.length) {
+    const newMessage = newMessages[newMessages.length - 1]
+
+    // 如果是收到的消息（非自己发送），自动更新发送者信息
+    if (!newMessage.fromMe && newMessage.sessionId) {
+      autoUpdateSenderInfo(newMessage.sessionId)
+    }
+  }
+}, { deep: true })
 
 // 监听当前会话变化，切换会话时滚动到底部
 watch(
@@ -1139,6 +1178,10 @@ onUnmounted(() => {
 
     <!-- 聊天列表右键菜单 -->
     <Teleport to="body">
+      <!-- 右键菜单遮罩层 -->
+      <div v-if="sessionContextMenu.visible" class="context-menu-overlay" @click="hideSessionContextMenu"
+        @contextmenu.prevent="hideSessionContextMenu"></div>
+
       <div v-if="sessionContextMenu.visible" class="session-context-menu" :style="{
         left: sessionContextMenu.x + 'px',
         top: sessionContextMenu.y + 'px'
@@ -1163,10 +1206,6 @@ onUnmounted(() => {
           <span>删除好友</span>
         </div>
       </div>
-
-      <!-- 右键菜单遮罩层 -->
-      <div v-if="sessionContextMenu.visible" class="context-menu-overlay" @click="hideSessionContextMenu"
-        @contextmenu.prevent="hideSessionContextMenu"></div>
     </Teleport>
 
     <!-- 备注修改对话框 -->
@@ -1850,6 +1889,7 @@ onUnmounted(() => {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   min-width: 150px;
   overflow: hidden;
+  z-index: 9999;
 
   .context-menu-item {
     display: flex;
@@ -1895,5 +1935,6 @@ onUnmounted(() => {
   right: 0;
   bottom: 0;
   background: transparent;
+  z-index: 9998;
 }
 </style>

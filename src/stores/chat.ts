@@ -6,6 +6,7 @@ import { friendApi } from '@/api/friend'
 import { uploadFile } from '@/api'
 // 使用动态导入避免与其他地方的动态导入冲突
 import { useAuthStore } from '@/stores/auth'
+import { useContactStore } from '@/stores/contact'
 import { fileCacheManager } from '@/utils/fileCache'
 import { ElMessage } from 'element-plus'
 
@@ -16,6 +17,9 @@ export const useChatStore = defineStore('chat', () => {
   const messages = ref<Record<string, ChatMessage[]>>({})
   const isLoading = ref(false)
   const isSending = ref(false)
+
+  // 联系人store
+  const contactStore = useContactStore()
 
   // 缓存键名
   const CACHE_KEYS = {
@@ -714,6 +718,111 @@ export const useChatStore = defineStore('chat', () => {
     messages.value = {}
   }
 
+  // 同步跨账号消息到当前聊天界面
+  const syncCrossAccountMessages = async (wxid: string) => {
+    try {
+      // 动态导入跨账号消息store以避免循环依赖
+      const { useCrossAccountMessageStore } = await import('./crossAccountMessage')
+      const crossAccountStore = useCrossAccountMessageStore()
+
+      // 获取该账号的跨账号消息
+      const crossMessages = crossAccountStore.getAccountMessages(wxid)
+
+      if (crossMessages.length === 0) {
+        console.log(`账号 ${wxid} 没有跨账号消息需要同步`)
+        return
+      }
+
+      console.log(`开始同步账号 ${wxid} 的 ${crossMessages.length} 条跨账号消息`)
+
+      // 按会话分组消息
+      const messagesBySession: Record<string, any[]> = {}
+
+      crossMessages.forEach(crossMsg => {
+        const sessionId = crossMsg.sessionId
+        if (!messagesBySession[sessionId]) {
+          messagesBySession[sessionId] = []
+        }
+
+        // 转换跨账号消息格式为聊天消息格式
+        const chatMessage = {
+          id: crossMsg.id,
+          content: crossMsg.content,
+          timestamp: crossMsg.timestamp,
+          fromMe: crossMsg.fromMe,
+          type: crossMsg.type,
+          status: 'received',
+          senderName: crossMsg.senderName,
+          isGroupMessage: crossMsg.isGroupMessage,
+          // 标记为跨账号同步的消息
+          isCrossAccountSync: true
+        }
+
+        messagesBySession[sessionId].push(chatMessage)
+      })
+
+      // 将消息添加到对应的会话中
+      Object.entries(messagesBySession).forEach(([sessionId, msgs]) => {
+        // 确保会话存在
+        if (!messages.value[sessionId]) {
+          messages.value[sessionId] = []
+        }
+
+        // 检查消息是否已存在（避免重复添加）
+        const existingIds = new Set(messages.value[sessionId].map(m => m.id))
+        const newMessages = msgs.filter(msg => !existingIds.has(msg.id))
+
+        if (newMessages.length > 0) {
+          // 按时间戳排序并添加到消息列表
+          messages.value[sessionId].push(...newMessages)
+          messages.value[sessionId].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+
+          console.log(`会话 ${sessionId} 同步了 ${newMessages.length} 条跨账号消息`)
+
+          // 更新或创建会话信息
+          let session = sessions.value.find(s => s.id === sessionId)
+          if (!session) {
+            // 如果会话不存在，创建一个基本的会话
+            const firstMessage = newMessages[0]
+            session = {
+              id: sessionId,
+              name: firstMessage.senderName || sessionId,
+              avatar: '',
+              type: firstMessage.isGroupMessage ? 'group' : 'friend',
+              lastMessage: '',
+              lastMessageTime: new Date(),
+              unreadCount: 0,
+              isOnline: false,
+            }
+            sessions.value.unshift(session)
+            console.log(`为跨账号消息创建新会话: ${sessionId}`)
+          }
+
+          // 更新会话的最后消息信息
+          const lastMessage = newMessages[newMessages.length - 1]
+          session.lastMessage = lastMessage.content
+          session.lastMessageTime = lastMessage.timestamp
+
+          // 如果消息不是自己发送的，增加未读计数
+          if (!lastMessage.fromMe) {
+            session.unreadCount += newMessages.filter(m => !m.fromMe).length
+          }
+        }
+      })
+
+      // 保存同步后的数据到缓存
+      saveCachedData(wxid)
+
+      // 清除已同步的跨账号消息，避免重复同步
+      crossAccountStore.clearAccountMessages(wxid)
+
+      console.log(`账号 ${wxid} 的跨账号消息同步完成`)
+
+    } catch (error) {
+      console.error('同步跨账号消息失败:', error)
+    }
+  }
+
   // 切换账号时的数据管理
   const switchAccount = (newWxid: string, oldWxid?: string) => {
     // 保存当前账号的数据到缓存
@@ -728,7 +837,12 @@ export const useChatStore = defineStore('chat', () => {
     // 加载新账号的缓存数据
     if (newWxid) {
       loadCachedData(newWxid)
+      // 加载联系人缓存
+      contactStore.loadContactCache(newWxid)
       console.log(`已切换到账号 ${newWxid}`)
+
+      // 同步跨账号消息到聊天界面
+      syncCrossAccountMessages(newWxid)
 
       // 清除新账号的未读计数（因为用户已经切换到这个账号）
       const authStore = useAuthStore()
@@ -980,36 +1094,7 @@ export const useChatStore = defineStore('chat', () => {
         // 异步获取联系人详情并更新会话信息
         const authStore = useAuthStore()
         if (authStore.currentAccount?.wxid) {
-          getContactDetail(authStore.currentAccount.wxid, sessionId).then((contactInfo) => {
-            if (contactInfo) {
-              // 找到会话在数组中的索引
-              const sessionIndex = sessions.value.findIndex(s => s.id === sessionId)
-              if (sessionIndex !== -1) {
-                // 创建新的会话对象来触发响应式更新
-                const updatedSession = {
-                  ...sessions.value[sessionIndex],
-                  name: contactInfo.isGroup 
-                    ? (contactInfo.nickname || sessionId)
-                    : (contactInfo.remark || contactInfo.nickname || contactInfo.alias || sessionId),
-                  type: (contactInfo.isGroup ? 'group' : 'friend') as 'friend' | 'group',
-                  avatar: contactInfo.avatar || ''
-                }
-                
-                // 替换数组中的会话对象
-                sessions.value[sessionIndex] = updatedSession
-                
-                // 如果这是当前选中的会话，也要更新currentSession
-                if (currentSession.value?.id === sessionId) {
-                  currentSession.value = updatedSession
-                }
-                
-                console.log('会话信息已更新:', updatedSession.name, updatedSession.avatar, '类型:', updatedSession.type)
-                
-                // 保存到缓存
-                saveCachedData(authStore.currentAccount.wxid)
-              }
-            }
-          })
+          updateSessionContactInfo(authStore.currentAccount.wxid, sessionId)
         }
       }
 
@@ -1101,6 +1186,49 @@ export const useChatStore = defineStore('chat', () => {
     handleChatMessage(testMessage)
   }
 
+  // 更新会话联系人信息
+  const updateSessionContactInfo = async (accountWxid: string, sessionId: string, forceRefresh = false) => {
+    try {
+      // 使用联系人store获取最新信息
+      const contactInfo = await contactStore.updateContactInfo(accountWxid, sessionId, forceRefresh)
+
+      if (contactInfo) {
+        // 找到会话在数组中的索引
+        const sessionIndex = sessions.value.findIndex(s => s.id === sessionId)
+        if (sessionIndex !== -1) {
+          // 创建新的会话对象来触发响应式更新
+          const updatedSession = {
+            ...sessions.value[sessionIndex],
+            name: contactInfo.isGroup
+              ? (contactInfo.groupName || contactInfo.nickname || sessionId)
+              : (contactInfo.remark || contactInfo.nickname || contactInfo.alias || sessionId),
+            type: (contactInfo.isGroup ? 'group' : 'friend') as 'friend' | 'group',
+            avatar: contactInfo.avatar || ''
+          }
+
+          // 替换数组中的会话对象
+          sessions.value[sessionIndex] = updatedSession
+
+          // 如果这是当前选中的会话，也要更新currentSession
+          if (currentSession.value?.id === sessionId) {
+            currentSession.value = updatedSession
+          }
+
+          console.log('会话联系人信息已更新:', updatedSession.name, updatedSession.avatar, '类型:', updatedSession.type)
+
+          // 保存到缓存
+          saveCachedData(accountWxid)
+
+          return updatedSession
+        }
+      }
+    } catch (error) {
+      console.error('更新会话联系人信息失败:', error)
+    }
+
+    return null
+  }
+
   // 更新会话信息
   const updateSessionInfo = (sessionId: string, updates: Partial<ChatSession>) => {
     const sessionIndex = sessions.value.findIndex(s => s.id === sessionId)
@@ -1190,6 +1318,7 @@ export const useChatStore = defineStore('chat', () => {
     syncMessages,
     testWebSocketMessage,
     updateSessionInfo,
+    updateSessionContactInfo,
     removeSession,
     updateSessionName,
 
@@ -1197,6 +1326,7 @@ export const useChatStore = defineStore('chat', () => {
     loadCachedData,
     saveCachedData,
     switchAccount,
+    syncCrossAccountMessages,
     clearCache,
   }
 })

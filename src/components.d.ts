@@ -15,6 +15,7 @@ declare module 'vue' {
     BaseModal: typeof import('./components/common/BaseModal.vue')['default']
     BaseSide: typeof import('./components/layouts/BaseSide.vue')['default']
     ChatInterface: typeof import('./components/ChatInterface.vue')['default']
+    ContactInfoTest: typeof import('./components/ContactInfoTest.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']
     ElAside: typeof import('element-plus/es')['ElAside']
     ElAvatar: typeof import('element-plus/es')['ElAvatar']
