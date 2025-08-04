@@ -55,6 +55,7 @@ declare module 'vue' {
     ElTag: typeof import('element-plus/es')['ElTag']
     ElTooltip: typeof import('element-plus/es')['ElTooltip']
     EmojiImage: typeof import('./components/common/EmojiImage.vue')['default']
+    FeatureProxyManagement: typeof import('./components/feature/Proxy/FeatureProxyManagement.vue')['default']
     FileCacheManager: typeof import('./components/business/FileCacheManager.vue')['default']
     FileMessage: typeof import('./components/common/FileMessage.vue')['default']
     FriendManagement: typeof import('./components/FriendManagement.vue')['default']

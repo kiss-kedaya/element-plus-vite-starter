@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { ApiResponse } from '@/types'
+import type { ApiResponse } from '../types/index'
 
 // 创建axios实例
 export const api = axios.create({

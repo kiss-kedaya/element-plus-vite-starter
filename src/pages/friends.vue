@@ -286,8 +286,7 @@ const goBack = () => {
 const selectAccount = async (account: any) => {
   // 如果切换到不同的账号，先清空当前好友列表
   if (authStore.currentAccount?.wxid !== account.wxid) {
-    friends.value = []
-    filteredFriends.value = []
+    friendStore.setFriends(account.wxid, [])
     searchKeyword.value = ''
     ElMessage.info(`已切换到账号：${account.nickname}，正在获取通讯录...`)
   }

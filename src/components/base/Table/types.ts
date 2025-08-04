@@ -104,15 +104,15 @@ export interface TableProps {
   events?: TableEvents
 }
 
-// 导出所有类型
+// 导出所有类型（重命名以避免冲突）
 export type {
-  TableColumn,
-  TableSort,
-  TableSelection,
-  PaginationConfig,
-  TableAction,
-  TableConfig,
-  TableEvents,
-  TableMethods,
-  TableProps
+  TableColumn as BaseTableColumn,
+  TableSort as BaseTableSort,
+  TableSelection as BaseTableSelection,
+  PaginationConfig as BasePaginationConfig,
+  TableAction as BaseTableAction,
+  TableConfig as BaseTableConfig,
+  TableEvents as BaseTableEvents,
+  TableMethods as BaseTableMethods,
+  TableProps as BaseTableProps
 }

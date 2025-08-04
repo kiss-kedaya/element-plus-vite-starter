@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useAuthStore } from './auth'
-import { webSocketService } from '@/services/websocket'
+// 使用动态导入避免与其他地方的动态导入冲突
 import { ElNotification } from 'element-plus'
 
 // 跨账号消息类型定义
@@ -45,26 +45,32 @@ export const useCrossAccountMessageStore = defineStore('crossAccountMessage', ()
   }
 
   // 初始化跨账号消息监听
-  const initializeCrossAccountMessaging = () => {
+  const initializeCrossAccountMessaging = async () => {
     if (isInitialized.value) return
 
     console.log('初始化跨账号消息监听')
 
-    // 监听所有账号的消息
-    webSocketService.on('chat_message', handleCrossAccountMessage)
-    webSocketService.on('friend_request', handleCrossAccountFriendRequest)
+    try {
+      const { webSocketService } = await import('@/services/websocket')
 
-    // 监听连接状态变化
-    webSocketService.on('connection_status', (connected: boolean, wxid: string) => {
-      console.log(`账号 ${wxid} 连接状态变化: ${connected ? '已连接' : '已断开'}`)
-      if (connected) {
-        console.log(`✅ 账号 ${wxid} WebSocket连接已建立，开始监听消息`)
-      } else {
-        console.log(`❌ 账号 ${wxid} WebSocket连接已断开`)
-      }
-    })
+      // 监听所有账号的消息
+      webSocketService.on('chat_message', handleCrossAccountMessage)
+      webSocketService.on('friend_request', handleCrossAccountFriendRequest)
 
-    isInitialized.value = true
+      // 监听连接状态变化
+      webSocketService.on('connection_status', (connected: boolean, wxid: string) => {
+        console.log(`账号 ${wxid} 连接状态变化: ${connected ? '已连接' : '已断开'}`)
+        if (connected) {
+          console.log(`✅ 账号 ${wxid} WebSocket连接已建立，开始监听消息`)
+        } else {
+          console.log(`❌ 账号 ${wxid} WebSocket连接已断开`)
+        }
+      })
+
+      isInitialized.value = true
+    } catch (error) {
+      console.error('初始化跨账号消息监听失败:', error)
+    }
   }
 
   // 处理跨账号聊天消息
@@ -209,11 +215,16 @@ export const useCrossAccountMessageStore = defineStore('crossAccountMessage', ()
   }
 
   // 销毁监听器
-  const destroy = () => {
+  const destroy = async () => {
     if (isInitialized.value) {
-      webSocketService.off('chat_message', handleCrossAccountMessage)
-      webSocketService.off('friend_request', handleCrossAccountFriendRequest)
-      isInitialized.value = false
+      try {
+        const { webSocketService } = await import('@/services/websocket')
+        webSocketService.off('chat_message', handleCrossAccountMessage)
+        webSocketService.off('friend_request', handleCrossAccountFriendRequest)
+        isInitialized.value = false
+      } catch (error) {
+        console.error('销毁跨账号消息监听失败:', error)
+      }
     }
   }
 

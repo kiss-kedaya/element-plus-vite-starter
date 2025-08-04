@@ -4,7 +4,7 @@ import { computed, ref } from 'vue'
 import { chatApi } from '@/api/chat'
 import { friendApi } from '@/api/friend'
 import { uploadFile } from '@/api'
-import { webSocketService } from '@/services/websocket'
+// 使用动态导入避免与其他地方的动态导入冲突
 import { useAuthStore } from '@/stores/auth'
 import { fileCacheManager } from '@/utils/fileCache'
 import { ElMessage } from 'element-plus'
@@ -117,7 +117,7 @@ export const useChatStore = defineStore('chat', () => {
     const cachedMessages = loadFromCache(CACHE_KEYS.MESSAGES, wxid)
     if (cachedMessages && typeof cachedMessages === 'object') {
       messages.value = cachedMessages
-      const messageCount = Object.values(cachedMessages).reduce((total, msgs) => total + (Array.isArray(msgs) ? msgs.length : 0), 0)
+      const messageCount = Object.values(cachedMessages).reduce((total: number, msgs) => total + (Array.isArray(msgs) ? msgs.length : 0), 0)
       console.log(`加载了 ${messageCount} 条缓存消息`)
     }
 
@@ -739,6 +739,8 @@ export const useChatStore = defineStore('chat', () => {
   // WebSocket连接管理
   const connectWebSocket = async (wxid: string): Promise<boolean> => {
     try {
+      const { webSocketService } = await import('@/services/websocket')
+
       // 检查是否已经连接到该账号
       if (webSocketService.isAccountConnected(wxid)) {
         console.log(`账号 ${wxid} 已有WebSocket连接，切换到该账号`)
@@ -937,14 +939,14 @@ export const useChatStore = defineStore('chat', () => {
       // 视频相关字段
       videoAesKey: data.videoAesKey,
       videoMd5: data.videoMd5,
-      videoNewMd5: data.videoNewMd5,
+      // videoNewMd5: data.videoNewMd5, // 移除不存在的字段
       videoDataLen: data.videoDataLen,
       videoCompressType: data.videoCompressType,
       videoPlayLength: data.videoPlayLength,
       videoCdnUrl: data.videoCdnUrl,
       videoThumbUrl: data.videoThumbUrl,
       videoThumbAesKey: data.videoThumbAesKey,
-      videoThumbLength: data.videoThumbLength,
+      // videoThumbLength: data.videoThumbLength, // 移除不存在的字段
       videoThumbWidth: data.videoThumbWidth,
       videoThumbHeight: data.videoThumbHeight,
       videoFromUserName: data.videoFromUserName,
@@ -1041,8 +1043,13 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  const disconnectWebSocket = () => {
-    webSocketService.disconnect()
+  const disconnectWebSocket = async () => {
+    try {
+      const { webSocketService } = await import('@/services/websocket')
+      webSocketService.disconnect()
+    } catch (error) {
+      console.error('断开WebSocket连接失败:', error)
+    }
   }
 
   // 创建或获取聊天会话

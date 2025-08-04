@@ -1,5 +1,5 @@
 import { createApp } from 'vue'
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import App from './App.vue'
 import { pinia } from './stores'
 import { cleanOldAccountBasedCache } from '@/utils/fileCache'
@@ -48,7 +48,7 @@ import 'element-plus/theme-chalk/src/message-box.scss'
 import './styles/element-override.scss'
 
 // 路由配置
-const routes = [
+const routes: RouteRecordRaw[] = [
   {
     path: '/',
     redirect: '/dashboard'

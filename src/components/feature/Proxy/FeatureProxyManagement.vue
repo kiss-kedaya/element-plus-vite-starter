@@ -1,5 +1,5 @@
 <template>
-  <div class="proxy-management">
+  <div class="feature-proxy-management">
     <el-card>
       <template #header>
         <div class="card-header">
@@ -14,35 +14,27 @@
       </template>
 
       <!-- 统计信息 -->
-      <!-- <ProxyStats :stats="stats" /> -->
       <div class="stats-section">
         <el-row :gutter="16">
           <el-col :span="6">
             <el-statistic title="总数" :value="stats.total" />
           </el-col>
           <el-col :span="6">
-            <el-statistic title="可用" :value="stats.active" value-style="color: #67c23a" />
+            <el-statistic title="可用" :value="stats.active" />
           </el-col>
           <el-col :span="6">
-            <el-statistic title="未测试" :value="stats.inactive" value-style="color: #909399" />
+            <el-statistic title="未测试" :value="stats.inactive" />
           </el-col>
           <el-col :span="6">
-            <el-statistic title="错误" :value="stats.error" value-style="color: #f56c6c" />
+            <el-statistic title="错误" :value="stats.error" />
           </el-col>
         </el-row>
       </div>
 
-      <!-- 筛选器 -->
-      <!-- <ProxyFilter
-        v-model:filters="filters"
-        :countries="countries"
-        @filter-change="handleFilterChange"
-        @test-selected="testSelectedProxies"
-        :selected-count="selectedProxies.length"
-      /> -->
+      <!-- 筛选区域 -->
       <div class="filter-section">
         <el-row :gutter="16">
-          <el-col :span="6">
+          <el-col :span="4">
             <el-select v-model="filters.status" placeholder="状态筛选" clearable @change="handleFilterChange">
               <el-option label="全部" value="" />
               <el-option label="可用" value="active" />
@@ -51,9 +43,8 @@
               <el-option label="错误" value="error" />
             </el-select>
           </el-col>
-          <el-col :span="6">
+          <el-col :span="4">
             <el-select v-model="filters.country" placeholder="地区筛选" clearable @change="handleFilterChange">
-              <el-option label="全部" value="" />
               <el-option v-for="country in countries" :key="country" :label="country" :value="country" />
             </el-select>
           </el-col>
@@ -192,10 +183,13 @@ const pagination = reactive({
 const adaptedGetProxyList = async (params: any) => {
   const response = await proxyApi.getProxyList(params)
   return {
-    success: true,
-    code: 200,
-    message: 'success',
-    data: response
+    Code: 200,
+    Success: true,
+    Message: 'success',
+    Data: {
+      list: response.data?.list || [],
+      total: response.data?.total || 0
+    }
   }
 }
 
@@ -231,59 +225,31 @@ const handlePageSizeChange = (newPageSize: number) => {
   changePageSize(newPageSize)
 }
 
-// 使用定时器Hook进行自动刷新
-const { start: startAutoRefresh, stop: stopAutoRefresh } = useTimer(
-  refreshProxyList,
-  30000, // 30秒刷新一次
-  { autoStart: true }
-)
-
 // 表格列配置
-const tableColumns: TableColumn[] = [
-  {
-    prop: 'status',
-    label: '状态',
-    width: 80,
-    slot: true
-  },
-  {
-    prop: 'ip',
-    label: 'IP地址',
-    width: 140
-  },
-  {
-    prop: 'port',
-    label: '端口',
-    width: 80
-  },
-  {
-    prop: 'username',
-    label: '用户名',
-    width: 120
-  },
-  {
-    prop: 'country',
-    label: '地区',
-    width: 100
-  },
-  {
-    prop: 'response_time',
-    label: '响应时间',
-    width: 100,
-    slot: true
-  },
-  {
-    prop: 'expire_date',
-    label: '过期时间',
-    width: 120
-  }
-]
+const tableColumns = computed<TableColumn[]>(() => [
+  { prop: 'ip', label: 'IP地址', width: 150 },
+  { prop: 'port', label: '端口', width: 80 },
+  { prop: 'username', label: '用户名', width: 120 },
+  { prop: 'password', label: '密码', width: 120 },
+  { prop: 'status', label: '状态', width: 100, slot: 'status' },
+  { prop: 'response_time', label: '响应时间', width: 100, slot: 'response_time' },
+  { prop: 'country', label: '地区', width: 100 },
+  { prop: 'region', label: '区域', width: 100 },
+  { prop: 'last_test', label: '最后测试', width: 150 },
+  { prop: 'expire_date', label: '过期时间', width: 150 },
+  { prop: 'actions', label: '操作', width: 200, slot: 'actions', fixed: 'right' }
+])
 
-// 计算属性
+// 获取可用国家列表
 const countries = computed(() => {
-  const list = proxyList.value?.list || []
-  return getProxyCountries(list)
+  return getProxyCountries()
 })
+
+// 自动刷新定时器
+const { start: startAutoRefresh, stop: stopAutoRefresh } = useTimer(() => {
+  refreshProxyList()
+  refreshStats()
+}, 30000) // 30秒刷新一次
 
 // 获取状态类型
 const getStatusType = (status: string): 'success' | 'warning' | 'info' | 'primary' | 'danger' => {
@@ -332,7 +298,7 @@ const testSelectedProxies = async () => {
   try {
     const proxyIds = selectedProxies.value.map(proxy => proxy.id)
     const response = await proxyApi.testProxies({ proxy_ids: proxyIds })
-    
+
     if (response.code === 0) {
       ElMessage.success('代理测试已开始，请稍后查看结果')
       // 3秒后刷新列表查看测试结果
@@ -421,29 +387,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped lang="scss">
-.proxy-management {
+.feature-proxy-management {
   padding: 20px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.header-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.stats-section {
-  margin-bottom: 20px;
-  padding: 16px;
-  background: #f5f7fa;
-  border-radius: 4px;
-}
-
-.filter-section {
-  margin-bottom: 20px;
 }
 </style>

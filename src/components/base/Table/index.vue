@@ -89,7 +89,7 @@
           :align="column.align"
           :header-align="column.headerAlign"
           :show-overflow-tooltip="column.showOverflowTooltip"
-          :formatter="column.formatter"
+          :formatter="column.formatter as any"
         >
           <!-- 自定义列头 -->
           <template v-if="column.headerSlot" #header="scope">

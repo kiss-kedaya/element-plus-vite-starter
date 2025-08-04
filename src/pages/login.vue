@@ -66,15 +66,14 @@ const generateQRCode = async () => {
   try {
     // 调用真实的API生成二维码
     const response = await loginApi.getQRCode('Car', {
-      DeviceId: qrForm.deviceId,
-      DeviceName: qrForm.deviceName,
-      DeviceType: 'car-31'
+      DeviceID: qrForm.deviceId,
+      DeviceName: qrForm.deviceName
     })
 
     if (response.Success && response.Data) {
-      qrCodeData.value = response.Data.qrCodeData || response.Data.QrCodeData
+      qrCodeData.value = response.Data.QRCodeData || response.Data.QrBase64
       qrCodeUrl.value = await QRCode.toDataURL(qrCodeData.value)
-      currentUuid.value = response.Data.uuid || response.Data.Uuid
+      currentUuid.value = response.Data.Uuid || ''
 
       ElMessage.success('二维码生成成功，请使用微信扫码登录')
 

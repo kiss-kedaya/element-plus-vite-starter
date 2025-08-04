@@ -1,13 +1,8 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import { ElMessage } from 'element-plus'
+import type { ApiResponse } from '../types/index'
 
-// 响应数据接口
-export interface ApiResponse<T = any> {
-  code: number
-  success: boolean
-  message: string
-  data: T
-}
+// 响应数据接口 - 移除重复定义，使用 @/types 中的定义
 
 // 分页参数接口
 export interface PaginationParams {
@@ -77,7 +72,7 @@ class ApiRequest {
 
     // 响应拦截器
     this.instance.interceptors.response.use(
-      (response: AxiosResponse<ApiResponse>) => {
+      (response: AxiosResponse<ApiResponse>): AxiosResponse<ApiResponse> | Promise<never> => {
         const { data } = response
         
         // 如果是文件下载等特殊响应，直接返回
@@ -86,12 +81,12 @@ class ApiRequest {
         }
 
         // 检查业务状态码
-        if (data.success === false) {
-          const errorMessage = data.message || '请求失败'
+        if (data.Success === false) {
+          const errorMessage = data.Message || '请求失败'
           console.error('API Error:', errorMessage)
           
           // 根据错误码进行特殊处理
-          if (data.code === 401) {
+          if (data.Code === 401) {
             // 未授权，清除token并跳转登录
             localStorage.removeItem('auth_token')
             window.location.href = '/login'
@@ -101,7 +96,7 @@ class ApiRequest {
           return Promise.reject(new Error(errorMessage))
         }
 
-        return data
+        return response
       },
       (error) => {
         console.error('Response interceptor error:', error)
@@ -160,7 +155,7 @@ class ApiRequest {
         params,
         ...config
       })
-      return response as ApiResponse<T>
+      return response.data as ApiResponse<T>
     } catch (error: unknown) {
       if (config?.showError !== false) {
         ElMessage.error((error as Error).message)
@@ -173,7 +168,7 @@ class ApiRequest {
   async post<T = any>(url: string, data?: any, config?: RequestConfig): Promise<ApiResponse<T>> {
     try {
       const response = await this.instance.post(url, data, config)
-      return response as ApiResponse<T>
+      return response.data as ApiResponse<T>
     } catch (error: unknown) {
       if (config?.showError !== false) {
         ElMessage.error((error as Error).message)
@@ -186,7 +181,7 @@ class ApiRequest {
   async put<T = any>(url: string, data?: any, config?: RequestConfig): Promise<ApiResponse<T>> {
     try {
       const response = await this.instance.put(url, data, config)
-      return response as ApiResponse<T>
+      return response.data as ApiResponse<T>
     } catch (error: unknown) {
       if (config?.showError !== false) {
         ElMessage.error((error as Error).message)
@@ -199,7 +194,7 @@ class ApiRequest {
   async delete<T = any>(url: string, config?: RequestConfig): Promise<ApiResponse<T>> {
     try {
       const response = await this.instance.delete(url, config)
-      return response as ApiResponse<T>
+      return response.data as ApiResponse<T>
     } catch (error: unknown) {
       if (config?.showError !== false) {
         ElMessage.error((error as Error).message)
@@ -220,7 +215,7 @@ class ApiRequest {
         },
         ...config
       })
-      return response as ApiResponse<T>
+      return response.data as ApiResponse<T>
     } catch (error: unknown) {
       if (config?.showError !== false) {
         ElMessage.error((error as Error).message)

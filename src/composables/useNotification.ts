@@ -94,7 +94,7 @@ export function useNotification(options: UseNotificationOptions = {}) {
   const confirm = async (
     content: string,
     title: string = '确认',
-    opts?: Partial<MessageBoxOptions>
+    opts?: Partial<ElMessageBoxOptions>
   ) => {
     try {
       await ElMessageBox.confirm(content, title, {
@@ -113,7 +113,7 @@ export function useNotification(options: UseNotificationOptions = {}) {
   const prompt = async (
     content: string,
     title: string = '输入',
-    opts?: Partial<MessageBoxOptions>
+    opts?: Partial<ElMessageBoxOptions>
   ) => {
     try {
       const { value } = await ElMessageBox.prompt(content, title, {
@@ -131,7 +131,7 @@ export function useNotification(options: UseNotificationOptions = {}) {
   const alert = async (
     content: string,
     title: string = '提示',
-    opts?: Partial<MessageBoxOptions>
+    opts?: Partial<ElMessageBoxOptions>
   ) => {
     try {
       await ElMessageBox.alert(content, title, {

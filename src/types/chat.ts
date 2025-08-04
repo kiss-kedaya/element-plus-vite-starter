@@ -14,7 +14,7 @@ export interface ChatMessage {
   content: string
   timestamp: Date
   fromMe: boolean
-  type: 'text' | 'image' | 'file' | 'video' | 'system' | 'emoji'
+  type: 'text' | 'image' | 'file' | 'video' | 'system' | 'emoji' | 'link'
   status?: 'sending' | 'sent' | 'failed' | 'received'
   imageData?: string
   imagePath?: string         // 图片文件路径
@@ -24,6 +24,8 @@ export interface ChatMessage {
   imageCompressType?: number // 图片压缩类型
   imageCdnFileAesKey?: string // 图片CDN文件AES密钥
   imageCdnFileNo?: string    // 图片CDN文件编号
+  imageCdnThumbUrl?: string  // 图片CDN缩略图URL
+  imageCdnMidUrl?: string    // 图片CDN中等尺寸URL
   fileData?: {
     name: string
     size: number

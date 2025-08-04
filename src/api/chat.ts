@@ -18,7 +18,7 @@ export const chatApi = {
   },
 
   // 发送CDN文件（转发已存在的文件）
-  sendCDNFile: (params: { Wxid: string; ToWxid: string; Content: string }): Promise<ChatResponse> => {
+  sendCDNFile: (params: { Wxid: string; ToWxid: string; Content: string }): Promise<MessageResponse> => {
     return api.post('/Msg/SendCDNFile', params)
   },
 

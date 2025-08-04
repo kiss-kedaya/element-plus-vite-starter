@@ -79,7 +79,7 @@ import { ElMessage } from 'element-plus'
 import { User } from '@element-plus/icons-vue'
 import { friendApi } from '@/api/friend'
 import { useAuthStore } from '@/stores/auth'
-import { webSocketService } from '@/services/websocket'
+// 使用动态导入避免与其他地方的动态导入冲突
 
 interface FriendRequest {
   id: string
@@ -216,14 +216,24 @@ const handleFriendRequest = async (data: any, messageWxid?: string) => {
 }
 
 // 生命周期
-onMounted(() => {
-  // 监听好友请求事件
-  webSocketService.on('friend_request', handleFriendRequest)
+onMounted(async () => {
+  try {
+    const { webSocketService } = await import('@/services/websocket')
+    // 监听好友请求事件
+    webSocketService.on('friend_request', handleFriendRequest)
+  } catch (error) {
+    console.error('初始化好友请求监听失败:', error)
+  }
 })
 
-onUnmounted(() => {
-  // 移除事件监听
-  webSocketService.off('friend_request', handleFriendRequest)
+onUnmounted(async () => {
+  try {
+    const { webSocketService } = await import('@/services/websocket')
+    // 移除事件监听
+    webSocketService.off('friend_request', handleFriendRequest)
+  } catch (error) {
+    console.error('移除好友请求监听失败:', error)
+  }
 })
 </script>
 

@@ -321,6 +321,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
   'account-updated': [account: LoginAccount]
+  'refresh': []
 }>()
 
 // Store
@@ -704,14 +705,14 @@ const testProxyConnection = async () => {
 }
 
 // 获取代理状态类型
-const getProxyStatusType = (status: string) => {
-  const statusMap = {
+const getProxyStatusType = (status: string): 'success' | 'warning' | 'info' | 'primary' | 'danger' => {
+  const statusMap: Record<string, 'success' | 'warning' | 'info' | 'primary' | 'danger'> = {
     'active': 'success',
     'testing': 'warning',
     'error': 'danger',
     'inactive': 'info'
   }
-  return statusMap[status as keyof typeof statusMap] || 'info'
+  return statusMap[status] || 'info'
 }
 
 // 获取代理状态标签
@@ -757,7 +758,7 @@ const generateQRCode = async () => {
       } else if (response.Data.QrUrl) {
         // 备用方案：如果没有QrBase64但有QrUrl
         qrCodeUrl.value = response.Data.QrUrl
-        currentUuid.value = response.Data.Uuid || response.Data.uuid || ''
+        currentUuid.value = response.Data.Uuid || ''
         qrStatus.value = '请使用微信扫描二维码'
 
         // 开始检查二维码状态
@@ -801,11 +802,13 @@ const startQRCodeCheck = () => {
           console.log('登录成功，正在设置代理...', props.account.proxy)
           const proxyResponse = await loginApi.setProxy({
             Wxid: data.wxid,
-            Type: props.account.proxy.Type || 'SOCKS5',
-            Host: props.account.proxy.Host,
-            Port: props.account.proxy.Port,
-            User: props.account.proxy.ProxyUser || '',
-            Password: props.account.proxy.ProxyPassword || ''
+            Proxy: {
+              Type: props.account.proxy.Type || 'SOCKS5',
+              Host: props.account.proxy.Host,
+              Port: props.account.proxy.Port,
+              ProxyUser: props.account.proxy.ProxyUser || '',
+              ProxyPassword: props.account.proxy.ProxyPassword || ''
+            }
           })
 
           if (proxyResponse.Success) {

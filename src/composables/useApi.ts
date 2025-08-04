@@ -1,13 +1,8 @@
 import { ref, unref, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 
-// 临时类型定义，应该从实际的request文件中导入
-interface ApiResponse<T = any> {
-  code: number
-  success: boolean
-  message: string
-  data: T
-}
+// 使用项目统一的 ApiResponse 类型
+import type { ApiResponse } from '@/types/index'
 
 // API调用状态
 export interface ApiState<T = any> {
@@ -61,7 +56,7 @@ export function useApi<T = any>(
       const response = await apiFunction(...args)
       
       // 数据转换
-      const transformedData = transform ? transform(response.data) : response.data
+      const transformedData = transform ? transform(response.Data) : response.Data
       data.value = transformedData
 
       success.value = true
