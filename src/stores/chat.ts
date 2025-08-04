@@ -1221,23 +1221,8 @@ export const useChatStore = defineStore('chat', () => {
     if (messageWxid && currentAccountWxid && messageWxid !== currentAccountWxid) {
       console.log(`📨 消息属于账号 ${messageWxid}，但当前账号是 ${currentAccountWxid}`)
 
-      // 将消息路由到跨账号消息存储，而不是当前账号的消息缓存
-      try {
-        const { useCrossAccountMessageStore } = await import('./crossAccountMessage')
-        const crossAccountStore = useCrossAccountMessageStore()
-        crossAccountStore.handleCrossAccountMessage(data, messageWxid)
-        console.log(`✅ 消息已路由到跨账号消息存储: ${messageWxid}`)
-      } catch (error) {
-        console.error('处理跨账号消息失败:', error)
-      }
-
-      // 更新未读计数
-      if (!data.fromMe) {
-        authStore.incrementAccountUnreadCount(messageWxid, 1)
-      }
-
-      // 跳过当前账号的消息处理，避免消息污染
-      console.log(`⏭️ 跳过当前账号的消息处理，避免跨账号消息污染`)
+      // 跨账号消息已经由 crossAccountMessage.ts 处理了，这里不需要重复处理
+      console.log(`⏭️ 跳过当前账号的消息处理，跨账号消息由专门的存储处理`)
       return
     }
 
