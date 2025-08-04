@@ -112,36 +112,87 @@ export const useContactStore = defineStore('contact', () => {
       console.log('📡 API返回结果:', { Success: result.Success, hasData: !!result.Data })
 
       if (result.Success && result.Data) {
-        const contactData = result.Data
+        const responseData = result.Data
+
+        // 添加详细的数据结构日志
+        console.log('📊 API返回的原始数据结构:', {
+          ContactCount: responseData.ContactCount,
+          ContactList: responseData.ContactList?.length || 0,
+          hasContactList: !!responseData.ContactList
+        })
 
         let contactInfo: ContactInfo
 
-        if (isGroup) {
-          // 群聊信息
-          contactInfo = {
-            wxid: contactWxid,
-            nickname: contactData.NickName?.string || contactWxid,
-            alias: contactData.Alias || '',
-            avatar: contactData.SmallHeadImgUrl || contactData.BigHeadImgUrl || '',
-            remark: contactData.Remark?.string || '',
-            isGroup: true,
-            lastUpdated: Date.now(),
-            groupName: contactData.NickName?.string || contactWxid,
-            memberCount: contactData.MemberCount || 0,
+        // 检查是否有ContactList数据
+        if (responseData.ContactList && responseData.ContactList.length > 0) {
+          const contactData = responseData.ContactList[0] // 取第一个联系人数据
+
+          console.log('📋 解析ContactList中的联系人数据:', {
+            UserName: contactData.UserName?.string,
+            NickName: contactData.NickName?.string,
+            Alias: contactData.Alias,
+            Remark: contactData.Remark?.string,
+            SmallHeadImgUrl: contactData.SmallHeadImgUrl,
+            BigHeadImgUrl: contactData.BigHeadImgUrl,
+            Sex: contactData.Sex,
+            Country: contactData.Country
+          })
+
+          if (isGroup) {
+            // 群聊信息
+            const groupName = contactData.NickName?.string || contactWxid
+            const groupAvatar = contactData.SmallHeadImgUrl || contactData.BigHeadImgUrl || ''
+
+            contactInfo = {
+              wxid: contactWxid,
+              nickname: groupName,
+              alias: contactData.Alias || '',
+              avatar: groupAvatar,
+              remark: contactData.Remark?.string || '',
+              isGroup: true,
+              lastUpdated: Date.now(),
+              groupName: groupName,
+              memberCount: responseData.ContactCount || 0,
+            }
+          } else {
+            // 个人联系人信息
+            const nickname = contactData.NickName?.string || contactWxid
+            const remark = contactData.Remark?.string || ''
+            const avatar = contactData.SmallHeadImgUrl || contactData.BigHeadImgUrl || ''
+            const alias = contactData.Alias || ''
+
+            contactInfo = {
+              wxid: contactWxid,
+              nickname: nickname,
+              alias: alias,
+              avatar: avatar,
+              remark: remark,
+              isGroup: false,
+              lastUpdated: Date.now(),
+              signature: contactData.Signature || '',
+              sex: contactData.Sex || 0,
+              region: `${contactData.Country || ''} ${contactData.City || ''}`.trim() || '',
+            }
           }
         } else {
-          // 个人联系人信息
+          // 如果没有ContactList，使用兜底数据
+          console.warn('⚠️ 没有找到ContactList数据，使用兜底信息')
           contactInfo = {
             wxid: contactWxid,
-            nickname: contactData.NickName?.string || contactWxid,
-            alias: contactData.Alias || '',
-            avatar: contactData.SmallHeadImgUrl || contactData.BigHeadImgUrl || '',
-            remark: contactData.Remark?.string || '',
-            isGroup: false,
+            nickname: contactWxid,
+            alias: '',
+            avatar: '',
+            remark: '',
+            isGroup: isGroup,
             lastUpdated: Date.now(),
-            signature: contactData.Signature || '',
-            sex: contactData.Sex || 0,
-            region: `${contactData.Country || ''} ${contactData.City || ''}`.trim() || '',
+            signature: '',
+            sex: 0,
+            region: '',
+          }
+
+          if (isGroup) {
+            contactInfo.groupName = contactWxid
+            contactInfo.memberCount = 0
           }
         }
 

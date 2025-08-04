@@ -773,7 +773,7 @@ async function refreshContactInfo() {
     const result = await friendApi.getFriendDetail({
       Wxid: props.account.wxid,
       Towxids: chatStore.currentSession.id,
-      ChatRoom: chatStore.currentSession.id.includes('@chatroom') ? chatStore.currentSession.id : '',
+      ChatRoom: '',
       force_refresh: true, // 强制刷新
     })
 
@@ -896,12 +896,39 @@ const autoUpdateSenderInfo = async (sessionId: string) => {
         avatar: result.avatar,
         type: result.type
       })
+
+      // 强制刷新UI以确保更新立即显示
+      chatStore.forceRefreshUI()
     } else {
       console.warn('⚠️ 自动更新联系人信息返回空结果:', sessionId)
     }
   } catch (error) {
     console.error('❌ 自动更新发送者信息失败:', error)
   }
+}
+
+// 批量更新所有会话的联系人信息
+const batchUpdateAllSessions = async () => {
+  if (!props.account?.wxid) {
+    console.warn('批量更新失败: 账号信息为空')
+    return
+  }
+
+  console.log('🔄 开始批量更新所有会话的联系人信息')
+  const sessionIds = chatStore.sessions.map(s => s.id)
+
+  for (const sessionId of sessionIds) {
+    try {
+      await chatStore.updateSessionContactInfo(props.account.wxid, sessionId, true)
+      // 添加小延迟避免API请求过于频繁
+      await new Promise(resolve => setTimeout(resolve, 100))
+    } catch (error) {
+      console.warn(`更新会话 ${sessionId} 失败:`, error)
+    }
+  }
+
+  console.log('✅ 批量更新完成')
+  chatStore.forceRefreshUI()
 }
 
 // 监听账号变化
@@ -1086,14 +1113,14 @@ onUnmounted(() => {
           <div class="session-avatar">
             <el-avatar :src="session.avatar || ''" :size="40">
               <template #default>
-                <span class="avatar-text">{{ session.name?.charAt(0) || '?' }}</span>
+                <span class="avatar-text">{{ (typeof session.name === 'string' ? session.name.charAt(0) : String(session.name || session.id || '?').charAt(0)) }}</span>
               </template>
             </el-avatar>
           </div>
           <div class="session-content">
             <div class="session-top">
               <div class="session-name">
-                {{ session.name }}
+                {{ typeof session.name === 'string' ? session.name : String(session.name || session.id || '未知会话') }}
               </div>
               <div class="session-time">
                 {{ formatSessionTime(session.lastMessageTime) }}
@@ -1141,6 +1168,12 @@ onUnmounted(() => {
                 <Refresh />
               </el-icon>
               刷新信息
+            </el-button>
+            <el-button link class="action-btn" @click="batchUpdateAllSessions" size="small">
+              <el-icon>
+                <Refresh />
+              </el-icon>
+              批量更新
             </el-button>
 
             <el-button link class="action-btn" @click="testAutoUpdate">

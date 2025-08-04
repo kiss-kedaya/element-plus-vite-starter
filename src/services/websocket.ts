@@ -366,8 +366,9 @@ export class WebSocketService {
         fromMe = msg.actualSender === data.wxid
       }
       else {
-        // 个人消息：比较fromUser和当前wxid，或者使用actualSender
-        fromMe = msg.fromUser === data.wxid || msg.actualSender === data.wxid
+        // 个人消息：只比较fromUser和当前wxid
+        // data.wxid是当前账号，如果fromUser等于当前账号，说明是自己发送的
+        fromMe = msg.fromUser === data.wxid
       }
 
       // 确定会话ID
@@ -727,6 +728,7 @@ export class WebSocketService {
       // 处理表情消息
       if (msg.msgType === 47) {
         chatMessage.content = '[表情]'
+        chatMessage.type = 'emoji' // 设置消息类型为表情
         // 解析表情信息
         if (msg.originalContent) {
           chatMessage.emojiData = msg.originalContent

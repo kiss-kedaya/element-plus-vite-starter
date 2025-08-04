@@ -1107,12 +1107,25 @@ export const useChatStore = defineStore('chat', () => {
     // 如果提供了messageWxid，检查是否匹配当前账号
     if (messageWxid && currentAccountWxid && messageWxid !== currentAccountWxid) {
       console.log(`📨 消息属于账号 ${messageWxid}，但当前账号是 ${currentAccountWxid}`)
-      // 更新未读计数但不跳过处理，让消息能够显示在界面中
+
+      // 将消息路由到跨账号消息存储，而不是当前账号的消息缓存
+      try {
+        const { useCrossAccountMessageStore } = await import('./crossAccountMessage')
+        const crossAccountStore = useCrossAccountMessageStore()
+        crossAccountStore.handleCrossAccountMessage(data, messageWxid)
+        console.log(`✅ 消息已路由到跨账号消息存储: ${messageWxid}`)
+      } catch (error) {
+        console.error('处理跨账号消息失败:', error)
+      }
+
+      // 更新未读计数
       if (!data.fromMe) {
         authStore.incrementAccountUnreadCount(messageWxid, 1)
       }
-      // 继续处理消息，但标记为来自其他账号
-      console.log(`🔄 继续处理来自其他账号的消息，确保界面能显示`)
+
+      // 跳过当前账号的消息处理，避免消息污染
+      console.log(`⏭️ 跳过当前账号的消息处理，避免跨账号消息污染`)
+      return
     }
 
     const sessionId = data.sessionId || (data.fromMe ? data.toUser : data.fromUser)
@@ -1313,12 +1326,34 @@ export const useChatStore = defineStore('chat', () => {
         // 找到会话在数组中的索引
         const sessionIndex = sessions.value.findIndex(s => s.id === sessionId)
         if (sessionIndex !== -1) {
+          // 确定显示名称的优先级，确保结果始终是字符串
+          let displayName = sessionId
+          if (contactInfo.isGroup) {
+            // 群聊：优先显示群名称，其次昵称
+            displayName = String(contactInfo.groupName || contactInfo.nickname || sessionId)
+          } else {
+            // 个人：优先显示备注，其次昵称，再次别名
+            displayName = String(contactInfo.remark || contactInfo.nickname || contactInfo.alias || sessionId)
+          }
+
+          // 确保displayName是有效的字符串
+          if (!displayName || displayName === 'undefined' || displayName === 'null') {
+            displayName = sessionId
+          }
+
+          console.log(`📝 更新会话显示名称: ${sessionId} -> ${displayName}`, {
+            isGroup: contactInfo.isGroup,
+            groupName: contactInfo.groupName,
+            nickname: contactInfo.nickname,
+            remark: contactInfo.remark,
+            alias: contactInfo.alias,
+            finalName: displayName
+          })
+
           // 创建新的会话对象来触发响应式更新
           const updatedSession = {
             ...sessions.value[sessionIndex],
-            name: contactInfo.isGroup
-              ? (contactInfo.groupName || contactInfo.nickname || sessionId)
-              : (contactInfo.remark || contactInfo.nickname || contactInfo.alias || sessionId),
+            name: displayName,
             type: (contactInfo.isGroup ? 'group' : 'friend') as 'friend' | 'group',
             avatar: contactInfo.avatar || ''
           }

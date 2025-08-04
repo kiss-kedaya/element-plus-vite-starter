@@ -83,11 +83,20 @@ export const useAuthStore = defineStore('auth', () => {
       // 设置文件缓存管理器的当前微信账号
       fileCacheManager.setCurrentWxid(wxid)
 
-      // 如果是真正的账号切换（不是初始化），触发数据清空事件
+      // 如果是真正的账号切换（不是初始化），触发数据清空和切换
       if (previousAccount && previousAccount.wxid !== wxid) {
         console.log(`账号切换：${previousAccount.wxid} -> ${wxid}`)
-        // 这里可以触发全局的数据清空事件
-        // 各个组件可以监听这个事件来清空自己的数据
+
+        // 触发聊天数据的账号切换
+        try {
+          // 动态导入避免循环依赖
+          import('@/stores/chat').then(({ useChatStore }) => {
+            const chatStore = useChatStore()
+            chatStore.switchAccount(wxid, previousAccount.wxid)
+          })
+        } catch (error) {
+          console.error('切换聊天账号数据失败:', error)
+        }
       }
     }
   }
