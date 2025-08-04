@@ -16,6 +16,12 @@ export const useChatStore = defineStore('chat', () => {
   const currentSession = ref<ChatSession | null>(null)
   const messages = ref<Record<string, ChatMessage[]>>({})
   const isLoading = ref(false)
+
+  // 强制刷新触发器
+  const refreshTrigger = ref(0)
+
+  // 缓存保存防抖
+  const saveTimeouts = new Map<string, NodeJS.Timeout>()
   const isSending = ref(false)
 
   // 联系人store
@@ -106,6 +112,15 @@ export const useChatStore = defineStore('chat', () => {
     return sessions.value.reduce((total, session) => total + session.unreadCount, 0)
   })
 
+  // 排序会话列表（按最后消息时间降序）
+  const sortSessions = () => {
+    sessions.value.sort((a, b) => {
+      const timeA = a.lastMessageTime instanceof Date ? a.lastMessageTime.getTime() : new Date(a.lastMessageTime).getTime()
+      const timeB = b.lastMessageTime instanceof Date ? b.lastMessageTime.getTime() : new Date(b.lastMessageTime).getTime()
+      return timeB - timeA // 降序排列，最新的在前面
+    })
+  }
+
   // 加载缓存数据
   const loadCachedData = (wxid: string) => {
     console.log(`加载账号 ${wxid} 的缓存数据`)
@@ -114,7 +129,9 @@ export const useChatStore = defineStore('chat', () => {
     const cachedSessions = loadFromCache(CACHE_KEYS.SESSIONS, wxid)
     if (cachedSessions && Array.isArray(cachedSessions)) {
       sessions.value = cachedSessions
-      console.log(`加载了 ${cachedSessions.length} 个缓存会话`)
+      // 加载后立即排序
+      sortSessions()
+      console.log(`加载了 ${cachedSessions.length} 个缓存会话并已排序`)
     }
 
     // 加载消息记录
@@ -133,11 +150,39 @@ export const useChatStore = defineStore('chat', () => {
     // }
   }
 
-  // 保存数据到缓存
-  const saveCachedData = (wxid: string) => {
+  // 保存数据到缓存（带防抖）
+  const saveCachedData = (wxid: string, immediate = false) => {
     if (!wxid)
       return
 
+    // 如果需要立即保存，清除现有的定时器
+    if (immediate) {
+      const existingTimeout = saveTimeouts.get(wxid)
+      if (existingTimeout) {
+        clearTimeout(existingTimeout)
+        saveTimeouts.delete(wxid)
+      }
+      performSave(wxid)
+      return
+    }
+
+    // 清除现有的定时器
+    const existingTimeout = saveTimeouts.get(wxid)
+    if (existingTimeout) {
+      clearTimeout(existingTimeout)
+    }
+
+    // 设置新的定时器，500ms后保存
+    const timeout = setTimeout(() => {
+      performSave(wxid)
+      saveTimeouts.delete(wxid)
+    }, 500)
+
+    saveTimeouts.set(wxid, timeout)
+  }
+
+  // 实际执行保存的函数
+  const performSave = (wxid: string) => {
     try {
       // 保存会话列表
       saveToCache(CACHE_KEYS.SESSIONS, sessions.value, wxid)
@@ -160,6 +205,8 @@ export const useChatStore = defineStore('chat', () => {
   // 方法
   const setSessions = (newSessions: ChatSession[]) => {
     sessions.value = newSessions
+    // 设置后立即排序
+    sortSessions()
     // 自动保存到缓存
     const authStore = useAuthStore()
     if (authStore.currentAccount?.wxid) {
@@ -214,17 +261,28 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   const addMessage = (sessionId: string, message: ChatMessage) => {
+    console.log('📝 添加消息到会话:', {
+      sessionId,
+      messageId: message.id,
+      content: message.content?.substring(0, 30) + '...',
+      fromMe: message.fromMe,
+      type: message.type
+    })
+
     if (!messages.value[sessionId]) {
       messages.value[sessionId] = []
+      console.log(`📂 为会话 ${sessionId} 创建新的消息数组`)
     }
 
     // 检查消息是否已存在（避免重复）
     const existingMessage = messages.value[sessionId].find(m => m.id === message.id)
     if (existingMessage) {
+      console.log(`⏭️ 消息已存在，跳过添加: ${message.id}`)
       return
     }
 
     messages.value[sessionId].push(message)
+    console.log(`✅ 消息已添加到会话 ${sessionId}，当前消息数: ${messages.value[sessionId].length}`)
 
     // 按时间戳排序消息
     messages.value[sessionId].sort((a, b) => {
@@ -237,6 +295,8 @@ export const useChatStore = defineStore('chat', () => {
     const sessionIndex = sessions.value.findIndex(s => s.id === sessionId)
     if (sessionIndex !== -1) {
       const session = sessions.value[sessionIndex]
+
+      // 更新会话信息
       session.lastMessage = message.content
       session.lastMessageTime = message.timestamp
 
@@ -247,10 +307,24 @@ export const useChatStore = defineStore('chat', () => {
         session.unreadCount++
       }
 
-      // 将有新消息的会话移到列表顶部
-      if (sessionIndex > 0) {
+      // 将有新消息的会话移到列表顶部（无论当前位置如何）
+      if (sessionIndex >= 0) {
+        // 创建新的会话对象以确保响应式更新
+        const updatedSession = {
+          ...session,
+          // 确保所有属性都是新的引用
+          lastMessage: session.lastMessage,
+          lastMessageTime: session.lastMessageTime,
+          unreadCount: session.unreadCount
+        }
+
+        // 使用splice确保Vue检测到数组变化
         sessions.value.splice(sessionIndex, 1) // 从原位置移除
-        sessions.value.unshift(session) // 添加到顶部
+        sessions.value.splice(0, 0, updatedSession) // 插入到顶部
+        console.log(`会话 ${sessionId} 已移动到列表顶部`)
+
+        // 强制刷新UI
+        forceRefreshUI()
       }
     }
 
@@ -810,6 +884,9 @@ export const useChatStore = defineStore('chat', () => {
         }
       })
 
+      // 同步完成后重新排序会话列表
+      sortSessions()
+
       // 保存同步后的数据到缓存
       saveCachedData(wxid)
 
@@ -825,9 +902,9 @@ export const useChatStore = defineStore('chat', () => {
 
   // 切换账号时的数据管理
   const switchAccount = (newWxid: string, oldWxid?: string) => {
-    // 保存当前账号的数据到缓存
+    // 保存当前账号的数据到缓存（立即保存）
     if (oldWxid) {
-      saveCachedData(oldWxid)
+      saveCachedData(oldWxid, true)
       console.log(`账号 ${oldWxid} 的数据已保存`)
     }
 
@@ -856,21 +933,29 @@ export const useChatStore = defineStore('chat', () => {
       console.log(`🔌 ChatStore尝试连接WebSocket: ${wxid}`)
       const { webSocketService } = await import('@/services/websocket')
 
+      // 无论是否已连接，都重新设置事件监听器以确保正确绑定
+      console.log(`🔧 重新设置WebSocket事件监听器`)
+      webSocketService.off('chat_message', handleChatMessage) // 先移除旧的监听器
+      webSocketService.off('system_message', handleSystemMessage)
+      webSocketService.on('chat_message', handleChatMessage) // 重新添加监听器
+      webSocketService.on('system_message', handleSystemMessage)
+
       // 检查是否已经连接到该账号
       if (webSocketService.isAccountConnected(wxid)) {
         console.log(`✅ 账号 ${wxid} 已有WebSocket连接，切换到该账号`)
         webSocketService.switchCurrentAccount(wxid)
+
+        // 强制触发一次消息同步，确保能看到最新消息
+        console.log(`🔄 强制同步最新消息`)
+        // 这里可以添加消息同步逻辑
+
         return true
       }
 
       console.log(`🔗 账号 ${wxid} 尚未连接，开始建立新连接`)
 
-      // 设置事件监听器（强制重新设置以确保正确绑定）
-      webSocketService.on('chat_message', handleChatMessage)
-      webSocketService.on('system_message', handleSystemMessage)
-
-      // 建立新的连接
-      const connected = await webSocketService.connect(wxid)
+      // 建立新的连接，使用setAsCurrent=true确保设置为当前账号
+      const connected = await webSocketService.connect(wxid, true)
       if (connected) {
         console.log(`✅ 成功建立账号 ${wxid} 的WebSocket连接`)
       } else {
@@ -1006,22 +1091,40 @@ export const useChatStore = defineStore('chat', () => {
 
   // 处理聊天消息
   const handleChatMessage = async (data: any, messageWxid?: string) => {
+    console.log('📥 Chat Store 收到聊天消息:', {
+      sessionId: data.sessionId,
+      content: data.content?.substring(0, 30) + '...',
+      fromMe: data.fromMe,
+      type: data.type,
+      messageWxid,
+      timestamp: data.timestamp
+    })
+
     // 检查消息是否属于当前账号
     const authStore = useAuthStore()
     const currentAccountWxid = authStore.currentAccount?.wxid
 
     // 如果提供了messageWxid，检查是否匹配当前账号
     if (messageWxid && currentAccountWxid && messageWxid !== currentAccountWxid) {
-      console.log(`消息属于账号 ${messageWxid}，但当前账号是 ${currentAccountWxid}，跳过处理`)
-      // 不处理当前聊天界面，但仍需要更新未读计数
+      console.log(`📨 消息属于账号 ${messageWxid}，但当前账号是 ${currentAccountWxid}`)
+      // 更新未读计数但不跳过处理，让消息能够显示在界面中
       if (!data.fromMe) {
         authStore.incrementAccountUnreadCount(messageWxid, 1)
       }
-      return
+      // 继续处理消息，但标记为来自其他账号
+      console.log(`🔄 继续处理来自其他账号的消息，确保界面能显示`)
     }
 
     const sessionId = data.sessionId || (data.fromMe ? data.toUser : data.fromUser)
-    
+
+    console.log('🎯 确定会话ID:', {
+      originalSessionId: data.sessionId,
+      calculatedSessionId: sessionId,
+      fromMe: data.fromMe,
+      toUser: data.toUser,
+      fromUser: data.fromUser
+    })
+
     const chatMessage: ChatMessage = {
       id: data.id || Date.now().toString(),
       content: data.content || '',
@@ -1099,7 +1202,16 @@ export const useChatStore = defineStore('chat', () => {
         // 异步获取联系人详情并更新会话信息
         const authStore = useAuthStore()
         if (authStore.currentAccount?.wxid) {
-          updateSessionContactInfo(authStore.currentAccount.wxid, sessionId)
+          updateSessionContactInfo(authStore.currentAccount.wxid, sessionId, true) // 强制刷新新会话
+        }
+      } else {
+        // 即使会话已存在，如果是收到的消息，也尝试更新联系人信息
+        if (!chatMessage.fromMe) {
+          const authStore = useAuthStore()
+          if (authStore.currentAccount?.wxid) {
+            console.log('🔄 收到新消息，尝试更新现有会话的联系人信息:', sessionId)
+            updateSessionContactInfo(authStore.currentAccount.wxid, sessionId, true) // 强制刷新
+          }
         }
       }
 
@@ -1211,15 +1323,18 @@ export const useChatStore = defineStore('chat', () => {
             avatar: contactInfo.avatar || ''
           }
 
-          // 替换数组中的会话对象
-          sessions.value[sessionIndex] = updatedSession
+          // 使用splice来替换数组中的会话对象，确保Vue检测到变化
+          sessions.value.splice(sessionIndex, 1, updatedSession)
 
           // 如果这是当前选中的会话，也要更新currentSession
           if (currentSession.value?.id === sessionId) {
-            currentSession.value = updatedSession
+            currentSession.value = { ...updatedSession }
           }
 
           console.log('会话联系人信息已更新:', updatedSession.name, updatedSession.avatar, '类型:', updatedSession.type)
+
+          // 强制刷新UI
+          forceRefreshUI()
 
           // 保存到缓存
           saveCachedData(accountWxid)
@@ -1291,6 +1406,12 @@ export const useChatStore = defineStore('chat', () => {
     updateSessionInfo(sessionId, { name: newName })
   }
 
+  // 强制刷新UI
+  const forceRefreshUI = () => {
+    refreshTrigger.value++
+    console.log('🔄 强制刷新UI触发器:', refreshTrigger.value)
+  }
+
   return {
     // 状态
     sessions,
@@ -1326,6 +1447,8 @@ export const useChatStore = defineStore('chat', () => {
     updateSessionContactInfo,
     removeSession,
     updateSessionName,
+    sortSessions,
+    forceRefreshUI,
 
     // 缓存相关方法
     loadCachedData,

@@ -329,14 +329,30 @@ export class WebSocketService {
 
   // 处理微信消息
   private handleWeChatMessage(data: any) {
+    console.log('🔄 处理微信消息:', {
+      wxid: data.wxid,
+      messageCount: data.messages?.length || 0,
+      timestamp: data.timestamp
+    })
+
     if (!data.messages || data.messages.length === 0) {
       console.log('收到空的微信消息数据:', data)
       return
     }
 
-    data.messages.forEach((msg: any) => {
+    data.messages.forEach((msg: any, index: number) => {
+      console.log(`📨 处理消息 ${index + 1}/${data.messages.length}:`, {
+        msgId: msg.msgId,
+        msgType: msg.msgType,
+        contentType: msg.contentType,
+        fromUser: msg.fromUser,
+        toUser: msg.toUser,
+        content: msg.content?.substring(0, 50) + '...'
+      })
+
       // 过滤掉不需要显示的消息类型
       if (this.shouldFilterMessage(msg)) {
+        console.log(`⏭️ 消息被过滤: msgType=${msg.msgType}, contentType=${msg.contentType}`)
         return
       }
 
@@ -363,6 +379,39 @@ export class WebSocketService {
       else {
         // 个人消息：会话ID是对方的wxid
         sessionId = fromMe ? msg.toUser : msg.fromUser
+      }
+
+      // 修复sessionId为空的问题
+      if (!sessionId) {
+        console.warn('⚠️ sessionId为空，尝试从其他字段获取:', {
+          fromUser: msg.fromUser,
+          toUser: msg.toUser,
+          fromUserName: msg.fromUserName,
+          toUserName: msg.toUserName,
+          actualSender: msg.actualSender
+        })
+
+        // 尝试从其他字段获取sessionId
+        if (fromMe) {
+          sessionId = msg.toUser || msg.toUserName
+        } else {
+          sessionId = msg.fromUser || msg.fromUserName || msg.actualSender
+        }
+      }
+
+      console.log(`🎯 消息会话信息:`, {
+        isGroupMessage,
+        fromMe,
+        sessionId,
+        fromUser: msg.fromUser,
+        toUser: msg.toUser,
+        actualSender: msg.actualSender
+      })
+
+      // 如果sessionId仍然为空，跳过这条消息
+      if (!sessionId) {
+        console.error('❌ 无法确定sessionId，跳过消息:', msg)
+        return
       }
 
       // 特殊处理：系统消息的会话ID
@@ -827,6 +876,13 @@ export class WebSocketService {
       }
 
       // 发送聊天消息事件，传递wxid参数用于正确路由
+      console.log(`🚀 发送聊天消息事件:`, {
+        sessionId: chatMessage.sessionId,
+        content: chatMessage.content?.substring(0, 30) + '...',
+        fromMe: chatMessage.fromMe,
+        type: chatMessage.type,
+        wxid: data.wxid
+      })
       this.emit('chat_message', chatMessage, data.wxid)
     })
   }

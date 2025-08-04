@@ -13,6 +13,7 @@ import {
   RefreshRight,
   Search,
   Select,
+  Tools,
   User,
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -81,6 +82,9 @@ const currentRemarkSession = ref<ChatSession | null>(null)
 
 // 计算属性
 const filteredSessions = computed(() => {
+  // 使用refreshTrigger来强制重新计算
+  chatStore.refreshTrigger
+
   if (!searchKeyword.value)
     return chatStore.sessions
   return chatStore.sessions.filter(session =>
@@ -847,16 +851,56 @@ async function refreshContactInfo() {
   }
 }
 
+// 测试自动更新功能
+async function testAutoUpdate() {
+  if (!props.account?.wxid || !chatStore.currentSession) {
+    ElMessage.warning('请先选择一个会话')
+    return
+  }
+
+  console.log('🧪 测试自动更新功能')
+  ElMessage.info('开始测试自动更新...')
+
+  try {
+    await autoUpdateSenderInfo(chatStore.currentSession.id)
+    ElMessage.success('测试完成，请查看控制台日志')
+  } catch (error) {
+    console.error('测试失败:', error)
+    ElMessage.error('测试失败')
+  }
+}
+
+// 强制刷新UI
+function forceRefreshUI() {
+  console.log('🔄 手动触发强制刷新UI')
+  chatStore.forceRefreshUI()
+  ElMessage.success('UI已强制刷新')
+}
+
 // 自动更新消息发送者信息
 const autoUpdateSenderInfo = async (sessionId: string) => {
-  if (!props.account?.wxid) return
+  if (!props.account?.wxid) {
+    console.warn('自动更新联系人信息失败: 账号信息为空')
+    return
+  }
+
+  console.log(`🔄 开始自动更新联系人信息: sessionId=${sessionId}, accountWxid=${props.account.wxid}`)
 
   try {
     // 异步更新发送者信息，强制刷新以获取最新的头像和昵称
-    await chatStore.updateSessionContactInfo(props.account.wxid, sessionId, true)
-    console.log('自动更新联系人信息完成:', sessionId)
+    const result = await chatStore.updateSessionContactInfo(props.account.wxid, sessionId, true)
+    if (result) {
+      console.log('✅ 自动更新联系人信息完成:', {
+        sessionId,
+        name: result.name,
+        avatar: result.avatar,
+        type: result.type
+      })
+    } else {
+      console.warn('⚠️ 自动更新联系人信息返回空结果:', sessionId)
+    }
   } catch (error) {
-    console.error('自动更新发送者信息失败:', error)
+    console.error('❌ 自动更新发送者信息失败:', error)
   }
 }
 
@@ -871,23 +915,15 @@ watch(() => props.account?.wxid, async (newWxid, oldWxid) => {
       await loadFriendsAsSessions()
     }
 
-    // 尝试建立或切换 WebSocket 连接（不断开其他账号的连接）
+    // 尝试建立或切换 WebSocket 连接（确保事件监听器正确绑定）
     try {
-      const { webSocketService } = await import('@/services/websocket')
-
-      if (webSocketService.isAccountConnected(newWxid)) {
-        // 如果已经连接，只需要切换当前账号
-        console.log(`账号 ${newWxid} 已有WebSocket连接，切换到该账号`)
-        webSocketService.switchCurrentAccount(newWxid)
+      console.log(`🔄 账号切换，重新建立WebSocket连接: ${newWxid}`)
+      // 无论是否已连接，都重新连接以确保事件监听器正确绑定
+      const connected = await chatStore.connectWebSocket(newWxid)
+      if (connected) {
+        console.log(`✅ WebSocket已连接到账号: ${newWxid}`)
       } else {
-        // 如果没有连接，尝试建立新连接
-        console.log(`账号 ${newWxid} 尚未连接WebSocket，尝试建立连接`)
-        const connected = await chatStore.connectWebSocket(newWxid)
-        if (connected) {
-          console.log(`WebSocket已连接到账号: ${newWxid}`)
-        } else {
-          console.warn(`WebSocket连接失败: ${newWxid}，将使用离线模式`)
-        }
+        console.warn(`❌ WebSocket连接失败: ${newWxid}，将使用离线模式`)
       }
     }
     catch (error) {
@@ -899,15 +935,26 @@ watch(() => props.account?.wxid, async (newWxid, oldWxid) => {
 
 // 监听消息变化，自动更新发送者信息
 watch(() => chatStore.currentMessages, (newMessages, oldMessages) => {
-  if (!props.account?.wxid || !newMessages || !oldMessages) return
+  if (!props.account?.wxid || !newMessages || !oldMessages) {
+    console.log('⏭️ 跳过消息监听: 账号或消息为空')
+    return
+  }
 
   // 检查是否有新消息
   if (newMessages.length > oldMessages.length) {
     const newMessage = newMessages[newMessages.length - 1]
+    console.log('📨 检测到新消息:', {
+      fromMe: newMessage.fromMe,
+      sessionId: newMessage.sessionId,
+      content: newMessage.content?.substring(0, 20) + '...'
+    })
 
     // 如果是收到的消息（非自己发送），自动更新发送者信息
     if (!newMessage.fromMe && newMessage.sessionId) {
+      console.log('🚀 触发自动更新联系人信息:', newMessage.sessionId)
       autoUpdateSenderInfo(newMessage.sessionId)
+    } else {
+      console.log('⏭️ 跳过自动更新: 消息来自自己或无sessionId')
     }
   }
 }, { deep: true })
@@ -967,21 +1014,14 @@ onMounted(async () => {
       await loadFriendsAsSessions()
     }
 
-    // 检查WebSocket是否已经连接，如果没有连接才尝试连接
+    // 无论WebSocket是否已连接，都重新建立连接以确保事件监听器正确绑定
     try {
-      const { webSocketService } = await import('@/services/websocket')
-
-      if (!webSocketService.isAccountConnected(props.account.wxid)) {
-        console.log(`账号 ${props.account.wxid} 尚未连接WebSocket，尝试建立连接`)
-        const connected = await chatStore.connectWebSocket(props.account.wxid)
-        if (connected) {
-          console.log(`WebSocket连接成功: ${props.account.wxid}`)
-        } else {
-          console.warn('WebSocket连接失败，将使用离线模式')
-        }
+      console.log(`🔄 页面挂载，重新建立WebSocket连接: ${props.account.wxid}`)
+      const connected = await chatStore.connectWebSocket(props.account.wxid)
+      if (connected) {
+        console.log(`✅ WebSocket连接成功: ${props.account.wxid}`)
       } else {
-        console.log(`账号 ${props.account.wxid} 已有WebSocket连接，切换到该账号`)
-        webSocketService.switchCurrentAccount(props.account.wxid)
+        console.warn('❌ WebSocket连接失败，将使用离线模式')
       }
     }
     catch (error) {
@@ -1101,6 +1141,20 @@ onUnmounted(() => {
                 <Refresh />
               </el-icon>
               刷新信息
+            </el-button>
+
+            <el-button link class="action-btn" @click="testAutoUpdate">
+              <el-icon>
+                <Tools />
+              </el-icon>
+              测试自动更新
+            </el-button>
+
+            <el-button link class="action-btn" @click="forceRefreshUI">
+              <el-icon>
+                <RefreshRight />
+              </el-icon>
+              强制刷新UI
             </el-button>
 
             <el-button link class="action-btn" @click="clearCurrentMessages">

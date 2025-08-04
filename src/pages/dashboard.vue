@@ -199,7 +199,7 @@ const getAccountUnreadCount = (wxid: string | undefined): number => {
 }
 
 // 方法
-const selectAccount = (account: any) => {
+const selectAccount = async (account: any) => {
   if (!account || !account.wxid) {
     console.error('无效的账号数据:', account)
     return
@@ -213,7 +213,17 @@ const selectAccount = (account: any) => {
     authStore.clearAccountUnreadCount(account.wxid)
     crossAccountMessageStore.clearAccountUnreadCount(account.wxid)
 
+    // 如果是真正的账号切换，重新建立WebSocket连接以确保能立即看到新消息
     if (previousAccount && previousAccount.wxid !== account.wxid) {
+      console.log(`🔄 账号切换：${previousAccount.wxid} -> ${account.wxid}`)
+      try {
+        const { useChatStore } = await import('@/stores/chat')
+        const chatStore = useChatStore()
+        await chatStore.connectWebSocket(account.wxid)
+        console.log(`✅ 账号切换后WebSocket重连成功`)
+      } catch (error) {
+        console.warn('账号切换后WebSocket重连失败:', error)
+      }
       ElMessage.success(`已切换到账号：${account.nickname}，相关数据已重置`)
     } else {
       ElMessage.success(`已切换到账号：${account.nickname}`)

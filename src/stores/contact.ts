@@ -95,17 +95,21 @@ export const useContactStore = defineStore('contact', () => {
     isUpdating.value[updateKey] = true
 
     try {
-      console.log(`更新联系人信息: ${contactWxid}`)
+      console.log(`🔄 更新联系人信息: contactWxid=${contactWxid}, accountWxid=${accountWxid}, forceRefresh=${forceRefresh}`)
 
       // 判断是否为群聊
       const isGroup = contactWxid.includes('@chatroom')
 
-      const result = await friendApi.getFriendDetail({
+      const apiParams = {
         Wxid: accountWxid,
         Towxids: contactWxid,
         ChatRoom: isGroup ? contactWxid : '',
         force_refresh: forceRefresh,
-      })
+      }
+      console.log('📡 调用API参数:', apiParams)
+
+      const result = await friendApi.getFriendDetail(apiParams)
+      console.log('📡 API返回结果:', { Success: result.Success, hasData: !!result.Data })
 
       if (result.Success && result.Data) {
         const contactData = result.Data
@@ -150,8 +154,16 @@ export const useContactStore = defineStore('contact', () => {
         // 保存到本地存储
         saveContactCache(accountWxid)
 
-        console.log(`联系人信息已更新: ${contactInfo.nickname || contactInfo.wxid}`)
+        console.log(`✅ 联系人信息已更新:`, {
+          wxid: contactInfo.wxid,
+          nickname: contactInfo.nickname,
+          avatar: contactInfo.avatar,
+          remark: contactInfo.remark,
+          isGroup: contactInfo.isGroup
+        })
         return contactInfo
+      } else {
+        console.warn('⚠️ API调用失败或无数据:', { Success: result.Success, Data: result.Data })
       }
     } catch (error) {
       console.error('更新联系人信息失败:', error)
