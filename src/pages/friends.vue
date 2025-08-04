@@ -291,7 +291,7 @@ const selectAccount = async (account: any) => {
     ElMessage.info(`已切换到账号：${account.nickname}，正在获取通讯录...`)
   }
 
-  authStore.setCurrentAccount(account.wxid)
+  await authStore.setCurrentAccount(account.wxid)
 
   // 自动获取新账号的缓存通讯录
   await loadFriends()

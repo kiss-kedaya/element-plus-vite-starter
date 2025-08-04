@@ -1033,8 +1033,8 @@ watch(
 
 onMounted(async () => {
   if (props.account?.wxid) {
-    // 首先加载缓存数据
-    chatStore.loadCachedData(props.account.wxid)
+    // 迁移旧缓存数据到新的 accountDataManager
+    chatStore.migrateOldCacheData(props.account.wxid)
 
     // 如果缓存中没有会话，则从好友列表加载
     if (chatStore.sessions.length === 0) {

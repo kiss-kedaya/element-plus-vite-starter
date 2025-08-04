@@ -207,7 +207,7 @@ const selectAccount = async (account: any) => {
 
   try {
     const previousAccount = authStore.currentAccount
-    authStore.setCurrentAccount(account.wxid)
+    await authStore.setCurrentAccount(account.wxid)
 
     // 清除当前账号的未读计数
     authStore.clearAccountUnreadCount(account.wxid)
@@ -335,14 +335,39 @@ const handleAccountAction = async (command) => {
     }
   } else if (action === 'delete') {
     try {
-      await ElMessageBox.confirm(`确定要删除账号 ${account.nickname} 吗？此操作不可恢复！`, '确认删除', {
-        type: 'error'
-      })
+      await ElMessageBox.confirm(
+        `确定要删除账号 ${account.nickname} 吗？此操作将调用API删除账号，不可恢复！`,
+        '确认删除',
+        {
+          type: 'error',
+          confirmButtonText: '确认删除',
+          cancelButtonText: '取消'
+        }
+      )
 
-      authStore.removeAccount(wxid)
-      ElMessage.success('账号已删除')
+      try {
+        // 调用删除账号API
+        const { loginApi } = await import('@/api/auth')
+        console.log(`🗑️ 开始删除账号: ${wxid}`)
+        const result = await loginApi.deleteAccount(wxid, false)
+
+        if (result.Success) {
+          // API调用成功，从本地存储中移除账号
+          authStore.removeAccount(wxid)
+          ElMessage.success('账号删除成功')
+          console.log(`✅ 账号删除成功: ${wxid}`)
+        } else {
+          // API调用失败
+          ElMessage.error(`删除账号失败: ${result.Message || '未知错误'}`)
+          console.error(`❌ 删除账号API失败:`, result)
+        }
+      } catch (apiError: any) {
+        console.error(`❌ 删除账号API调用异常:`, apiError)
+        ElMessage.error(`删除账号失败: ${apiError.message || '网络错误'}`)
+      }
     } catch {
       // 用户取消
+      console.log('用户取消删除账号操作')
     }
   }
 }

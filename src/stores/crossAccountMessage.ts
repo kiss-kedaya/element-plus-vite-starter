@@ -75,7 +75,20 @@ export const useCrossAccountMessageStore = defineStore('crossAccountMessage', ()
 
   // 处理跨账号聊天消息
   const handleCrossAccountMessage = (messageData: any, messageWxid: string) => {
-    if (!messageWxid) return
+    console.log('🔄 处理跨账号消息:', {
+      messageWxid,
+      currentAccount: useAuthStore().currentAccount?.wxid,
+      sessionId: messageData.sessionId,
+      fromUser: messageData.fromUser,
+      toUser: messageData.toUser,
+      fromMe: messageData.fromMe,
+      content: messageData.content?.substring(0, 30) + '...'
+    })
+
+    if (!messageWxid) {
+      console.warn('⚠️ messageWxid为空，跳过处理')
+      return
+    }
 
     const authStore = useAuthStore()
     const currentAccountWxid = authStore.currentAccount?.wxid
@@ -93,19 +106,26 @@ export const useCrossAccountMessageStore = defineStore('crossAccountMessage', ()
       isGroupMessage: messageData.isGroupMessage || false
     }
 
+    console.log('💾 存储跨账号消息:', {
+      messageWxid,
+      sessionId: crossMessage.sessionId,
+      messageId: crossMessage.id,
+      content: crossMessage.content?.substring(0, 30) + '...'
+    })
+
     // 存储消息
     if (!accountMessages.value[messageWxid]) {
       accountMessages.value[messageWxid] = []
     }
     accountMessages.value[messageWxid].push(crossMessage)
 
+    console.log(`✅ 跨账号消息已存储，账号 ${messageWxid} 现有 ${accountMessages.value[messageWxid].length} 条消息`)
+
     // 更新账号统计
     updateAccountStats(messageWxid, crossMessage)
 
     // 如果消息不属于当前账号，显示通知
     if (messageWxid !== currentAccountWxid && !crossMessage.fromMe) {
-      showCrossAccountNotification(crossMessage)
-      
       // 更新auth store中的未读计数
       authStore.incrementAccountUnreadCount(messageWxid, 1)
     }
@@ -127,9 +147,9 @@ export const useCrossAccountMessageStore = defineStore('crossAccountMessage', ()
         title: '好友请求',
         message: `账号 ${accountName} 收到新的好友请求`,
         duration: 5000,
-        onClick: () => {
+        onClick: async () => {
           // 可以在这里添加切换到对应账号的逻辑
-          authStore.setCurrentAccount(messageWxid)
+          await authStore.setCurrentAccount(messageWxid)
         }
       })
     }
@@ -145,7 +165,7 @@ export const useCrossAccountMessageStore = defineStore('crossAccountMessage', ()
     }
 
     const stats = accountStats.value[wxid]
-    
+
     // 更新最后消息
     stats.lastMessage = message
     stats.lastMessageTime = message.timestamp
@@ -154,42 +174,6 @@ export const useCrossAccountMessageStore = defineStore('crossAccountMessage', ()
     if (!message.fromMe) {
       stats.unreadCount++
     }
-  }
-
-  // 显示跨账号消息通知
-  const showCrossAccountNotification = (message: CrossAccountMessage) => {
-    const authStore = useAuthStore()
-    const account = authStore.accounts.find(acc => acc.wxid === message.wxid)
-    const accountName = account?.nickname || message.wxid
-
-    let title = `${accountName} 收到新消息`
-    let content = message.content
-
-    // 处理不同类型的消息
-    if (message.type === 'image') {
-      content = '[图片]'
-    } else if (message.type === 'file') {
-      content = '[文件]'
-    } else if (message.type === 'voice') {
-      content = '[语音]'
-    } else if (message.type === 'video') {
-      content = '[视频]'
-    }
-
-    // 群聊消息显示发送者
-    if (message.isGroupMessage && message.senderName) {
-      content = `${message.senderName}: ${content}`
-    }
-
-    ElNotification.info({
-      title,
-      message: content,
-      duration: 5000,
-      onClick: () => {
-        // 点击通知切换到对应账号
-        authStore.setCurrentAccount(message.wxid)
-      }
-    })
   }
 
   // 清除账号的未读计数
@@ -254,6 +238,7 @@ export const useCrossAccountMessageStore = defineStore('crossAccountMessage', ()
 
     // 方法
     initializeCrossAccountMessaging,
+    handleCrossAccountMessage,
     getAccountUnreadCount,
     getAccountLastMessage,
     clearAccountUnreadCount,

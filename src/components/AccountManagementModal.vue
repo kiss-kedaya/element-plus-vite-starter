@@ -321,6 +321,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
   'account-updated': [account: LoginAccount]
+  'account-deleted': [wxid: string]
   'refresh': []
 }>()
 
@@ -978,15 +979,46 @@ const removeAccount = async () => {
     await ElMessageBox.confirm(
       `确定要删除账号 ${props.account.nickname} 吗？此操作不可恢复！`,
       '确认删除',
-      { type: 'error' }
+      {
+        type: 'error',
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消',
+        dangerouslyUseHTMLString: true,
+        message: `
+          <div>
+            <p>确定要删除账号 <strong>${props.account.nickname}</strong> 吗？</p>
+            <p style="color: #f56c6c; font-size: 12px;">此操作将调用API删除账号，不可恢复！</p>
+          </div>
+        `
+      }
     )
 
     removeLoading.value = true
-    authStore.removeAccount(props.account.wxid)
-    ElMessage.success('账号已删除')
-    visible.value = false
+
+    try {
+      // 调用删除账号API
+      console.log(`🗑️ 开始删除账号: ${props.account.wxid}`)
+      const result = await loginApi.deleteAccount(props.account.wxid, false)
+
+      if (result.Success) {
+        // API调用成功，从本地存储中移除账号
+        authStore.removeAccount(props.account.wxid)
+        ElMessage.success('账号删除成功')
+        console.log(`✅ 账号删除成功: ${props.account.wxid}`)
+        visible.value = false
+        emit('account-deleted', props.account.wxid)
+      } else {
+        // API调用失败
+        ElMessage.error(`删除账号失败: ${result.Message || '未知错误'}`)
+        console.error(`❌ 删除账号API失败:`, result)
+      }
+    } catch (apiError: any) {
+      console.error(`❌ 删除账号API调用异常:`, apiError)
+      ElMessage.error(`删除账号失败: ${apiError.message || '网络错误'}`)
+    }
   } catch {
     // 用户取消
+    console.log('用户取消删除账号操作')
   } finally {
     removeLoading.value = false
   }

@@ -74,30 +74,35 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  const setCurrentAccount = (wxid: string) => {
+  const setCurrentAccount = async (wxid: string) => {
     const account = accounts.value.find(a => a.wxid === wxid)
     if (account) {
       const previousAccount = currentAccount.value
-      currentAccount.value = account
 
-      // 设置文件缓存管理器的当前微信账号
-      fileCacheManager.setCurrentWxid(wxid)
-
-      // 如果是真正的账号切换（不是初始化），触发数据清空和切换
-      if (previousAccount && previousAccount.wxid !== wxid) {
+      // 触发聊天数据的账号切换（包括初始化和切换）
+      if (!previousAccount) {
+        console.log(`账号初始化：${wxid}`)
+      } else if (previousAccount.wxid !== wxid) {
         console.log(`账号切换：${previousAccount.wxid} -> ${wxid}`)
+      }
 
-        // 触发聊天数据的账号切换
+      // 无论是初始化还是切换，都需要加载对应账号的数据
+      if (!previousAccount || previousAccount.wxid !== wxid) {
         try {
           // 动态导入避免循环依赖
-          import('@/stores/chat').then(({ useChatStore }) => {
-            const chatStore = useChatStore()
-            chatStore.switchAccount(wxid, previousAccount.wxid)
-          })
+          const { useChatStore } = await import('@/stores/chat')
+          const chatStore = useChatStore()
+          chatStore.switchAccount(wxid, previousAccount?.wxid)
         } catch (error) {
           console.error('切换聊天账号数据失败:', error)
         }
       }
+
+      // 在数据切换完成后，才更新currentAccount
+      currentAccount.value = account
+
+      // 设置文件缓存管理器的当前微信账号
+      fileCacheManager.setCurrentWxid(wxid)
     }
   }
 
@@ -239,20 +244,19 @@ export const useAuthStore = defineStore('auth', () => {
       if (accounts.value.length > 0 && !currentAccount.value) {
         const onlineAccount = accounts.value.find(acc => acc.status === 'online')
         const selectedAccount = onlineAccount || accounts.value[0]
-        currentAccount.value = selectedAccount
+
+        console.log('初始化时设置当前账号:', selectedAccount.wxid)
+
+        // 使用 setCurrentAccount 方法来正确设置账号（这会触发数据加载）
+        await setCurrentAccount(selectedAccount.wxid)
 
         // 明确设置该账号为当前WebSocket连接的账号
-        if (selectedAccount.wxid) {
-          console.log('初始化时设置当前账号:', selectedAccount.wxid)
-          try {
-            const { webSocketService } = await import('@/services/websocket')
-            // 使用setAsCurrent=true参数确保设置为当前账号
-            await webSocketService.connect(selectedAccount.wxid, true)
-          } catch (error) {
-            console.warn('设置当前账号WebSocket连接失败:', error)
-            // 如果WebSocket连接失败，至少设置文件缓存管理器
-            fileCacheManager.setCurrentWxid(selectedAccount.wxid)
-          }
+        try {
+          const { webSocketService } = await import('@/services/websocket')
+          // 使用setAsCurrent=true参数确保设置为当前账号
+          await webSocketService.connect(selectedAccount.wxid, true)
+        } catch (error) {
+          console.warn('设置当前账号WebSocket连接失败:', error)
         }
       }
 

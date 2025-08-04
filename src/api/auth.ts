@@ -80,6 +80,13 @@ export const loginApi = {
     return response.Data ? response : response as any
   },
 
+  // 删除账号
+  deleteAccount: async (wxid: string, logout: boolean = false): Promise<LoginResponse> => {
+    const response = await request.post<LoginResponse>(`/Login/DeleteAccount?wxid=${encodeURIComponent(wxid)}&logout=${logout}&api_key=api_kedaya`)
+    // response 已经是后端返回的格式 {Code, Success, Message, Data}
+    return response.Data ? response : response as any
+  },
+
   // 设置代理
   setProxy: async (params: SetProxyRequest): Promise<LoginResponse> => {
     const response = await request.post<LoginResponse>('/Tools/setproxy', params)

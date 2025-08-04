@@ -7,22 +7,67 @@ import { uploadFile } from '@/api'
 // 使用动态导入避免与其他地方的动态导入冲突
 import { useAuthStore } from '@/stores/auth'
 import { useContactStore } from '@/stores/contact'
+import { accountDataManager } from './accountDataManager'
 import { fileCacheManager } from '@/utils/fileCache'
 import { ElMessage } from 'element-plus'
 
 export const useChatStore = defineStore('chat', () => {
-  // 状态
-  const sessions = ref<ChatSession[]>([])
-  const currentSession = ref<ChatSession | null>(null)
-  const messages = ref<Record<string, ChatMessage[]>>({})
+  // 状态 - 现在通过accountDataManager管理
   const isLoading = ref(false)
+  const isSending = ref(false)
 
   // 强制刷新触发器
   const refreshTrigger = ref(0)
 
   // 缓存保存防抖
   const saveTimeouts = new Map<string, NodeJS.Timeout>()
-  const isSending = ref(false)
+
+  // 获取当前账号的会话列表
+  const sessions = computed(() => {
+    const authStore = useAuthStore()
+    if (!authStore.currentAccount?.wxid) return []
+
+    const accountData = accountDataManager.getAccountData(authStore.currentAccount.wxid)
+    return accountData.sessions
+  })
+
+  // 获取当前账号的当前会话
+  const currentSession = computed(() => {
+    const authStore = useAuthStore()
+    if (!authStore.currentAccount?.wxid) return null
+
+    const accountData = accountDataManager.getAccountData(authStore.currentAccount.wxid)
+
+    // 添加调试日志
+    console.log(`🔍 计算currentSession:`, {
+      wxid: authStore.currentAccount.wxid,
+      currentSession: accountData.currentSession?.name,
+      refreshTrigger: refreshTrigger.value
+    })
+
+    return accountData.currentSession
+  })
+
+  // 获取当前账号的所有消息
+  const messages = computed(() => {
+    const authStore = useAuthStore()
+    if (!authStore.currentAccount?.wxid) return {}
+
+    const accountData = accountDataManager.getAccountData(authStore.currentAccount.wxid)
+    return accountData.messages
+  })
+
+  // 计算属性
+  const currentMessages = computed(() => {
+    const authStore = useAuthStore()
+    if (!authStore.currentAccount?.wxid || !currentSession.value) return []
+
+    return accountDataManager.getSessionMessages(authStore.currentAccount.wxid, currentSession.value.id)
+  })
+
+  const unreadCount = computed(() => {
+    return sessions.value.reduce((total, session) => total + (session.unreadCount || 0), 0)
+  })
 
   // 联系人store
   const contactStore = useContactStore()
@@ -46,6 +91,11 @@ export const useChatStore = defineStore('chat', () => {
         return value
       })
       localStorage.setItem(cacheKey, serializedData)
+      console.log(`💾 保存缓存: ${cacheKey}, 大小: ${serializedData.length} 字符`, {
+        originalKey: key,
+        wxid: wxid,
+        finalCacheKey: cacheKey
+      })
     }
     catch (error: unknown) {
       console.error('保存缓存失败:', error)
@@ -55,8 +105,14 @@ export const useChatStore = defineStore('chat', () => {
   const loadFromCache = (key: string, wxid?: string) => {
     try {
       const cacheKey = wxid ? `${key}_${wxid}` : key
+      console.log(`🔍 尝试加载缓存: ${cacheKey}`)
       const cached = localStorage.getItem(cacheKey)
       if (cached) {
+        console.log(`✅ 找到缓存数据: ${cacheKey}, 大小: ${cached.length} 字符`, {
+          originalKey: key,
+          wxid: wxid,
+          finalCacheKey: cacheKey
+        })
         return JSON.parse(cached, (key, value) => {
           // 处理Date对象的反序列化
           if (value && typeof value === 'object' && value.__type === 'Date') {
@@ -83,17 +139,26 @@ export const useChatStore = defineStore('chat', () => {
     try {
       if (wxid) {
         // 清除特定账号的缓存
-        localStorage.removeItem(`${CACHE_KEYS.SESSIONS}_${wxid}`)
-        localStorage.removeItem(`${CACHE_KEYS.MESSAGES}_${wxid}`)
-        localStorage.removeItem(`${CACHE_KEYS.CURRENT_SESSION}_${wxid}`)
+        const keys = [
+          `${CACHE_KEYS.SESSIONS}_${wxid}`,
+          `${CACHE_KEYS.MESSAGES}_${wxid}`,
+          `${CACHE_KEYS.CURRENT_SESSION}_${wxid}`
+        ]
+        keys.forEach(key => {
+          localStorage.removeItem(key)
+          console.log(`🗑️ 删除缓存键: ${key}`)
+        })
+        console.log(`已清除账号 ${wxid} 的所有缓存`)
       }
       else {
         // 清除所有聊天缓存
-        Object.keys(localStorage).forEach((key) => {
-          if (key.startsWith('wechat_chat_')) {
-            localStorage.removeItem(key)
-          }
+        const allKeys = Object.keys(localStorage)
+        const chatKeys = allKeys.filter(key => key.startsWith('wechat_chat_'))
+        chatKeys.forEach(key => {
+          localStorage.removeItem(key)
+          console.log(`🗑️ 删除缓存键: ${key}`)
         })
+        console.log(`已清除所有聊天缓存，共删除 ${chatKeys.length} 个键`)
       }
     }
     catch (error: unknown) {
@@ -101,16 +166,7 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  // 计算属性
-  const currentMessages = computed(() => {
-    if (!currentSession.value)
-      return []
-    return messages.value[currentSession.value.id] || []
-  })
 
-  const unreadCount = computed(() => {
-    return sessions.value.reduce((total, session) => total + session.unreadCount, 0)
-  })
 
   // 排序会话列表（按最后消息时间降序）
   const sortSessions = () => {
@@ -121,33 +177,91 @@ export const useChatStore = defineStore('chat', () => {
     })
   }
 
-  // 加载缓存数据
-  const loadCachedData = (wxid: string) => {
-    console.log(`加载账号 ${wxid} 的缓存数据`)
+  // 调试：列出所有相关的缓存键
+  const debugCacheKeys = (wxid: string) => {
+    const allKeys = Object.keys(localStorage)
+    const relevantKeys = allKeys.filter(key =>
+      key.includes('wechat_chat') || key.includes(wxid)
+    )
+    console.log(`🔍 当前localStorage中的相关缓存键:`, relevantKeys)
 
-    // 加载会话列表
+    // 显示每个键的数据大小和内容摘要
+    relevantKeys.forEach(key => {
+      const data = localStorage.getItem(key)
+      if (data) {
+        try {
+          const parsed = JSON.parse(data)
+          let summary = ''
+          if (Array.isArray(parsed)) {
+            summary = `数组，${parsed.length} 项`
+          } else if (typeof parsed === 'object') {
+            summary = `对象，${Object.keys(parsed).length} 个键`
+          } else {
+            summary = `${typeof parsed}`
+          }
+          console.log(`  - ${key}: ${data.length} 字符 (${summary})`)
+        } catch {
+          console.log(`  - ${key}: ${data.length} 字符 (无法解析)`)
+        }
+      } else {
+        console.log(`  - ${key}: 0 字符`)
+      }
+    })
+  }
+
+  // 迁移旧缓存数据到新的 accountDataManager
+  const migrateOldCacheData = (wxid: string) => {
+    console.log(`� 开始迁移账号 ${wxid} 的旧缓存数据`)
+
+    // 调试：显示所有相关缓存键
+    debugCacheKeys(wxid)
+
+    // 检查是否已经有新格式的数据
+    const newCacheKey = `account_data_${wxid}`
+    const existingNewData = localStorage.getItem(newCacheKey)
+    if (existingNewData) {
+      try {
+        const parsed = JSON.parse(existingNewData)
+        if (parsed.sessions && parsed.sessions.length > 0) {
+          console.log(`✅ 账号 ${wxid} 已有新格式数据，跳过迁移`)
+          return
+        }
+      } catch (error) {
+        console.warn('解析新格式数据失败，继续迁移:', error)
+      }
+    }
+
+    // 加载旧格式的会话列表
     const cachedSessions = loadFromCache(CACHE_KEYS.SESSIONS, wxid)
     if (cachedSessions && Array.isArray(cachedSessions)) {
-      sessions.value = cachedSessions
-      // 加载后立即排序
-      sortSessions()
-      console.log(`加载了 ${cachedSessions.length} 个缓存会话并已排序`)
+      console.log(`📦 找到旧格式会话数据: ${cachedSessions.length} 个会话`)
+      accountDataManager.updateSessions(wxid, cachedSessions)
     }
 
-    // 加载消息记录
+    // 加载旧格式的消息记录
     const cachedMessages = loadFromCache(CACHE_KEYS.MESSAGES, wxid)
     if (cachedMessages && typeof cachedMessages === 'object') {
-      messages.value = cachedMessages
       const messageCount = Object.values(cachedMessages).reduce((total: number, msgs) => total + (Array.isArray(msgs) ? msgs.length : 0), 0)
-      console.log(`加载了 ${messageCount} 条缓存消息`)
+      console.log(`📦 找到旧格式消息数据: ${messageCount} 条消息`)
+
+      // 将消息逐个添加到 accountDataManager
+      Object.entries(cachedMessages).forEach(([sessionId, msgs]) => {
+        if (Array.isArray(msgs)) {
+          msgs.forEach(msg => {
+            accountDataManager.addMessage(wxid, sessionId, msg)
+          })
+        }
+      })
     }
 
-    // 不自动恢复当前会话，等待用户点击选择
-    // const cachedCurrentSession = loadFromCache(CACHE_KEYS.CURRENT_SESSION, wxid)
-    // if (cachedCurrentSession && sessions.value.find(s => s.id === cachedCurrentSession.id)) {
-    //   currentSession.value = cachedCurrentSession
-    //   console.log(`恢复当前会话: ${cachedCurrentSession.name}`)
-    // }
+    // 加载旧格式的当前会话
+    const cachedCurrentSession = loadFromCache(CACHE_KEYS.CURRENT_SESSION, wxid)
+    if (cachedCurrentSession) {
+      console.log(`📦 找到旧格式当前会话: ${cachedCurrentSession.name}`)
+      accountDataManager.updateCurrentSession(wxid, cachedCurrentSession)
+    }
+
+    console.log(`✅ 账号 ${wxid} 的旧缓存数据迁移完成`)
   }
 
   // 保存数据到缓存（带防抖）
@@ -202,35 +316,53 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  // 方法
-  const setSessions = (newSessions: ChatSession[]) => {
-    sessions.value = newSessions
-    // 设置后立即排序
-    sortSessions()
-    // 自动保存到缓存
+  // 方法 - 重构为使用accountDataManager
+  const setSessions = (newSessions: ChatSession[], wxid?: string) => {
     const authStore = useAuthStore()
-    if (authStore.currentAccount?.wxid) {
-      saveCachedData(authStore.currentAccount.wxid)
+    const targetWxid = wxid || authStore.currentAccount?.wxid
+
+    if (!targetWxid) {
+      console.warn('setSessions: 无法确定目标账号')
+      return
     }
+
+    // 排序会话
+    const sortedSessions = [...newSessions].sort((a, b) => {
+      const timeA = a.lastMessageTime?.getTime() || 0
+      const timeB = b.lastMessageTime?.getTime() || 0
+      return timeB - timeA // 降序排列，最新的在前面
+    })
+
+    // 使用accountDataManager更新会话
+    accountDataManager.updateSessions(targetWxid, sortedSessions)
+
+    console.log(`✅ 更新账号 ${targetWxid} 的会话列表: ${sortedSessions.length} 个会话`)
   }
 
-  const setCurrentSession = (sessionId: string) => {
+  const setCurrentSession = (sessionId: string, wxid?: string) => {
+    const authStore = useAuthStore()
+    const targetWxid = wxid || authStore.currentAccount?.wxid
+
+    if (!targetWxid) {
+      console.warn('setCurrentSession: 无法确定目标账号')
+      return
+    }
+
     const session = sessions.value.find(s => s.id === sessionId)
     if (session) {
-      currentSession.value = session
       // 标记为已读
       session.unreadCount = 0
+
+      // 使用accountDataManager更新当前会话
+      accountDataManager.updateCurrentSession(targetWxid, session)
 
       // 懒加载：只加载当前会话的最近消息（限制数量）
       loadSessionMessagesLazy(sessionId)
 
-      // 自动保存到缓存
-      const authStore = useAuthStore()
-      if (authStore.currentAccount?.wxid) {
-        saveCachedData(authStore.currentAccount.wxid)
-        // 当用户查看会话时，清除该账号的未读计数
-        authStore.clearAccountUnreadCount(authStore.currentAccount.wxid)
-      }
+      // 当用户查看会话时，清除该账号的未读计数
+      authStore.clearAccountUnreadCount(targetWxid)
+
+      console.log(`✅ 设置账号 ${targetWxid} 的当前会话: ${session.name}`)
     }
   }
 
@@ -260,8 +392,17 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  const addMessage = (sessionId: string, message: ChatMessage) => {
-    console.log('📝 添加消息到会话:', {
+  const addMessage = (sessionId: string, message: ChatMessage, wxid?: string) => {
+    const authStore = useAuthStore()
+    const targetWxid = wxid || authStore.currentAccount?.wxid
+
+    if (!targetWxid) {
+      console.warn('addMessage: 无法确定目标账号')
+      return
+    }
+
+    console.log('📝 添加消息到账号会话:', {
+      wxid: targetWxid,
       sessionId,
       messageId: message.id,
       content: message.content?.substring(0, 30) + '...',
@@ -269,32 +410,15 @@ export const useChatStore = defineStore('chat', () => {
       type: message.type
     })
 
-    if (!messages.value[sessionId]) {
-      messages.value[sessionId] = []
-      console.log(`📂 为会话 ${sessionId} 创建新的消息数组`)
-    }
+    // 使用accountDataManager添加消息
+    accountDataManager.addMessage(targetWxid, sessionId, message)
 
-    // 检查消息是否已存在（避免重复）
-    const existingMessage = messages.value[sessionId].find(m => m.id === message.id)
-    if (existingMessage) {
-      console.log(`⏭️ 消息已存在，跳过添加: ${message.id}`)
-      return
-    }
+    // 更新会话的最后消息和未读计数
+    const accountData = accountDataManager.getAccountData(targetWxid)
+    const sessionIndex = accountData.sessions.findIndex(s => s.id === sessionId)
 
-    messages.value[sessionId].push(message)
-    console.log(`✅ 消息已添加到会话 ${sessionId}，当前消息数: ${messages.value[sessionId].length}`)
-
-    // 按时间戳排序消息
-    messages.value[sessionId].sort((a, b) => {
-      const timeA = a.timestamp instanceof Date ? a.timestamp.getTime() : new Date(a.timestamp).getTime()
-      const timeB = b.timestamp instanceof Date ? b.timestamp.getTime() : new Date(b.timestamp).getTime()
-      return timeA - timeB
-    })
-
-    // 更新会话的最后消息
-    const sessionIndex = sessions.value.findIndex(s => s.id === sessionId)
     if (sessionIndex !== -1) {
-      const session = sessions.value[sessionIndex]
+      const session = accountData.sessions[sessionIndex]
 
       // 更新会话信息
       session.lastMessage = message.content
@@ -304,35 +428,24 @@ export const useChatStore = defineStore('chat', () => {
       // 1. 消息不是自己发送的
       // 2. 用户当前没有在查看这个会话
       if (message.fromMe === false && currentSession.value?.id !== sessionId) {
-        session.unreadCount++
+        session.unreadCount = (session.unreadCount || 0) + 1
       }
 
-      // 将有新消息的会话移到列表顶部（无论当前位置如何）
-      if (sessionIndex >= 0) {
-        // 创建新的会话对象以确保响应式更新
-        const updatedSession = {
-          ...session,
-          // 确保所有属性都是新的引用
-          lastMessage: session.lastMessage,
-          lastMessageTime: session.lastMessageTime,
-          unreadCount: session.unreadCount
-        }
+      // 将有新消息的会话移到列表顶部
+      const updatedSession = { ...session }
+      accountData.sessions.splice(sessionIndex, 1) // 从原位置移除
+      accountData.sessions.splice(0, 0, updatedSession) // 插入到顶部
 
-        // 使用splice确保Vue检测到数组变化
-        sessions.value.splice(sessionIndex, 1) // 从原位置移除
-        sessions.value.splice(0, 0, updatedSession) // 插入到顶部
-        console.log(`会话 ${sessionId} 已移动到列表顶部`)
+      // 更新accountDataManager中的会话列表
+      accountDataManager.updateSessions(targetWxid, accountData.sessions)
 
-        // 强制刷新UI
-        forceRefreshUI()
-      }
+      console.log(`✅ 会话 ${sessionId} 已移动到账号 ${targetWxid} 列表顶部`)
+
+      // 强制刷新UI
+      forceRefreshUI()
     }
 
-    // 自动保存到缓存
-    const authStore = useAuthStore()
-    if (authStore.currentAccount?.wxid) {
-      saveCachedData(authStore.currentAccount.wxid)
-    }
+    console.log(`✅ 消息已添加到账号 ${targetWxid} 的会话 ${sessionId}`)
   }
 
   const loadMessages = async (sessionId: string) => {
@@ -787,9 +900,9 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   const clearAllData = () => {
-    sessions.value = []
-    currentSession.value = null
-    messages.value = {}
+    // 现在数据通过 accountDataManager 管理，这个方法主要用于清理状态
+    console.log('🧹 清空所有数据（通过accountDataManager管理）')
+    // accountDataManager 会在账号切换时自动处理数据清理
   }
 
   // 同步跨账号消息到当前聊天界面
@@ -837,58 +950,55 @@ export const useChatStore = defineStore('chat', () => {
 
       // 将消息添加到对应的会话中
       Object.entries(messagesBySession).forEach(([sessionId, msgs]) => {
-        // 确保会话存在
-        if (!messages.value[sessionId]) {
-          messages.value[sessionId] = []
-        }
+        // 使用accountDataManager添加消息（内置防重复机制）
+        msgs.forEach(msg => {
+          accountDataManager.addMessage(wxid, sessionId, msg)
+        })
 
-        // 检查消息是否已存在（避免重复添加）
-        const existingIds = new Set(messages.value[sessionId].map(m => m.id))
-        const newMessages = msgs.filter(msg => !existingIds.has(msg.id))
+        console.log(`会话 ${sessionId} 同步了 ${msgs.length} 条跨账号消息`)
 
-        if (newMessages.length > 0) {
-          // 按时间戳排序并添加到消息列表
-          messages.value[sessionId].push(...newMessages)
-          messages.value[sessionId].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+        // 获取当前账号数据
+        const accountData = accountDataManager.getAccountData(wxid)
+        let session = accountData.sessions.find(s => s.id === sessionId)
 
-          console.log(`会话 ${sessionId} 同步了 ${newMessages.length} 条跨账号消息`)
-
-          // 更新或创建会话信息
-          let session = sessions.value.find(s => s.id === sessionId)
-          if (!session) {
-            // 如果会话不存在，创建一个基本的会话
-            const firstMessage = newMessages[0]
-            session = {
-              id: sessionId,
-              name: firstMessage.senderName || sessionId,
-              avatar: '',
-              type: firstMessage.isGroupMessage ? 'group' : 'friend',
-              lastMessage: '',
-              lastMessageTime: new Date(),
-              unreadCount: 0,
-              isOnline: false,
-            }
-            sessions.value.unshift(session)
-            console.log(`为跨账号消息创建新会话: ${sessionId}`)
+        if (!session) {
+          // 如果会话不存在，创建一个基本的会话
+          const firstMessage = msgs[0]
+          session = {
+            id: sessionId,
+            name: firstMessage.senderName || sessionId,
+            avatar: '',
+            type: firstMessage.isGroupMessage ? 'group' : 'friend',
+            lastMessage: '',
+            lastMessageTime: new Date(),
+            unreadCount: 0,
+            isOnline: false,
           }
 
-          // 更新会话的最后消息信息
-          const lastMessage = newMessages[newMessages.length - 1]
+          // 添加新会话到账号数据
+          const updatedSessions = [session, ...accountData.sessions]
+          accountDataManager.updateSessions(wxid, updatedSessions)
+          console.log(`为跨账号消息创建新会话: ${sessionId}`)
+        }
+
+        // 更新会话的最后消息信息
+        const lastMessage = msgs[msgs.length - 1]
+        if (session) {
           session.lastMessage = lastMessage.content
           session.lastMessageTime = lastMessage.timestamp
 
           // 如果消息不是自己发送的，增加未读计数
           if (!lastMessage.fromMe) {
-            session.unreadCount += newMessages.filter(m => !m.fromMe).length
+            session.unreadCount = (session.unreadCount || 0) + msgs.filter(m => !m.fromMe).length
           }
+
+          // 更新会话信息
+          accountDataManager.updateSessions(wxid, accountData.sessions)
         }
       })
 
-      // 同步完成后重新排序会话列表
-      sortSessions()
-
-      // 保存同步后的数据到缓存
-      saveCachedData(wxid)
+      // 强制刷新UI
+      forceRefreshUI()
 
       // 清除已同步的跨账号消息，避免重复同步
       crossAccountStore.clearAccountMessages(wxid)
@@ -902,29 +1012,32 @@ export const useChatStore = defineStore('chat', () => {
 
   // 切换账号时的数据管理
   const switchAccount = (newWxid: string, oldWxid?: string) => {
-    // 保存当前账号的数据到缓存（立即保存）
-    if (oldWxid) {
-      saveCachedData(oldWxid, true)
-      console.log(`账号 ${oldWxid} 的数据已保存`)
-    }
+    console.log(`🔄 开始账号切换: ${oldWxid} -> ${newWxid}`)
 
-    // 清空当前数据
-    clearAllData()
+    // 先迁移旧缓存数据（如果存在）
+    migrateOldCacheData(newWxid)
 
-    // 加载新账号的缓存数据
-    if (newWxid) {
-      loadCachedData(newWxid)
-      // 加载联系人缓存
-      contactStore.loadContactCache(newWxid)
-      console.log(`已切换到账号 ${newWxid}`)
+    // 使用accountDataManager进行账号切换
+    const newAccountData = accountDataManager.switchToAccount(newWxid)
 
-      // 同步跨账号消息到聊天界面
-      syncCrossAccountMessages(newWxid)
+    // 加载联系人缓存
+    contactStore.loadContactCache(newWxid)
 
-      // 清除新账号的未读计数（因为用户已经切换到这个账号）
-      const authStore = useAuthStore()
-      authStore.clearAccountUnreadCount(newWxid)
-    }
+    console.log(`✅ 已切换到账号 ${newWxid}`, {
+      sessionsCount: newAccountData.sessions.length,
+      currentSession: newAccountData.currentSession?.name,
+      messagesCount: Object.keys(newAccountData.messages).length
+    })
+
+    // 同步跨账号消息到聊天界面
+    syncCrossAccountMessages(newWxid)
+
+    // 清除新账号的未读计数（因为用户已经切换到这个账号）
+    const authStore = useAuthStore()
+    authStore.clearAccountUnreadCount(newWxid)
+
+    // 强制刷新UI以确保显示新账号的数据
+    forceRefreshUI()
   }
 
   // WebSocket连接管理
@@ -1228,11 +1341,15 @@ export const useChatStore = defineStore('chat', () => {
         }
       }
 
-      addMessage(sessionId, chatMessage)
+      // 确定消息应该保存到哪个账号的缓存中
+      const authStore = useAuthStore()
+      const targetWxid = messageWxid || authStore.currentAccount?.wxid
+
+      addMessage(sessionId, chatMessage, targetWxid)
 
       // 如果当前没有选中会话，自动选中这个会话
       if (!currentSession.value) {
-        setCurrentSession(sessionId)
+        setCurrentSession(sessionId, targetWxid)
         console.log('自动选中会话:', sessionId)
       }
     }
@@ -1361,10 +1478,7 @@ export const useChatStore = defineStore('chat', () => {
           // 使用splice来替换数组中的会话对象，确保Vue检测到变化
           sessions.value.splice(sessionIndex, 1, updatedSession)
 
-          // 如果这是当前选中的会话，也要更新currentSession
-          if (currentSession.value?.id === sessionId) {
-            currentSession.value = { ...updatedSession }
-          }
+          // currentSession 是计算属性，会自动响应 accountDataManager 中的变化
 
           console.log('会话联系人信息已更新:', updatedSession.name, updatedSession.avatar, '类型:', updatedSession.type)
 
@@ -1386,28 +1500,41 @@ export const useChatStore = defineStore('chat', () => {
 
   // 更新会话信息
   const updateSessionInfo = (sessionId: string, updates: Partial<ChatSession>) => {
-    const sessionIndex = sessions.value.findIndex(s => s.id === sessionId)
+    const authStore = useAuthStore()
+    const targetWxid = authStore.currentAccount?.wxid
+
+    if (!targetWxid) {
+      console.warn('updateSessionInfo: 无法确定目标账号')
+      return null
+    }
+
+    const accountData = accountDataManager.getAccountData(targetWxid)
+    const sessionIndex = accountData.sessions.findIndex(s => s.id === sessionId)
+
     if (sessionIndex !== -1) {
-      // 创建新的会话对象来触发响应式更新
+      // 创建新的会话对象
       const updatedSession = {
-        ...sessions.value[sessionIndex],
+        ...accountData.sessions[sessionIndex],
         ...updates
       }
 
-      // 替换数组中的会话对象
-      sessions.value[sessionIndex] = updatedSession
+      // 更新会话列表
+      const updatedSessions = [...accountData.sessions]
+      updatedSessions[sessionIndex] = updatedSession
+
+      // 使用accountDataManager更新会话列表
+      accountDataManager.updateSessions(targetWxid, updatedSessions)
 
       // 如果这是当前选中的会话，也要更新currentSession
       if (currentSession.value?.id === sessionId) {
-        currentSession.value = updatedSession
+        accountDataManager.updateCurrentSession(targetWxid, updatedSession)
+        console.log(`🔄 当前会话已更新: ${updatedSession.name}`)
       }
 
-      // 自动保存到缓存
-      const authStore = useAuthStore()
-      if (authStore.currentAccount?.wxid) {
-        saveCachedData(authStore.currentAccount.wxid)
-      }
+      // 强制刷新UI以确保界面更新
+      forceRefreshUI()
 
+      console.log(`✅ 更新账号 ${targetWxid} 的会话信息: ${sessionId}`)
       return updatedSession
     }
     return null
@@ -1415,24 +1542,31 @@ export const useChatStore = defineStore('chat', () => {
 
   // 删除会话
   const removeSession = (sessionId: string) => {
-    const sessionIndex = sessions.value.findIndex(s => s.id === sessionId)
+    const authStore = useAuthStore()
+    const targetWxid = authStore.currentAccount?.wxid
+
+    if (!targetWxid) {
+      console.warn('removeSession: 无法确定目标账号')
+      return
+    }
+
+    const accountData = accountDataManager.getAccountData(targetWxid)
+    const sessionIndex = accountData.sessions.findIndex(s => s.id === sessionId)
+
     if (sessionIndex !== -1) {
       // 删除会话
-      sessions.value.splice(sessionIndex, 1)
+      const updatedSessions = accountData.sessions.filter(s => s.id !== sessionId)
+      accountDataManager.updateSessions(targetWxid, updatedSessions)
 
       // 删除相关消息
-      delete messages.value[sessionId]
+      accountDataManager.removeSessionMessages(targetWxid, sessionId)
 
       // 如果删除的是当前会话，清空当前会话
       if (currentSession.value?.id === sessionId) {
-        currentSession.value = null
+        accountDataManager.updateCurrentSession(targetWxid, null)
       }
 
-      // 保存到缓存
-      const authStore = useAuthStore()
-      if (authStore.currentAccount?.wxid) {
-        saveCachedData(authStore.currentAccount.wxid)
-      }
+      console.log(`✅ 删除账号 ${targetWxid} 的会话: ${sessionId}`)
     }
   }
 
@@ -1454,6 +1588,7 @@ export const useChatStore = defineStore('chat', () => {
     messages,
     isLoading,
     isSending,
+    refreshTrigger,
 
     // 计算属性
     currentMessages,
@@ -1486,10 +1621,11 @@ export const useChatStore = defineStore('chat', () => {
     forceRefreshUI,
 
     // 缓存相关方法
-    loadCachedData,
+    migrateOldCacheData,
     saveCachedData,
     switchAccount,
     syncCrossAccountMessages,
     clearCache,
+    debugCacheKeys,
   }
 })
