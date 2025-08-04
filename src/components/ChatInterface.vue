@@ -852,8 +852,9 @@ const autoUpdateSenderInfo = async (sessionId: string) => {
   if (!props.account?.wxid) return
 
   try {
-    // 异步更新发送者信息，不阻塞消息显示
-    await chatStore.updateSessionContactInfo(props.account.wxid, sessionId, false)
+    // 异步更新发送者信息，强制刷新以获取最新的头像和昵称
+    await chatStore.updateSessionContactInfo(props.account.wxid, sessionId, true)
+    console.log('自动更新联系人信息完成:', sessionId)
   } catch (error) {
     console.error('自动更新发送者信息失败:', error)
   }

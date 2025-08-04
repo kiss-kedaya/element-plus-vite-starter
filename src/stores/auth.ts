@@ -209,19 +209,6 @@ export const useAuthStore = defineStore('auth', () => {
         return processedAccount
       })
 
-      // 设置当前账号为第一个在线账号
-      if (accounts.value.length > 0 && !currentAccount.value) {
-        const onlineAccount = accounts.value.find(acc => acc.status === 'online')
-        const selectedAccount = onlineAccount || accounts.value[0]
-        currentAccount.value = selectedAccount
-
-        // 设置文件缓存管理器的当前微信账号
-        if (selectedAccount.wxid) {
-          console.log('初始化时设置文件缓存管理器账号:', selectedAccount.wxid)
-          fileCacheManager.setCurrentWxid(selectedAccount.wxid)
-        }
-      }
-
       // 自动连接所有在线账号的WebSocket
       if (accounts.value.length > 0) {
         try {
@@ -236,6 +223,27 @@ export const useAuthStore = defineStore('auth', () => {
           }
         } catch (error) {
           console.warn('自动连接WebSocket失败:', error)
+        }
+      }
+
+      // 设置当前账号为第一个在线账号（在WebSocket连接之后）
+      if (accounts.value.length > 0 && !currentAccount.value) {
+        const onlineAccount = accounts.value.find(acc => acc.status === 'online')
+        const selectedAccount = onlineAccount || accounts.value[0]
+        currentAccount.value = selectedAccount
+
+        // 明确设置该账号为当前WebSocket连接的账号
+        if (selectedAccount.wxid) {
+          console.log('初始化时设置当前账号:', selectedAccount.wxid)
+          try {
+            const { webSocketService } = await import('@/services/websocket')
+            // 使用setAsCurrent=true参数确保设置为当前账号
+            await webSocketService.connect(selectedAccount.wxid, true)
+          } catch (error) {
+            console.warn('设置当前账号WebSocket连接失败:', error)
+            // 如果WebSocket连接失败，至少设置文件缓存管理器
+            fileCacheManager.setCurrentWxid(selectedAccount.wxid)
+          }
         }
       }
 

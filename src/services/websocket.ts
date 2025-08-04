@@ -121,7 +121,7 @@ export class WebSocketService {
   }
 
   // 连接WebSocket
-  connect(wxid?: string): Promise<boolean> {
+  connect(wxid?: string, setAsCurrent: boolean = false): Promise<boolean> {
     return new Promise((resolve, reject) => {
       if (!wxid) {
         reject(new Error('wxid不能为空'))
@@ -134,8 +134,12 @@ export class WebSocketService {
       const existingConnection = this.connections.get(wxid)
       if (existingConnection && existingConnection.ws.readyState === WebSocket.OPEN) {
         console.log(`✅ WebSocket已连接到 ${wxid}，复用现有连接`)
-        this.currentWxid = wxid
-        fileCacheManager.setCurrentWxid(wxid)
+        // 只在明确指定时才设置为当前账号
+        if (setAsCurrent) {
+          this.currentWxid = wxid
+          fileCacheManager.setCurrentWxid(wxid)
+          console.log(`🎯 设置当前账号: ${wxid}`)
+        }
         resolve(true)
         return
       }
@@ -153,9 +157,12 @@ export class WebSocketService {
         return
       }
 
-      // 设置当前账号
-      this.currentWxid = wxid
-      fileCacheManager.setCurrentWxid(wxid)
+      // 只在明确指定或者没有当前账号时才设置当前账号
+      if (setAsCurrent || !this.currentWxid) {
+        this.currentWxid = wxid
+        fileCacheManager.setCurrentWxid(wxid)
+        console.log(`🎯 设置当前账号: ${wxid}`)
+      }
 
       // 创建新的连接信息
       const connectionInfo: AccountConnection = {
