@@ -62,6 +62,8 @@ declare module 'vue' {
     FriendManagement: typeof import('./components/FriendManagement.vue')['default']
     FriendManagement_backup: typeof import('./components/FriendManagement_backup.vue')['default']
     FriendRequestNotification: typeof import('./components/FriendRequestNotification.vue')['default']
+    GlassConfirmDialog: typeof import('./components/common/GlassConfirmDialog.vue')['default']
+    GlassmorphismShowcase: typeof import('./components/examples/GlassmorphismShowcase.vue')['default']
     GroupManagement: typeof import('./components/GroupManagement.vue')['default']
     HelloWorld: typeof import('./components/HelloWorld.vue')['default']
     ImageMessage: typeof import('./components/common/ImageMessage.vue')['default']

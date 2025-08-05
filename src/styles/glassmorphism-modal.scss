@@ -1,0 +1,337 @@
+/**
+ * 磨砂玻璃模态框设计系统
+ * Glassmorphism Modal Design System
+ * 
+ * 特性：
+ * - 纯白简约风格
+ * - 磨砂玻璃效果
+ * - 质感和层次感
+ * - 流畅的交互动画
+ */
+
+// ===== 设计令牌 (Design Tokens) =====
+:root {
+  // 颜色系统
+  --glass-white: rgba(255, 255, 255, 0.95);
+  --glass-white-light: rgba(255, 255, 255, 0.85);
+  --glass-white-lighter: rgba(255, 255, 255, 0.75);
+  --glass-overlay: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass-shadow: rgba(0, 0, 0, 0.1);
+  --glass-shadow-hover: rgba(0, 0, 0, 0.15);
+  --glass-shadow-active: rgba(0, 0, 0, 0.2);
+  
+  // 文字颜色
+  --glass-text-primary: #1a1a1a;
+  --glass-text-secondary: #4a4a4a;
+  --glass-text-tertiary: #8a8a8a;
+  --glass-text-placeholder: #bfbfbf;
+  
+  // 尺寸系统
+  --glass-radius-sm: 8px;
+  --glass-radius-md: 12px;
+  --glass-radius-lg: 16px;
+  --glass-radius-xl: 20px;
+  
+  // 间距系统
+  --glass-spacing-xs: 4px;
+  --glass-spacing-sm: 8px;
+  --glass-spacing-md: 16px;
+  --glass-spacing-lg: 24px;
+  --glass-spacing-xl: 32px;
+  --glass-spacing-2xl: 48px;
+  
+  // 阴影系统
+  --glass-shadow-sm: 0 2px 8px var(--glass-shadow);
+  --glass-shadow-md: 0 4px 16px var(--glass-shadow);
+  --glass-shadow-lg: 0 8px 32px var(--glass-shadow);
+  --glass-shadow-xl: 0 16px 64px var(--glass-shadow);
+  
+  // 动画系统
+  --glass-transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --glass-transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --glass-transition-slow: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  // 模糊效果
+  --glass-blur-sm: blur(8px);
+  --glass-blur-md: blur(12px);
+  --glass-blur-lg: blur(16px);
+  --glass-blur-xl: blur(20px);
+}
+
+// ===== 基础磨砂玻璃效果 =====
+@mixin glass-base {
+  background: var(--glass-white);
+  backdrop-filter: var(--glass-blur-md);
+  -webkit-backdrop-filter: var(--glass-blur-md);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow-md);
+}
+
+@mixin glass-hover {
+  background: var(--glass-white-light);
+  box-shadow: var(--glass-shadow-lg);
+  transform: translateY(-2px);
+}
+
+@mixin glass-active {
+  background: var(--glass-white-lighter);
+  box-shadow: var(--glass-shadow-sm);
+  transform: translateY(0);
+}
+
+// ===== 模态框遮罩层 =====
+.glass-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--glass-overlay);
+  backdrop-filter: var(--glass-blur-sm);
+  -webkit-backdrop-filter: var(--glass-blur-sm);
+  z-index: 2000;
+  
+  // 进入动画
+  &.glass-overlay-enter-active {
+    transition: all var(--glass-transition-normal);
+  }
+  
+  &.glass-overlay-leave-active {
+    transition: all var(--glass-transition-normal);
+  }
+  
+  &.glass-overlay-enter-from,
+  &.glass-overlay-leave-to {
+    opacity: 0;
+    backdrop-filter: blur(0);
+    -webkit-backdrop-filter: blur(0);
+  }
+}
+
+// ===== 基础模态框容器 =====
+.glass-modal {
+  @include glass-base;
+  border-radius: var(--glass-radius-lg);
+  overflow: hidden;
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  margin: auto;
+  
+  // 进入动画
+  &.glass-modal-enter-active {
+    transition: all var(--glass-transition-normal);
+  }
+  
+  &.glass-modal-leave-active {
+    transition: all var(--glass-transition-normal);
+  }
+  
+  &.glass-modal-enter-from,
+  &.glass-modal-leave-to {
+    opacity: 0;
+    transform: scale(0.9) translateY(-20px);
+  }
+  
+  // 响应式设计
+  @media (max-width: 768px) {
+    margin: var(--glass-spacing-md);
+    border-radius: var(--glass-radius-md);
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 32px);
+  }
+}
+
+// ===== 模态框头部 =====
+.glass-modal-header {
+  padding: var(--glass-spacing-lg) var(--glass-spacing-lg) var(--glass-spacing-md);
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--glass-white-light);
+  backdrop-filter: var(--glass-blur-sm);
+  -webkit-backdrop-filter: var(--glass-blur-sm);
+  
+  .glass-modal-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--glass-text-primary);
+    margin: 0;
+    line-height: 1.4;
+  }
+  
+  .glass-modal-close {
+    position: absolute;
+    top: var(--glass-spacing-md);
+    right: var(--glass-spacing-md);
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: var(--glass-white-lighter);
+    border-radius: var(--glass-radius-sm);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--glass-transition-fast);
+    
+    &:hover {
+      background: var(--glass-white);
+      transform: scale(1.05);
+    }
+    
+    &:active {
+      transform: scale(0.95);
+    }
+    
+    .glass-close-icon {
+      width: 16px;
+      height: 16px;
+      color: var(--glass-text-secondary);
+    }
+  }
+}
+
+// ===== 模态框主体 =====
+.glass-modal-body {
+  padding: var(--glass-spacing-lg);
+  color: var(--glass-text-primary);
+  line-height: 1.6;
+  overflow-y: auto;
+  
+  // 自定义滚动条
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  &::-webkit-scrollbar-track {
+    background: var(--glass-white-lighter);
+    border-radius: var(--glass-radius-sm);
+  }
+  
+  &::-webkit-scrollbar-thumb {
+    background: var(--glass-border);
+    border-radius: var(--glass-radius-sm);
+    
+    &:hover {
+      background: var(--glass-shadow);
+    }
+  }
+}
+
+// ===== 模态框底部 =====
+.glass-modal-footer {
+  padding: var(--glass-spacing-md) var(--glass-spacing-lg) var(--glass-spacing-lg);
+  border-top: 1px solid var(--glass-border);
+  background: var(--glass-white-light);
+  backdrop-filter: var(--glass-blur-sm);
+  -webkit-backdrop-filter: var(--glass-blur-sm);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--glass-spacing-md);
+  
+  @media (max-width: 480px) {
+    flex-direction: column-reverse;
+    gap: var(--glass-spacing-sm);
+  }
+}
+
+// ===== 磨砂玻璃按钮 =====
+.glass-button {
+  @include glass-base;
+  border-radius: var(--glass-radius-md);
+  padding: var(--glass-spacing-md) var(--glass-spacing-lg);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--glass-text-primary);
+  cursor: pointer;
+  transition: all var(--glass-transition-fast);
+  border: 1px solid var(--glass-border);
+  
+  &:hover {
+    @include glass-hover;
+  }
+  
+  &:active {
+    @include glass-active;
+  }
+  
+  &.glass-button-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: transparent;
+    
+    &:hover {
+      background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+      box-shadow: var(--glass-shadow-lg);
+      transform: translateY(-2px);
+    }
+  }
+  
+  &.glass-button-secondary {
+    background: var(--glass-white-lighter);
+    
+    &:hover {
+      background: var(--glass-white);
+    }
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    
+    &:hover {
+      transform: none;
+      box-shadow: var(--glass-shadow-md);
+    }
+  }
+  
+  @media (max-width: 480px) {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+// ===== 磨砂玻璃输入框 =====
+.glass-input {
+  @include glass-base;
+  border-radius: var(--glass-radius-md);
+  padding: var(--glass-spacing-md);
+  font-size: 14px;
+  color: var(--glass-text-primary);
+  transition: all var(--glass-transition-fast);
+  width: 100%;
+  
+  &::placeholder {
+    color: var(--glass-text-placeholder);
+  }
+  
+  &:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  }
+  
+  &:hover {
+    border-color: var(--glass-shadow);
+  }
+}
+
+// ===== 磨砂玻璃卡片 =====
+.glass-card {
+  @include glass-base;
+  border-radius: var(--glass-radius-lg);
+  padding: var(--glass-spacing-lg);
+  transition: all var(--glass-transition-fast);
+  
+  &:hover {
+    @include glass-hover;
+  }
+  
+  &.glass-card-interactive {
+    cursor: pointer;
+    
+    &:active {
+      @include glass-active;
+    }
+  }
+}

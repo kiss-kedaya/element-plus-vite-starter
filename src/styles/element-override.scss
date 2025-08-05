@@ -422,7 +422,7 @@ body {
   }
 }
 
-// 强制覆盖Element Plus组件的暗色样式
+// 强制覆盖Element Plus组件的暗色样式 - 磨砂玻璃效果
 .ep-card,
 .el-card,
 .ep-dialog,
@@ -437,8 +437,15 @@ body {
 .el-dropdown {
   background: rgba(255, 255, 255, 0.95) !important;
   backdrop-filter: blur(20px) !important;
-  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 12px !important;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5) !important;
   color: #262626 !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
 
   .ep-card__body,
   .el-card__body,
@@ -447,9 +454,18 @@ body {
     background: transparent !important;
     color: #262626 !important;
   }
+
+  // 悬浮效果
+  &:hover {
+    transform: translateY(-2px) !important;
+    box-shadow:
+      0 12px 48px rgba(0, 0, 0, 0.12),
+      0 4px 16px rgba(0, 0, 0, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+  }
 }
 
-// 强制覆盖表单组件的暗色样式
+// 强制覆盖表单组件的暗色样式 - 磨砂玻璃效果
 .ep-form,
 .el-form,
 .ep-form-item,
@@ -467,10 +483,100 @@ body {
   .el-input__wrapper,
   .ep-textarea__inner,
   .el-textarea__inner {
-    background: rgba(255, 255, 255, 0.7) !important;
-    backdrop-filter: blur(10px) !important;
-    border: 1px solid rgba(0, 0, 0, 0.06) !important;
+    background: rgba(255, 255, 255, 0.8) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.3) !important;
+    border-radius: 8px !important;
     color: #262626 !important;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.9) !important;
+      border-color: rgba(102, 126, 234, 0.3) !important;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
+    }
+
+    &:focus-within {
+      background: rgba(255, 255, 255, 0.95) !important;
+      border-color: #667eea !important;
+      box-shadow:
+        0 4px 16px rgba(0, 0, 0, 0.08),
+        0 0 0 3px rgba(102, 126, 234, 0.1) !important;
+    }
+  }
+}
+
+// 磨砂玻璃按钮效果
+.ep-button,
+.el-button {
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  border-radius: 8px !important;
+  color: #262626 !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.95) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1) !important;
+  }
+
+  &:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+  }
+
+  // 主要按钮
+  &.el-button--primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    border-color: transparent !important;
+    color: white !important;
+
+    &:hover {
+      background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%) !important;
+      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3) !important;
+    }
+  }
+
+  // 成功按钮
+  &.el-button--success {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+    border-color: transparent !important;
+    color: white !important;
+
+    &:hover {
+      background: linear-gradient(135deg, #0d9f73 0%, #047857 100%) !important;
+      box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3) !important;
+    }
+  }
+
+  // 警告按钮
+  &.el-button--warning {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+    border-color: transparent !important;
+    color: white !important;
+
+    &:hover {
+      background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
+      box-shadow: 0 8px 24px rgba(245, 158, 11, 0.3) !important;
+    }
+  }
+
+  // 危险按钮
+  &.el-button--danger {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+    border-color: transparent !important;
+    color: white !important;
+
+    &:hover {
+      background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
+      box-shadow: 0 8px 24px rgba(239, 68, 68, 0.3) !important;
+    }
   }
 }
 
