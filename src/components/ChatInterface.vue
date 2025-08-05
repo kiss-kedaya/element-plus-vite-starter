@@ -1033,12 +1033,21 @@ watch(
 
 onMounted(async () => {
   if (props.account?.wxid) {
-    // 迁移旧缓存数据到新的 accountDataManager
-    chatStore.migrateOldCacheData(props.account.wxid)
+    // 等待缓存迁移完成
+    console.log(`开始加载账号 ${props.account.wxid} 的缓存数据`)
+    const migrationSuccess = await chatStore.migrateOldCacheData(props.account.wxid)
+
+    // 等待Vue响应式更新完成
+    await nextTick()
+
+    console.log(`缓存迁移结果: ${migrationSuccess}, 当前会话数量: ${chatStore.sessions.length}`)
 
     // 如果缓存中没有会话，则从好友列表加载
     if (chatStore.sessions.length === 0) {
+      console.log('没有找到缓存会话，开始从好友列表加载')
       await loadFriendsAsSessions()
+    } else {
+      console.log(`成功加载 ${chatStore.sessions.length} 个缓存会话`)
     }
 
     // 无论WebSocket是否已连接，都重新建立连接以确保事件监听器正确绑定

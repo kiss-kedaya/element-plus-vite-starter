@@ -210,58 +210,76 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   // 迁移旧缓存数据到新的 accountDataManager
-  const migrateOldCacheData = (wxid: string) => {
+  const migrateOldCacheData = async (wxid: string): Promise<boolean> => {
     console.log(`� 开始迁移账号 ${wxid} 的旧缓存数据`)
 
     // 调试：显示所有相关缓存键
     debugCacheKeys(wxid)
 
-    // 检查是否已经有新格式的数据
-    const newCacheKey = `account_data_${wxid}`
-    const existingNewData = localStorage.getItem(newCacheKey)
-    if (existingNewData) {
-      try {
-        const parsed = JSON.parse(existingNewData)
-        if (parsed.sessions && parsed.sessions.length > 0) {
-          console.log(`✅ 账号 ${wxid} 已有新格式数据，跳过迁移`)
-          return
-        }
-      } catch (error) {
-        console.warn('解析新格式数据失败，继续迁移:', error)
+    try {
+      // 首先尝试加载新格式数据
+      accountDataManager.loadAccountFromCache(wxid)
+      const accountData = accountDataManager.getAccountData(wxid)
+
+      // 检查是否已有有效的新格式数据
+      if (accountData.sessions.length > 0 || Object.keys(accountData.messages).length > 0) {
+        console.log(`账号 ${wxid} 已有新格式数据，迁移完成`, {
+          sessions: accountData.sessions.length,
+          messageSessions: Object.keys(accountData.messages).length
+        })
+        return true
       }
+
+      console.log(`开始迁移旧格式缓存数据`)
+      let migrationSuccess = false
+
+      // 加载旧格式的会话列表
+      const cachedSessions = loadFromCache(CACHE_KEYS.SESSIONS, wxid)
+      if (cachedSessions && Array.isArray(cachedSessions)) {
+        console.log(`找到旧格式会话数据: ${cachedSessions.length} 个会话`)
+        accountDataManager.updateSessions(wxid, cachedSessions)
+        migrationSuccess = true
+      }
+
+      // 加载旧格式的消息记录
+      const cachedMessages = loadFromCache(CACHE_KEYS.MESSAGES, wxid)
+      if (cachedMessages && typeof cachedMessages === 'object') {
+        const messageCount = Object.values(cachedMessages).reduce((total: number, msgs) => total + (Array.isArray(msgs) ? msgs.length : 0), 0)
+        console.log(`找到旧格式消息数据: ${messageCount} 条消息`)
+
+        // 将消息逐个添加到 accountDataManager
+        Object.entries(cachedMessages).forEach(([sessionId, msgs]) => {
+          if (Array.isArray(msgs)) {
+            msgs.forEach(msg => {
+              accountDataManager.addMessage(wxid, sessionId, msg)
+            })
+          }
+        })
+        migrationSuccess = true
+      }
+
+      // 加载旧格式的当前会话
+      const cachedCurrentSession = loadFromCache(CACHE_KEYS.CURRENT_SESSION, wxid)
+      if (cachedCurrentSession) {
+        console.log(`找到旧格式当前会话: ${cachedCurrentSession.name}`)
+        accountDataManager.updateCurrentSession(wxid, cachedCurrentSession)
+        migrationSuccess = true
+      }
+
+      if (migrationSuccess) {
+        console.log(`账号 ${wxid} 的旧缓存数据迁移完成`)
+        // 迁移完成后，清理旧格式缓存以释放空间
+        clearCache(wxid)
+      } else {
+        console.log(`账号 ${wxid} 没有找到可迁移的旧缓存数据`)
+      }
+
+      return migrationSuccess
+
+    } catch (error) {
+      console.error(`账号 ${wxid} 缓存迁移失败:`, error)
+      return false
     }
-
-    // 加载旧格式的会话列表
-    const cachedSessions = loadFromCache(CACHE_KEYS.SESSIONS, wxid)
-    if (cachedSessions && Array.isArray(cachedSessions)) {
-      console.log(`📦 找到旧格式会话数据: ${cachedSessions.length} 个会话`)
-      accountDataManager.updateSessions(wxid, cachedSessions)
-    }
-
-    // 加载旧格式的消息记录
-    const cachedMessages = loadFromCache(CACHE_KEYS.MESSAGES, wxid)
-    if (cachedMessages && typeof cachedMessages === 'object') {
-      const messageCount = Object.values(cachedMessages).reduce((total: number, msgs) => total + (Array.isArray(msgs) ? msgs.length : 0), 0)
-      console.log(`📦 找到旧格式消息数据: ${messageCount} 条消息`)
-
-      // 将消息逐个添加到 accountDataManager
-      Object.entries(cachedMessages).forEach(([sessionId, msgs]) => {
-        if (Array.isArray(msgs)) {
-          msgs.forEach(msg => {
-            accountDataManager.addMessage(wxid, sessionId, msg)
-          })
-        }
-      })
-    }
-
-    // 加载旧格式的当前会话
-    const cachedCurrentSession = loadFromCache(CACHE_KEYS.CURRENT_SESSION, wxid)
-    if (cachedCurrentSession) {
-      console.log(`📦 找到旧格式当前会话: ${cachedCurrentSession.name}`)
-      accountDataManager.updateCurrentSession(wxid, cachedCurrentSession)
-    }
-
-    console.log(`✅ 账号 ${wxid} 的旧缓存数据迁移完成`)
   }
 
   // 保存数据到缓存（带防抖）
@@ -1010,12 +1028,80 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  // 检测和修复缓存问题
+  const detectAndRepairCache = (wxid: string) => {
+    console.log(`🔍 检测账号 ${wxid} 的缓存状态`)
+
+    try {
+      // 检查缓存是否可以正常加载
+      const accountData = accountDataManager.getAccountData(wxid)
+
+      // 验证数据完整性
+      let hasIssues = false
+
+      if (!Array.isArray(accountData.sessions)) {
+        console.warn(`会话数据格式异常`)
+        hasIssues = true
+      }
+
+      if (!accountData.messages || typeof accountData.messages !== 'object') {
+        console.warn(`消息数据格式异常`)
+        hasIssues = true
+      }
+
+      // 检查会话数据的完整性
+      accountData.sessions.forEach((session, index) => {
+        if (!session || !session.id || !session.name) {
+          console.warn(`会话 ${index} 数据不完整:`, session)
+          hasIssues = true
+        }
+      })
+
+      // 检查消息数据的完整性
+      Object.entries(accountData.messages).forEach(([sessionId, messages]) => {
+        if (!Array.isArray(messages)) {
+          console.warn(`会话 ${sessionId} 的消息数据不是数组`)
+          hasIssues = true
+        } else {
+          messages.forEach((msg, index) => {
+            if (!msg || !msg.id) {
+              console.warn(`会话 ${sessionId} 消息 ${index} 数据不完整:`, msg)
+              hasIssues = true
+            }
+          })
+        }
+      })
+
+      if (hasIssues) {
+        console.log(`🔧 检测到缓存问题，开始修复`)
+        accountDataManager.repairCorruptedCache(wxid)
+        return true
+      } else {
+        console.log(`✅ 缓存数据完整，无需修复`)
+        return false
+      }
+    } catch (error) {
+      console.error(`检测缓存时出错:`, error)
+      console.log(`🔧 强制修复缓存`)
+      accountDataManager.repairCorruptedCache(wxid)
+      return true
+    }
+  }
+
   // 切换账号时的数据管理
   const switchAccount = (newWxid: string, oldWxid?: string) => {
     console.log(`🔄 开始账号切换: ${oldWxid} -> ${newWxid}`)
 
-    // 先迁移旧缓存数据（如果存在）
-    migrateOldCacheData(newWxid)
+    // 检测和修复缓存问题
+    const wasRepaired = detectAndRepairCache(newWxid)
+    if (wasRepaired) {
+      console.log(`账号 ${newWxid} 的缓存已修复`)
+    }
+
+    // 先迁移旧缓存数据（如果存在且未修复）
+    if (!wasRepaired) {
+      migrateOldCacheData(newWxid)
+    }
 
     // 使用accountDataManager进行账号切换
     const newAccountData = accountDataManager.switchToAccount(newWxid)
@@ -1623,5 +1709,6 @@ export const useChatStore = defineStore('chat', () => {
     syncCrossAccountMessages,
     clearCache,
     debugCacheKeys,
+    detectAndRepairCache,
   }
 })

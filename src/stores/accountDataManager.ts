@@ -186,25 +186,82 @@ class AccountDataManager {
   private saveAccountToCache(wxid: string) {
     try {
       const accountData = this.accountsData[wxid]
-      if (!accountData) return
+      if (!accountData) {
+        console.warn(`尝试保存不存在的账号数据: ${wxid}`)
+        return
+      }
+
+      // 验证数据完整性
+      const validSessions = accountData.sessions.filter(session =>
+        session && typeof session === 'object' && session.id && session.name
+      )
+
+      const validMessages: Record<string, ChatMessage[]> = {}
+      Object.entries(accountData.messages).forEach(([sessionId, messages]) => {
+        if (Array.isArray(messages)) {
+          validMessages[sessionId] = messages.filter(msg =>
+            msg && typeof msg === 'object' && msg.id
+          )
+        }
+      })
 
       const cacheData = {
-        sessions: accountData.sessions,
-        messages: accountData.messages,
+        sessions: validSessions,
+        messages: validMessages,
         currentSession: accountData.currentSession,
-        lastUpdateTime: accountData.lastUpdateTime
+        lastUpdateTime: accountData.lastUpdateTime,
+        version: '1.0' // 添加版本号用于未来的兼容性
       }
 
       const cacheKey = `account_data_${wxid}`
-      const serializedData = JSON.stringify(cacheData, (key, value) => {
-        if (value instanceof Date) {
-          return { __type: 'Date', value: value.toISOString() }
-        }
-        return value
-      })
 
-      localStorage.setItem(cacheKey, serializedData)
-      console.log(`💾 保存账号 ${wxid} 数据到缓存: ${serializedData.length} 字符`)
+      let serializedData: string
+      try {
+        serializedData = JSON.stringify(cacheData, (key, value) => {
+          try {
+            if (value instanceof Date) {
+              return { __type: 'Date', value: value.toISOString() }
+            }
+            return value
+          } catch (serializeError) {
+            console.warn(`序列化字段 ${key} 时出错:`, serializeError, '值:', value)
+            return null // 跳过有问题的值
+          }
+        })
+      } catch (serializeError) {
+        console.error(`序列化账号 ${wxid} 数据失败:`, serializeError)
+        return
+      }
+
+      // 检查序列化后的数据大小
+      if (serializedData.length > 5 * 1024 * 1024) { // 5MB限制
+        console.warn(`账号 ${wxid} 缓存数据过大 (${Math.round(serializedData.length / 1024 / 1024)}MB)，可能影响性能`)
+      }
+
+      try {
+        localStorage.setItem(cacheKey, serializedData)
+        console.log(`💾 保存账号 ${wxid} 数据到缓存: ${Math.round(serializedData.length / 1024)}KB`, {
+          sessions: validSessions.length,
+          messagesSessions: Object.keys(validMessages).length,
+          totalMessages: Object.values(validMessages).reduce((sum, msgs) => sum + msgs.length, 0)
+        })
+      } catch (storageError) {
+        console.error(`存储账号 ${wxid} 数据失败:`, storageError)
+
+        // 如果是存储空间不足，尝试清理旧数据
+        if (storageError.name === 'QuotaExceededError') {
+          console.log(`存储空间不足，尝试清理旧缓存数据`)
+          this.cleanupOldCache()
+
+          // 重试保存
+          try {
+            localStorage.setItem(cacheKey, serializedData)
+            console.log(`💾 清理后重新保存成功: ${wxid}`)
+          } catch (retryError) {
+            console.error(`清理后重新保存仍然失败:`, retryError)
+          }
+        }
+      }
     } catch (error) {
       console.error(`保存账号 ${wxid} 数据失败:`, error)
     }
@@ -213,40 +270,129 @@ class AccountDataManager {
   /**
    * 从localStorage加载账号数据
    */
-  private loadAccountFromCache(wxid: string) {
+  loadAccountFromCache(wxid: string) {
     try {
       const cacheKey = `account_data_${wxid}`
+      console.log(`🔍 尝试加载账号 ${wxid} 的缓存数据，键名: ${cacheKey}`)
+
       const cached = localStorage.getItem(cacheKey)
-      
+
       if (!cached) {
         console.log(`📂 账号 ${wxid} 没有缓存数据`)
         return
       }
 
-      const cacheData = JSON.parse(cached, (key, value) => {
-        if (value && typeof value === 'object' && value.__type === 'Date') {
-          return new Date(value.value)
-        }
-        if ((key === 'timestamp' || key === 'lastMessageTime') && value) {
-          const date = new Date(value)
-          return Number.isNaN(date.getTime()) ? new Date() : date
-        }
-        return value
-      })
+      console.log(`📂 找到缓存数据，大小: ${cached.length} 字符`)
+
+      // 安全的JSON解析，带有详细的错误处理
+      let cacheData: any
+      try {
+        cacheData = JSON.parse(cached, (key, value) => {
+          try {
+            // 处理Date对象的反序列化
+            if (value && typeof value === 'object' && value.__type === 'Date') {
+              const date = new Date(value.value)
+              if (isNaN(date.getTime())) {
+                console.warn(`无效的Date对象: ${value.value}，使用当前时间`)
+                return new Date()
+              }
+              return date
+            }
+
+            // 处理时间戳字段
+            if ((key === 'timestamp' || key === 'lastMessageTime') && value) {
+              const date = new Date(value)
+              if (isNaN(date.getTime())) {
+                console.warn(`无效的时间戳: ${value}，使用当前时间`)
+                return new Date()
+              }
+              return date
+            }
+
+            return value
+          } catch (parseError) {
+            console.warn(`解析字段 ${key} 时出错:`, parseError, '值:', value)
+            return value
+          }
+        })
+      } catch (parseError) {
+        console.error(`JSON解析失败:`, parseError)
+        console.error(`缓存数据内容（前100字符）:`, cached.substring(0, 100))
+
+        // 尝试清除损坏的缓存
+        localStorage.removeItem(cacheKey)
+        console.log(`🗑️ 已清除损坏的缓存数据: ${cacheKey}`)
+        return
+      }
+
+      // 验证缓存数据结构
+      if (!cacheData || typeof cacheData !== 'object') {
+        console.error(`缓存数据格式无效:`, cacheData)
+        localStorage.removeItem(cacheKey)
+        return
+      }
 
       const accountData = this.initAccount(wxid)
-      accountData.sessions = cacheData.sessions || []
-      accountData.messages = cacheData.messages || {}
-      accountData.currentSession = cacheData.currentSession || null
+
+      // 安全地设置会话数据
+      if (Array.isArray(cacheData.sessions)) {
+        accountData.sessions = cacheData.sessions.filter(session => {
+          // 验证会话对象的基本结构
+          return session && typeof session === 'object' && session.id && session.name
+        })
+        console.log(`✅ 加载了 ${accountData.sessions.length} 个有效会话`)
+      } else {
+        console.warn(`会话数据格式无效，使用空数组`)
+        accountData.sessions = []
+      }
+
+      // 安全地设置消息数据
+      if (cacheData.messages && typeof cacheData.messages === 'object') {
+        accountData.messages = {}
+        Object.entries(cacheData.messages).forEach(([sessionId, messages]) => {
+          if (Array.isArray(messages)) {
+            accountData.messages[sessionId] = messages.filter(msg => {
+              // 验证消息对象的基本结构
+              return msg && typeof msg === 'object' && msg.id
+            })
+            console.log(`✅ 会话 ${sessionId} 加载了 ${accountData.messages[sessionId].length} 条有效消息`)
+          }
+        })
+      } else {
+        console.warn(`消息数据格式无效，使用空对象`)
+        accountData.messages = {}
+      }
+
+      // 安全地设置当前会话
+      if (cacheData.currentSession && typeof cacheData.currentSession === 'object' && cacheData.currentSession.id) {
+        accountData.currentSession = cacheData.currentSession
+        console.log(`✅ 加载当前会话: ${accountData.currentSession.name}`)
+      } else {
+        accountData.currentSession = null
+        console.log(`当前会话数据无效或为空`)
+      }
+
+      // 设置最后更新时间
       accountData.lastUpdateTime = cacheData.lastUpdateTime || Date.now()
 
-      console.log(`📂 加载账号 ${wxid} 缓存数据:`, {
+      console.log(`📂 成功加载账号 ${wxid} 缓存数据:`, {
         sessions: accountData.sessions.length,
-        messages: Object.keys(accountData.messages).length,
-        currentSession: accountData.currentSession?.name
+        messagesSessions: Object.keys(accountData.messages).length,
+        totalMessages: Object.values(accountData.messages).reduce((sum, msgs) => sum + msgs.length, 0),
+        currentSession: accountData.currentSession?.name || 'null',
+        lastUpdate: new Date(accountData.lastUpdateTime).toLocaleString()
       })
     } catch (error) {
       console.error(`加载账号 ${wxid} 数据失败:`, error)
+
+      // 发生错误时，确保账号数据至少是初始化状态
+      const accountData = this.initAccount(wxid)
+      accountData.sessions = []
+      accountData.messages = {}
+      accountData.currentSession = null
+      accountData.lastUpdateTime = Date.now()
+
+      console.log(`🔄 已重置账号 ${wxid} 为初始状态`)
     }
   }
 
@@ -274,6 +420,54 @@ class AccountDataManager {
   }
 
   /**
+   * 清理旧的缓存数据
+   */
+  private cleanupOldCache() {
+    try {
+      console.log(`🧹 开始清理旧缓存数据`)
+
+      const keysToRemove: string[] = []
+      const currentTime = Date.now()
+      const maxAge = 7 * 24 * 60 * 60 * 1000 // 7天
+
+      // 检查所有localStorage键
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i)
+        if (!key) continue
+
+        // 清理旧格式的缓存键
+        if (key.startsWith('wechat_chat_') || key.startsWith('account_data_')) {
+          try {
+            const data = localStorage.getItem(key)
+            if (data) {
+              const parsed = JSON.parse(data)
+              const lastUpdate = parsed.lastUpdateTime || parsed.lastUpdate || 0
+
+              // 如果数据超过7天未更新，标记为删除
+              if (currentTime - lastUpdate > maxAge) {
+                keysToRemove.push(key)
+              }
+            }
+          } catch (error) {
+            // 如果解析失败，也标记为删除
+            keysToRemove.push(key)
+          }
+        }
+      }
+
+      // 删除标记的键
+      keysToRemove.forEach(key => {
+        localStorage.removeItem(key)
+        console.log(`🗑️ 删除旧缓存键: ${key}`)
+      })
+
+      console.log(`🧹 清理完成，删除了 ${keysToRemove.length} 个旧缓存项`)
+    } catch (error) {
+      console.error(`清理旧缓存失败:`, error)
+    }
+  }
+
+  /**
    * 获取所有账号的数据统计
    */
   getDataStats() {
@@ -289,6 +483,37 @@ class AccountDataManager {
       }
     })
     return stats
+  }
+
+  /**
+   * 修复损坏的缓存数据
+   */
+  repairCorruptedCache(wxid: string) {
+    console.log(`🔧 开始修复账号 ${wxid} 的缓存数据`)
+
+    try {
+      const cacheKey = `account_data_${wxid}`
+      const cached = localStorage.getItem(cacheKey)
+
+      if (!cached) {
+        console.log(`没有找到缓存数据，无需修复`)
+        return
+      }
+
+      // 尝试解析并修复数据
+      const accountData = this.initAccount(wxid)
+      accountData.sessions = []
+      accountData.messages = {}
+      accountData.currentSession = null
+      accountData.lastUpdateTime = Date.now()
+
+      // 保存修复后的数据
+      this.saveAccountToCache(wxid)
+
+      console.log(`✅ 账号 ${wxid} 的缓存数据已修复`)
+    } catch (error) {
+      console.error(`修复账号 ${wxid} 缓存数据失败:`, error)
+    }
   }
 }
 
