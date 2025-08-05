@@ -6,6 +6,7 @@ import { Document, Picture, RefreshRight, Loading, VideoPlay } from '@element-pl
 import EmojiImage from '@/components/common/EmojiImage.vue'
 import ImageMessage from '@/components/common/ImageMessage.vue'
 import VideoMessage from '@/components/common/VideoMessage.vue'
+import VoiceMessage from '@/components/common/VoiceMessage.vue'
 import FileMessage from '@/components/common/FileMessage.vue'
 import { computed } from 'vue'
 import { useChatStore } from '@/stores/chat'
@@ -404,6 +405,26 @@ function openLink(url?: string) {
               <span class="emoji-text">{{ message.content }}</span>
             </div>
           </div>
+
+          <!-- 语音消息 -->
+          <div v-else-if="message.type === 'voice'" class="message-voice">
+            <VoiceMessage
+              v-if="chatStore.currentSession"
+              :msg-id="getMsgId"
+              :wxid="authStore.currentAccount?.wxid"
+              :from-user-name="message.voiceFromUserName || message.actualSender || (message.fromMe ? authStore.currentAccount?.wxid : chatStore.currentSession.id)"
+              :aes-key="message.voiceAesKey"
+              :buf-id="message.voiceBufId"
+              :length="message.voiceLength"
+              :duration="message.voiceDuration"
+              :duration-seconds="message.voiceDurationSeconds"
+              :voice-format="message.voiceFormat"
+              :voice-url="message.voiceUrl"
+              :can-download="message.voiceCanDownload"
+              :download-api="message.voiceDownloadAPI"
+              :download-params="message.voiceDownloadParams"
+            />
+          </div>
         </div>
 
         <!-- 重试按钮 -->
@@ -501,6 +522,26 @@ function openLink(url?: string) {
               </el-icon>
               <span class="emoji-text">{{ message.content }}</span>
             </div>
+          </div>
+
+          <!-- 语音消息 -->
+          <div v-else-if="message.type === 'voice'" class="message-voice">
+            <VoiceMessage
+              v-if="chatStore.currentSession"
+              :msg-id="getMsgId"
+              :wxid="authStore.currentAccount?.wxid"
+              :from-user-name="message.voiceFromUserName || message.actualSender || (message.fromMe ? authStore.currentAccount?.wxid : chatStore.currentSession.id)"
+              :aes-key="message.voiceAesKey"
+              :buf-id="message.voiceBufId"
+              :length="message.voiceLength"
+              :duration="message.voiceDuration"
+              :duration-seconds="message.voiceDurationSeconds"
+              :voice-format="message.voiceFormat"
+              :voice-url="message.voiceUrl"
+              :can-download="message.voiceCanDownload"
+              :download-api="message.voiceDownloadAPI"
+              :download-params="message.voiceDownloadParams"
+            />
           </div>
         </div>
 

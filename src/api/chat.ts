@@ -179,3 +179,18 @@ export const downloadVideo = (params: {
   })
   return api.post('/Tools/DownloadVideo', params)
 }
+
+// 下载语音
+export const downloadVoice = (params: {
+  Wxid: string;
+  FromUserName: string;
+  MsgId: number;
+  Length: number;
+  Bufid: string;
+}): Promise<any> => {
+  console.log('发送语音下载请求:', {
+    url: '/Tools/DownloadVoice',
+    params
+  })
+  return api.post('/Tools/DownloadVoice', params)
+}

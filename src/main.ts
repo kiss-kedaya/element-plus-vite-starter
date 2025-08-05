@@ -68,6 +68,11 @@ const routes: RouteRecordRaw[] = [
     path: '/friends',
     name: 'Friends',
     component: () => import('./pages/friends.vue')
+  },
+  {
+    path: '/voice-test',
+    name: 'VoiceTest',
+    component: () => import('./views/VoiceTest.vue')
   }
 ]
 

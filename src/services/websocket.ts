@@ -28,6 +28,9 @@ export class WebSocketService {
   private currentWxid: string | undefined = undefined
   private static instance: WebSocketService | null = null
   private autoConnectAccounts: Set<string> = new Set() // 需要自动连接的账号列表
+  // 添加联系人信息更新缓存，防止重复更新
+  private contactUpdateCache = new Map<string, number>()
+  private readonly CONTACT_UPDATE_COOLDOWN = 30000 // 30秒内不重复更新同一个联系人
 
   // 单例模式
   static getInstance(): WebSocketService {
@@ -39,6 +42,34 @@ export class WebSocketService {
 
   private constructor() {
     // 初始化事件监听器映射
+  }
+
+  // 检查是否应该更新联系人信息（防止重复更新）
+  private shouldUpdateContactInfo(accountWxid: string, contactWxid: string): boolean {
+    const cacheKey = `${accountWxid}_${contactWxid}`
+    const lastUpdate = this.contactUpdateCache.get(cacheKey)
+    const now = Date.now()
+
+    if (lastUpdate && (now - lastUpdate) < this.CONTACT_UPDATE_COOLDOWN) {
+      console.log(`⏰ 跳过联系人信息更新 (冷却中): ${contactWxid}, 距离上次更新 ${Math.round((now - lastUpdate) / 1000)}秒`)
+      return false
+    }
+
+    // 记录本次更新时间
+    this.contactUpdateCache.set(cacheKey, now)
+
+    // 清理过期的缓存条目（保持缓存大小合理）
+    if (this.contactUpdateCache.size > 1000) {
+      const expiredKeys: string[] = []
+      this.contactUpdateCache.forEach((timestamp, key) => {
+        if (now - timestamp > this.CONTACT_UPDATE_COOLDOWN * 2) {
+          expiredKeys.push(key)
+        }
+      })
+      expiredKeys.forEach(key => this.contactUpdateCache.delete(key))
+    }
+
+    return true
   }
 
   // 连接所有已登录的账号
@@ -798,7 +829,68 @@ export class WebSocketService {
         }
       }
 
+      // 处理语音消息
+      if (msg.msgType === 34) {
+        chatMessage.content = '[语音]'
+        chatMessage.type = 'voice' // 设置消息类型为语音
 
+        // 优先从extraData中提取语音信息
+        if (msg.extraData) {
+          chatMessage.voiceAesKey = msg.extraData.aeskey
+          chatMessage.voiceBufId = msg.extraData.bufid || '0'
+          chatMessage.voiceLength = parseInt(msg.extraData.length) || 0
+          chatMessage.voiceDuration = parseInt(msg.extraData.duration) || parseInt(msg.extraData.voicelength) || 0
+          chatMessage.voiceDurationSeconds = msg.extraData.durationSeconds
+          chatMessage.voiceFormat = msg.extraData.voiceFormat
+          chatMessage.voiceUrl = msg.extraData.voiceurl
+          chatMessage.voiceCanDownload = msg.extraData.canDownload !== false
+          chatMessage.voiceDownloadAPI = msg.extraData.downloadAPI || '/api/Tools/DownloadVoice'
+          chatMessage.voiceDownloadParams = msg.extraData.downloadParams
+        }
+
+        // 如果extraData没有信息，尝试从originalContent的XML中解析
+        if (!chatMessage.voiceAesKey && msg.originalContent) {
+          try {
+            const aesKeyMatch = msg.originalContent.match(/aeskey\s*=\s*"([^"]+)"/)
+            const bufIdMatch = msg.originalContent.match(/bufid\s*=\s*"([^"]+)"/)
+            const lengthMatch = msg.originalContent.match(/length\s*=\s*"([^"]+)"/)
+            const voiceLengthMatch = msg.originalContent.match(/voicelength\s*=\s*"([^"]+)"/)
+            const voiceFormatMatch = msg.originalContent.match(/voiceformat\s*=\s*"([^"]+)"/)
+            const voiceUrlMatch = msg.originalContent.match(/voiceurl\s*=\s*"([^"]+)"/)
+            const fromUserNameMatch = msg.originalContent.match(/fromusername\s*=\s*"([^"]+)"/)
+
+            if (aesKeyMatch) chatMessage.voiceAesKey = aesKeyMatch[1]
+            if (bufIdMatch) chatMessage.voiceBufId = bufIdMatch[1]
+            if (lengthMatch) chatMessage.voiceLength = parseInt(lengthMatch[1]) || 0
+            if (voiceLengthMatch) chatMessage.voiceDuration = parseInt(voiceLengthMatch[1]) || 0
+            if (voiceFormatMatch) chatMessage.voiceFormat = voiceFormatMatch[1]
+            if (voiceUrlMatch) chatMessage.voiceUrl = voiceUrlMatch[1]
+            if (fromUserNameMatch) chatMessage.voiceFromUserName = fromUserNameMatch[1]
+
+            // 计算秒数
+            if (chatMessage.voiceDuration) {
+              chatMessage.voiceDurationSeconds = (chatMessage.voiceDuration / 1000).toFixed(1)
+            }
+
+            chatMessage.voiceCanDownload = true
+            chatMessage.voiceDownloadAPI = '/api/Tools/DownloadVoice'
+          } catch (error) {
+            console.warn('解析语音消息XML失败:', error)
+          }
+        }
+
+        console.log('语音消息解析结果:', {
+          aesKey: chatMessage.voiceAesKey,
+          bufId: chatMessage.voiceBufId,
+          length: chatMessage.voiceLength,
+          duration: chatMessage.voiceDuration,
+          durationSeconds: chatMessage.voiceDurationSeconds,
+          format: chatMessage.voiceFormat,
+          canDownload: chatMessage.voiceCanDownload,
+          downloadAPI: chatMessage.voiceDownloadAPI,
+          fromUserName: chatMessage.voiceFromUserName
+        })
+      }
 
       // 处理好友请求消息
       if (msg.msgType === 37) {
@@ -919,6 +1011,8 @@ export class WebSocketService {
         return 'image'
       case 6: // 文件消息
         return 'file'
+      case 34: // 语音消息
+        return 'voice'
       case 43: // 视频消息
         return 'video'
       case 47: // 表情消息

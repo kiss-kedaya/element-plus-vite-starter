@@ -14,7 +14,7 @@ export interface ChatMessage {
   content: string
   timestamp: Date
   fromMe: boolean
-  type: 'text' | 'image' | 'file' | 'video' | 'system' | 'emoji' | 'link'
+  type: 'text' | 'image' | 'file' | 'video' | 'voice' | 'system' | 'emoji' | 'link'
   status?: 'sending' | 'sent' | 'failed' | 'received'
   imageData?: string
   imagePath?: string         // 图片文件路径
@@ -72,6 +72,18 @@ export interface ChatMessage {
   videoFromUserName?: string // 视频发送者用户名
   videoData?: string         // 视频数据
   videoPath?: string         // 视频文件路径
+  // 语音相关字段
+  voiceAesKey?: string       // 语音AES密钥
+  voiceBufId?: string        // 语音缓冲区ID
+  voiceLength?: number       // 语音文件大小
+  voiceDuration?: number     // 语音时长（毫秒）
+  voiceDurationSeconds?: string // 语音时长（秒，字符串格式）
+  voiceFormat?: string       // 语音格式
+  voiceUrl?: string          // 语音URL
+  voiceCanDownload?: boolean // 是否可以下载
+  voiceDownloadAPI?: string  // 下载API路径
+  voiceDownloadParams?: any  // 下载参数
+  voiceFromUserName?: string // 语音发送者用户名
   // 新增字段用于重试和撤回功能
   originalContent?: string  // 原始内容，用于重试
   canRetry?: boolean       // 是否可以重试

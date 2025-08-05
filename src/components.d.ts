@@ -78,6 +78,7 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     Table: typeof import('./components/base/Table/index.vue')['default']
     VideoMessage: typeof import('./components/common/VideoMessage.vue')['default']
+    VoiceMessage: typeof import('./components/common/VoiceMessage.vue')['default']
   }
   export interface ComponentCustomProperties {
     vLoading: typeof import('element-plus/es')['ElLoadingDirective']

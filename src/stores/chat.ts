@@ -1316,12 +1316,23 @@ export const useChatStore = defineStore('chat', () => {
           updateSessionContactInfo(authStore.currentAccount.wxid, sessionId, true) // 强制刷新新会话
         }
       } else {
-        // 即使会话已存在，如果是收到的消息，也尝试更新联系人信息
+        // 即使会话已存在，如果是收到的消息，也尝试更新联系人信息（添加防重复更新机制）
         if (!chatMessage.fromMe) {
           const authStore = useAuthStore()
           if (authStore.currentAccount?.wxid) {
-            console.log('🔄 收到新消息，尝试更新现有会话的联系人信息:', sessionId)
-            updateSessionContactInfo(authStore.currentAccount.wxid, sessionId, true) // 强制刷新
+            // 检查是否需要更新联系人信息（防止重复更新）
+            const cacheKey = `contact_update_${authStore.currentAccount.wxid}_${sessionId}`
+            const lastUpdate = sessionStorage.getItem(cacheKey)
+            const now = Date.now()
+            const CONTACT_UPDATE_COOLDOWN = 30000 // 30秒冷却时间
+
+            if (!lastUpdate || (now - parseInt(lastUpdate)) > CONTACT_UPDATE_COOLDOWN) {
+              console.log('🔄 收到新消息，尝试更新现有会话的联系人信息:', sessionId)
+              sessionStorage.setItem(cacheKey, now.toString())
+              updateSessionContactInfo(authStore.currentAccount.wxid, sessionId, false) // 不强制刷新，避免频繁更新
+            } else {
+              console.log(`⏰ 跳过联系人信息更新 (冷却中): ${sessionId}, 距离上次更新 ${Math.round((now - parseInt(lastUpdate)) / 1000)}秒`)
+            }
           }
         }
       }
