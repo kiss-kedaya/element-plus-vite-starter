@@ -10,6 +10,8 @@ import { useContactStore } from '@/stores/contact'
 import { accountDataManager } from './accountDataManager'
 import { fileCacheManager } from '@/utils/fileCache'
 import { ElMessage } from 'element-plus'
+import { memoryManager } from '@/utils/memoryManager'
+import { messageProcessor } from '@/utils/messageProcessor'
 
 export const useChatStore = defineStore('chat', () => {
   // 状态 - 现在通过accountDataManager管理
@@ -21,6 +23,41 @@ export const useChatStore = defineStore('chat', () => {
 
   // 缓存保存防抖
   const saveTimeouts = new Map<string, NodeJS.Timeout>()
+
+  // 内存管理配置
+  const memoryConfig = {
+    maxCacheSize: 50, // 最大缓存条目数
+    cleanupInterval: 300000, // 5分钟清理一次
+    lastCleanupTime: 0
+  }
+
+  // 注册内存清理回调
+  memoryManager.registerCleanupCallback('chatStore', () => {
+    performChatStoreCleanup()
+  })
+
+  // 账号切换现在由统一的AccountSwitchManager处理
+  // 移除原有的事件监听器以避免重复触发
+
+  // 执行聊天store的内存清理
+  const performChatStoreCleanup = () => {
+    console.log('开始执行聊天store内存清理')
+
+    // 清理保存超时
+    saveTimeouts.forEach((timeout, key) => {
+      clearTimeout(timeout)
+    })
+    saveTimeouts.clear()
+
+    // 清理文件缓存
+    fileCacheManager.cleanup()
+
+    // 触发强制刷新以清理计算属性缓存
+    refreshTrigger.value++
+
+    memoryConfig.lastCleanupTime = Date.now()
+    console.log('聊天store内存清理完成')
+  }
 
   // 获取当前账号的会话列表
   const sessions = computed(() => {
@@ -1288,155 +1325,218 @@ export const useChatStore = defineStore('chat', () => {
     return null
   }
 
-  // 处理聊天消息
+  // 处理聊天消息（改进的幂等性处理）
   const handleChatMessage = async (data: any, messageWxid?: string) => {
-    console.log('📥 Chat Store 收到聊天消息:', {
-      sessionId: data.sessionId,
-      content: data.content?.substring(0, 30) + '...',
-      fromMe: data.fromMe,
-      type: data.type,
-      messageWxid,
-      timestamp: data.timestamp
-    })
+    try {
+      console.log('收到聊天消息:', {
+        sessionId: data.sessionId,
+        content: data.content?.substring(0, 30) + '...',
+        fromMe: data.fromMe,
+        type: data.type,
+        messageWxid,
+        timestamp: data.timestamp,
+        messageId: data.id
+      })
 
-    // 检查消息是否属于当前账号
-    const authStore = useAuthStore()
-    const currentAccountWxid = authStore.currentAccount?.wxid
+      // 检查消息是否属于当前账号
+      const authStore = useAuthStore()
+      const currentAccountWxid = authStore.currentAccount?.wxid
 
-    // 如果提供了messageWxid，检查是否匹配当前账号
-    if (messageWxid && currentAccountWxid && messageWxid !== currentAccountWxid) {
-      console.log(`📨 消息属于账号 ${messageWxid}，但当前账号是 ${currentAccountWxid}`)
+      if (!currentAccountWxid) {
+        console.warn('当前没有登录账号，跳过消息处理')
+        return
+      }
 
-      // 跨账号消息已经由 crossAccountMessage.ts 处理了，这里不需要重复处理
-      console.log(`⏭️ 跳过当前账号的消息处理，跨账号消息由专门的存储处理`)
-      return
-    }
+      // 改进的跨账号消息处理逻辑
+      const targetWxid = messageWxid || currentAccountWxid
+      const isCurrentAccount = targetWxid === currentAccountWxid
 
-    const sessionId = data.sessionId || (data.fromMe ? data.toUser : data.fromUser)
+      // 使用消息处理器检查消息归属
+      if (messageWxid && !messageProcessor.isMessageForAccount(data, currentAccountWxid, messageWxid)) {
+        console.log(`消息属于其他账号 ${messageWxid}，当前账号 ${currentAccountWxid}`)
 
-    console.log('🎯 确定会话ID:', {
-      originalSessionId: data.sessionId,
-      calculatedSessionId: sessionId,
-      fromMe: data.fromMe,
-      toUser: data.toUser,
-      fromUser: data.fromUser
-    })
-
-    const chatMessage: ChatMessage = {
-      id: data.id || Date.now().toString(),
-      content: data.content || '',
-      timestamp: data.timestamp instanceof Date ? data.timestamp : new Date(data.timestamp || Date.now()),
-      fromMe: data.fromMe || false,
-      type: data.type || 'text',
-      status: 'received',
-      sessionId: sessionId,
-      isGroupMessage: sessionId?.includes('@chatroom') || false,
-      actualSender: data.actualSender || data.fromUser,
-      actualSenderName: data.actualSenderName || data.senderName,
-      // 表情相关字段
-      emojiUrl: data.emojiUrl,
-      emojiThumbUrl: data.emojiThumbUrl,
-      emojiExternUrl: data.emojiExternUrl,
-      emojiWidth: data.emojiWidth,
-      emojiHeight: data.emojiHeight,
-      emojiData: data.emojiData,
-      emojiAesKey: data.emojiAesKey,
-      emojiMd5: data.emojiMd5,
-      // 图片相关字段
-      imageData: data.imageData,
-      imagePath: data.imagePath,
-      imageAesKey: data.imageAesKey,
-      imageMd5: data.imageMd5,
-      imageDataLen: data.imageDataLen,
-      imageCompressType: data.imageCompressType,
-      // CDN下载参数
-      imageCdnFileAesKey: data.imageCdnFileAesKey,
-      imageCdnFileNo: data.imageCdnFileNo,
-      // 其他CDN信息
-      imageCdnThumbUrl: data.imageCdnThumbUrl,
-      imageCdnMidUrl: data.imageCdnMidUrl,
-      // 视频相关字段
-      videoAesKey: data.videoAesKey,
-      videoMd5: data.videoMd5,
-      // videoNewMd5: data.videoNewMd5, // 移除不存在的字段
-      videoDataLen: data.videoDataLen,
-      videoCompressType: data.videoCompressType,
-      videoPlayLength: data.videoPlayLength,
-      videoCdnUrl: data.videoCdnUrl,
-      videoThumbUrl: data.videoThumbUrl,
-      videoThumbAesKey: data.videoThumbAesKey,
-      // videoThumbLength: data.videoThumbLength, // 移除不存在的字段
-      videoThumbWidth: data.videoThumbWidth,
-      videoThumbHeight: data.videoThumbHeight,
-      videoFromUserName: data.videoFromUserName,
-      // 文件相关字段
-      fileData: data.fileData,
-      // 其他字段
-      extraData: data.extraData,
-    }
-    console.log('消息会话ID:', sessionId, '消息内容:', chatMessage.content)
-
-
-
-    if (sessionId) {
-      // 确保会话存在
-      let session = sessions.value.find(s => s.id === sessionId)
-      if (!session) {
-        // 如果会话不存在，创建一个新会话
-        session = {
-          id: sessionId,
-          name: sessionId, // 临时使用sessionId作为名称
-          avatar: '',
-          type: 'friend',
-          lastMessage: '',
-          lastMessageTime: new Date(),
-          unreadCount: 0,
-          isOnline: false,
+        // 如果是跨账号消息，确保被正确存储到对应账号
+        if (messageWxid !== currentAccountWxid) {
+          console.log(`跨账号消息将由专门的存储处理: ${messageWxid}`)
+          return
         }
-        sessions.value.unshift(session)
-        console.log('创建新会话:', sessionId)
+      }
 
-        // 异步获取联系人详情并更新会话信息
-        const authStore = useAuthStore()
-        if (authStore.currentAccount?.wxid) {
-          updateSessionContactInfo(authStore.currentAccount.wxid, sessionId, true) // 强制刷新新会话
+      // 使用消息处理器计算标准化的会话ID
+      const tempMessage: ChatMessage = {
+        id: data.id || Date.now().toString(),
+        content: data.content || '',
+        fromMe: data.fromMe || false,
+        fromUser: data.fromUser,
+        toUser: data.toUser,
+        sessionId: data.sessionId,
+        timestamp: data.timestamp instanceof Date ? data.timestamp : new Date(data.timestamp || Date.now()),
+        type: data.type || 'text',
+        status: 'received'
+      }
+
+      const sessionId = messageProcessor.calculateSessionId(tempMessage, currentAccountWxid)
+
+      console.log('会话ID计算结果:', {
+        originalSessionId: data.sessionId,
+        calculatedSessionId: sessionId,
+        fromMe: data.fromMe,
+        fromUser: data.fromUser,
+        toUser: data.toUser,
+        currentAccount: currentAccountWxid
+      })
+
+      // 创建完整的消息对象
+      const chatMessage: ChatMessage = {
+        id: data.id || Date.now().toString(),
+        content: data.content || '',
+        timestamp: data.timestamp instanceof Date ? data.timestamp : new Date(data.timestamp || Date.now()),
+        fromMe: data.fromMe || false,
+        fromUser: data.fromUser,
+        toUser: data.toUser,
+        type: data.type || 'text',
+        status: 'received',
+        sessionId: sessionId,
+        wxid: targetWxid, // 添加账号标识
+        isGroupMessage: sessionId?.includes('@chatroom') || false,
+        actualSender: data.actualSender || data.fromUser,
+        actualSenderName: data.actualSenderName || data.senderName,
+        // 表情相关字段
+        emojiUrl: data.emojiUrl,
+        emojiThumbUrl: data.emojiThumbUrl,
+        emojiExternUrl: data.emojiExternUrl,
+        emojiWidth: data.emojiWidth,
+        emojiHeight: data.emojiHeight,
+        emojiData: data.emojiData,
+        emojiAesKey: data.emojiAesKey,
+        emojiMd5: data.emojiMd5,
+        // 图片相关字段
+        imageData: data.imageData,
+        imagePath: data.imagePath,
+        imageAesKey: data.imageAesKey,
+        imageMd5: data.imageMd5,
+        imageDataLen: data.imageDataLen,
+        imageCompressType: data.imageCompressType,
+        // CDN下载参数
+        imageCdnFileAesKey: data.imageCdnFileAesKey,
+        imageCdnFileNo: data.imageCdnFileNo,
+        // 其他CDN信息
+        imageCdnThumbUrl: data.imageCdnThumbUrl,
+        imageCdnMidUrl: data.imageCdnMidUrl,
+        // 视频相关字段
+        videoAesKey: data.videoAesKey,
+        videoMd5: data.videoMd5,
+        videoDataLen: data.videoDataLen,
+        videoCompressType: data.videoCompressType,
+        videoPlayLength: data.videoPlayLength,
+        videoCdnUrl: data.videoCdnUrl,
+        videoThumbUrl: data.videoThumbUrl,
+        videoThumbAesKey: data.videoThumbAesKey,
+        videoThumbWidth: data.videoThumbWidth,
+        videoThumbHeight: data.videoThumbHeight,
+        videoFromUserName: data.videoFromUserName,
+        // 文件相关字段
+        fileData: data.fileData,
+        // 其他字段
+        extraData: data.extraData,
+      }
+
+      console.log('处理消息:', {
+        sessionId,
+        messageId: chatMessage.id,
+        content: chatMessage.content?.substring(0, 30) + '...',
+        targetAccount: targetWxid,
+        isCurrentAccount
+      })
+
+
+      // 使用改进的消息添加逻辑
+      if (sessionId) {
+        // 使用accountDataManager添加消息，它会处理去重和幂等性
+        const addSuccess = accountDataManager.addMessage(targetWxid, sessionId, chatMessage)
+
+        if (!addSuccess) {
+          console.log(`消息添加失败或重复: ${chatMessage.id}`)
+          return
         }
-      } else {
-        // 即使会话已存在，如果是收到的消息，也尝试更新联系人信息（添加防重复更新机制）
-        if (!chatMessage.fromMe) {
-          const authStore = useAuthStore()
-          if (authStore.currentAccount?.wxid) {
-            // 检查是否需要更新联系人信息（防止重复更新）
-            const cacheKey = `contact_update_${authStore.currentAccount.wxid}_${sessionId}`
-            const lastUpdate = sessionStorage.getItem(cacheKey)
-            const now = Date.now()
-            const CONTACT_UPDATE_COOLDOWN = 30000 // 30秒冷却时间
 
-            if (!lastUpdate || (now - parseInt(lastUpdate)) > CONTACT_UPDATE_COOLDOWN) {
-              console.log('🔄 收到新消息，尝试更新现有会话的联系人信息:', sessionId)
-              sessionStorage.setItem(cacheKey, now.toString())
-              updateSessionContactInfo(authStore.currentAccount.wxid, sessionId, false) // 不强制刷新，避免频繁更新
-            } else {
-              console.log(`⏰ 跳过联系人信息更新 (冷却中): ${sessionId}, 距离上次更新 ${Math.round((now - parseInt(lastUpdate)) / 1000)}秒`)
+        // 只有当前账号的消息才更新UI
+        if (isCurrentAccount) {
+          // 确保会话存在
+          let session = sessions.value.find(s => s.id === sessionId)
+          if (!session) {
+            // 如果会话不存在，创建一个新会话
+            session = {
+              id: sessionId,
+              name: sessionId, // 临时使用sessionId作为名称
+              avatar: '',
+              type: 'friend',
+              lastMessage: '',
+              lastMessageTime: new Date(),
+              unreadCount: 0,
+              isOnline: false,
+            }
+            sessions.value.unshift(session)
+            console.log('创建新会话:', sessionId)
+
+            // 异步获取联系人详情并更新会话信息
+            if (currentAccountWxid) {
+              updateSessionContactInfo(currentAccountWxid, sessionId, true) // 强制刷新新会话
+            }
+          } else {
+            // 即使会话已存在，如果是收到的消息，也尝试更新联系人信息（添加防重复更新机制）
+            if (!chatMessage.fromMe) {
+              // 检查是否需要更新联系人信息（防止重复更新）
+              const cacheKey = `contact_update_${currentAccountWxid}_${sessionId}`
+              const lastUpdate = sessionStorage.getItem(cacheKey)
+              const now = Date.now()
+              const CONTACT_UPDATE_COOLDOWN = 30000 // 30秒冷却时间
+
+              if (!lastUpdate || (now - parseInt(lastUpdate)) > CONTACT_UPDATE_COOLDOWN) {
+                console.log('收到新消息，尝试更新现有会话的联系人信息:', sessionId)
+                sessionStorage.setItem(cacheKey, now.toString())
+                updateSessionContactInfo(currentAccountWxid, sessionId, false) // 不强制刷新，避免频繁更新
+              } else {
+                console.log(`跳过联系人信息更新 (冷却中): ${sessionId}, 距离上次更新 ${Math.round((now - parseInt(lastUpdate)) / 1000)}秒`)
+              }
             }
           }
+
+          // 如果当前没有选中会话，自动选中这个会话
+          if (!currentSession.value) {
+            setCurrentSession(sessionId, currentAccountWxid)
+            console.log('自动选中会话:', sessionId)
+          }
+
+          // 触发UI更新
+          refreshTrigger.value++
+        }
+
+        console.log(`消息处理完成: ${chatMessage.id}`)
+      } else {
+        console.warn('无法确定消息的会话ID:', data)
+      }
+
+    } catch (error) {
+      console.error('处理聊天消息时发生错误:', error, data)
+
+      // 如果有消息ID，标记处理失败
+      if (data.id) {
+        const tempMessage: ChatMessage = {
+          id: data.id,
+          content: data.content || '',
+          fromMe: data.fromMe || false,
+          timestamp: new Date(),
+          type: data.type || 'text',
+          status: 'failed'
+        }
+        const messageId = messageProcessor.generateMessageIdentifier(tempMessage)
+        const authStore = useAuthStore()
+        const currentAccountWxid = authStore.currentAccount?.wxid
+        if (currentAccountWxid) {
+          messageProcessor.markMessageFailed(messageId, currentAccountWxid, error as Error)
         }
       }
-
-      // 确定消息应该保存到哪个账号的缓存中
-      const authStore = useAuthStore()
-      const targetWxid = messageWxid || authStore.currentAccount?.wxid
-
-      addMessage(sessionId, chatMessage, targetWxid)
-
-      // 如果当前没有选中会话，自动选中这个会话
-      if (!currentSession.value) {
-        setCurrentSession(sessionId, targetWxid)
-        console.log('自动选中会话:', sessionId)
-      }
-    }
-    else {
-      console.warn('无法确定消息的会话ID:', data)
     }
   }
 

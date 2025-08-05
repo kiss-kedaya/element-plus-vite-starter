@@ -4,6 +4,9 @@ import App from './App.vue'
 import { pinia } from './stores'
 import { cleanOldAccountBasedCache } from '@/utils/fileCache'
 import { initPresetFileCache } from '@/utils/presetFileCache'
+import { memoryManager } from '@/utils/memoryManager'
+import '@/utils/memoryMonitor' // 初始化内存监控工具
+// import '@/utils/messageProcessingValidator' // 初始化消息处理验证工具 - 暂时禁用，类型错误
 // 暂时注释掉懒加载相关导入，避免启动错误
 // import { lazy, lazyContainer } from './directives/lazy'
 // import { componentPreloader, smartPreloader } from './utils/lazyLoad'
@@ -94,6 +97,14 @@ app.use(pinia)
 app.use(router)
 
 app.mount('#app')
+
+// 初始化内存管理
+console.log('初始化内存管理系统')
+memoryManager.updateConfig({
+  autoCleanupEnabled: true,
+  memoryThreshold: 150, // 150MB阈值
+  memoryCheckInterval: 60000 // 1分钟检查一次
+})
 
 // 初始化预置文件缓存
 try {

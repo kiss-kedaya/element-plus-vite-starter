@@ -16,6 +16,10 @@ export interface ChatMessage {
   fromMe: boolean
   type: 'text' | 'image' | 'file' | 'video' | 'voice' | 'system' | 'emoji' | 'link'
   status?: 'sending' | 'sent' | 'failed' | 'received'
+  // 消息发送者和接收者信息
+  fromUser?: string           // 发送者微信ID
+  toUser?: string             // 接收者微信ID
+  wxid?: string               // 关联的微信账号ID
   imageData?: string
   imagePath?: string         // 图片文件路径
   imageAesKey?: string       // 图片AES密钥
@@ -26,6 +30,11 @@ export interface ChatMessage {
   imageCdnFileNo?: string    // 图片CDN文件编号
   imageCdnThumbUrl?: string  // 图片CDN缩略图URL
   imageCdnMidUrl?: string    // 图片CDN中等尺寸URL
+  // 图片消息相关字段
+  imageUrl?: string           // 图片URL
+  imageSize?: number          // 图片大小
+  fileName?: string           // 文件名
+  fileSize?: number           // 文件大小
   fileData?: {
     name: string
     size: number

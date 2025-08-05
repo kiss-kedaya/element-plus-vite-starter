@@ -3,6 +3,9 @@ import { ElMessage } from 'element-plus'
 import { WEBSOCKET_CONFIG } from '@/config/websocket'
 import { parseImageMessage, parseVideoMessage } from '@/utils/imageMessageParser'
 import { fileCacheManager } from '@/utils/fileCache'
+import { memoryManager } from '@/utils/memoryManager'
+import { sessionIdCalculator } from '@/utils/sessionIdCalculator'
+import { improvedMessageDeduplicator } from '@/utils/improvedMessageDeduplicator'
 
 // 事件类型定义
 export interface WebSocketEvents {
@@ -22,7 +25,7 @@ interface AccountConnection {
 
 export class WebSocketService {
   private connections: Map<string, AccountConnection> = new Map()
-  private maxReconnectAttempts = Infinity // 无限重连
+  private maxReconnectAttempts = 10 // 限制重连次数
   private reconnectInterval = WEBSOCKET_CONFIG.RECONNECT.INTERVAL
   private eventListeners: Map<string, Function[]> = new Map()
   private currentWxid: string | undefined = undefined
@@ -31,6 +34,14 @@ export class WebSocketService {
   // 添加联系人信息更新缓存，防止重复更新
   private contactUpdateCache = new Map<string, number>()
   private readonly CONTACT_UPDATE_COOLDOWN = 30000 // 30秒内不重复更新同一个联系人
+
+  // 内存管理配置
+  private memoryConfig = {
+    maxConnections: 5, // 最大连接数
+    maxEventListeners: 100, // 最大事件监听器数量
+    connectionTimeout: 300000, // 连接超时时间(5分钟)
+    lastActivityTime: new Map<string, number>() // 连接最后活动时间
+  }
 
   // 单例模式
   static getInstance(): WebSocketService {
@@ -42,6 +53,23 @@ export class WebSocketService {
 
   private constructor() {
     // 初始化事件监听器映射
+
+    // 注册内存清理回调
+    memoryManager.registerCleanupCallback('websocketService', () => {
+      this.performMemoryCleanup()
+    })
+
+    // 监听页面卸载，清理资源
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', () => {
+        this.cleanup()
+      })
+    }
+
+    // 定期清理不活跃的连接
+    setInterval(() => {
+      this.cleanupInactiveConnections()
+    }, 60000) // 每分钟检查一次
   }
 
   // 检查是否应该更新联系人信息（防止重复更新）
@@ -211,7 +239,7 @@ export class WebSocketService {
         connectionInfo.ws = ws
 
         ws.onopen = () => {
-          console.log(`✅ WebSocket连接已建立 (wxid: ${wxid})`)
+          console.log(`WebSocket连接已建立 (wxid: ${wxid})`)
           console.log(`当前所有连接:`, Array.from(this.connections.keys()))
           connectionInfo.isConnecting = false
           connectionInfo.reconnectAttempts = 0
@@ -219,12 +247,16 @@ export class WebSocketService {
           fileCacheManager.setCurrentWxid(wxid)
           this.startHeartbeat(wxid)
 
+          // 更新连接活动时间
+          this.updateConnectionActivity(wxid)
+
           // 触发连接状态事件
           this.emit('connection_status', true, wxid)
           resolve(true)
         }
 
         ws.onmessage = (event) => {
+          this.updateConnectionActivity(wxid)
           this.handleMessage(event.data, wxid)
         }
 
@@ -402,33 +434,36 @@ export class WebSocketService {
         fromMe = msg.fromUser === data.wxid
       }
 
-      // 确定会话ID
-      let sessionId
-      if (isGroupMessage) {
-        // 群聊消息：会话ID是群聊ID（可能在fromUser或toUser中）
-        sessionId = msg.fromUser?.includes('@chatroom') ? msg.fromUser : msg.toUser
-      }
-      else {
-        // 个人消息：会话ID是对方的wxid
-        sessionId = fromMe ? msg.toUser : msg.fromUser
+      // 创建临时消息对象用于会话ID计算
+      const tempMessage: ChatMessage = {
+        id: msg.msgId || Date.now().toString(),
+        content: msg.content || '',
+        fromMe,
+        fromUser: msg.fromUser,
+        toUser: msg.toUser,
+        timestamp: new Date(),
+        type: 'text'
       }
 
-      // 修复sessionId为空的问题
-      if (!sessionId) {
-        console.warn('⚠️ sessionId为空，尝试从其他字段获取:', {
-          fromUser: msg.fromUser,
-          toUser: msg.toUser,
-          fromUserName: msg.fromUserName,
-          toUserName: msg.toUserName,
-          actualSender: msg.actualSender
+      // 使用统一的会话ID计算器
+      const sessionIdResult = sessionIdCalculator.calculateSessionId(tempMessage, data.wxid)
+      let sessionId = sessionIdResult.sessionId
+
+      // 记录会话ID计算结果
+      if (sessionIdResult.confidence < 0.8) {
+        console.warn('⚠️ 会话ID计算置信度较低:', {
+          messageId: tempMessage.id,
+          sessionId,
+          confidence: sessionIdResult.confidence,
+          reason: sessionIdResult.reason,
+          messageType: sessionIdResult.messageType,
+          originalData: {
+            fromUser: msg.fromUser,
+            toUser: msg.toUser,
+            fromMe,
+            isGroupMessage
+          }
         })
-
-        // 尝试从其他字段获取sessionId
-        if (fromMe) {
-          sessionId = msg.toUser || msg.toUserName
-        } else {
-          sessionId = msg.fromUser || msg.fromUserName || msg.actualSender
-        }
       }
 
       console.log(`🎯 消息会话信息:`, {
@@ -1117,6 +1152,145 @@ export class WebSocketService {
       return true
     }
     return false
+  }
+
+  /**
+   * 执行内存清理
+   */
+  private performMemoryCleanup() {
+    console.log('开始执行WebSocket内存清理')
+
+    // 清理过多的连接
+    if (this.connections.size > this.memoryConfig.maxConnections) {
+      this.cleanupExcessConnections()
+    }
+
+    // 清理过多的事件监听器
+    this.cleanupEventListeners()
+
+    // 清理联系人更新缓存
+    this.cleanupContactUpdateCache()
+
+    console.log(`WebSocket内存清理完成，当前连接数: ${this.connections.size}`)
+  }
+
+  /**
+   * 清理过多的连接
+   */
+  private cleanupExcessConnections() {
+    const connections = Array.from(this.connections.entries())
+
+    // 按最后活动时间排序
+    connections.sort((a, b) => {
+      const timeA = this.memoryConfig.lastActivityTime.get(a[0]) || 0
+      const timeB = this.memoryConfig.lastActivityTime.get(b[0]) || 0
+      return timeA - timeB // 最久未活动的排在前面
+    })
+
+    // 保留最近活动的连接，关闭其他
+    const connectionsToClose = connections.slice(0, connections.length - this.memoryConfig.maxConnections)
+
+    connectionsToClose.forEach(([wxid, connection]) => {
+      if (wxid !== this.currentWxid) { // 不关闭当前账号的连接
+        console.log(`关闭不活跃的连接: ${wxid}`)
+        this.disconnect(wxid)
+      }
+    })
+  }
+
+  /**
+   * 清理不活跃的连接
+   */
+  private cleanupInactiveConnections() {
+    const now = Date.now()
+    const connectionsToClose: string[] = []
+
+    this.connections.forEach((connection, wxid) => {
+      const lastActivity = this.memoryConfig.lastActivityTime.get(wxid) || 0
+
+      // 如果连接超过5分钟没有活动，且不是当前账号，则关闭
+      if (now - lastActivity > this.memoryConfig.connectionTimeout && wxid !== this.currentWxid) {
+        connectionsToClose.push(wxid)
+      }
+    })
+
+    connectionsToClose.forEach(wxid => {
+      console.log(`关闭超时连接: ${wxid}`)
+      this.disconnect(wxid)
+    })
+  }
+
+  /**
+   * 清理事件监听器
+   */
+  private cleanupEventListeners() {
+    let totalListeners = 0
+
+    this.eventListeners.forEach((listeners, event) => {
+      totalListeners += listeners.length
+
+      // 如果某个事件的监听器过多，保留最新的
+      if (listeners.length > 10) {
+        this.eventListeners.set(event, listeners.slice(-10))
+        console.log(`清理事件 ${event} 的过多监听器`)
+      }
+    })
+
+    if (totalListeners > this.memoryConfig.maxEventListeners) {
+      console.warn(`事件监听器总数过多: ${totalListeners}`)
+    }
+  }
+
+  /**
+   * 清理联系人更新缓存
+   */
+  private cleanupContactUpdateCache() {
+    const now = Date.now()
+    const keysToDelete: string[] = []
+
+    this.contactUpdateCache.forEach((timestamp, key) => {
+      // 清理超过1小时的缓存
+      if (now - timestamp > 3600000) {
+        keysToDelete.push(key)
+      }
+    })
+
+    keysToDelete.forEach(key => {
+      this.contactUpdateCache.delete(key)
+    })
+
+    if (keysToDelete.length > 0) {
+      console.log(`清理了 ${keysToDelete.length} 个过期的联系人更新缓存`)
+    }
+  }
+
+  /**
+   * 更新连接活动时间
+   */
+  private updateConnectionActivity(wxid: string) {
+    this.memoryConfig.lastActivityTime.set(wxid, Date.now())
+  }
+
+  /**
+   * 清理所有资源
+   */
+  private cleanup() {
+    console.log('清理WebSocket服务资源')
+
+    // 关闭所有连接
+    this.connections.forEach((connection, wxid) => {
+      this.disconnect(wxid)
+    })
+
+    // 清理事件监听器
+    this.eventListeners.clear()
+
+    // 清理缓存
+    this.contactUpdateCache.clear()
+    this.memoryConfig.lastActivityTime.clear()
+
+    // 注销内存清理回调
+    memoryManager.unregisterCleanupCallback('websocketService')
   }
 }
 

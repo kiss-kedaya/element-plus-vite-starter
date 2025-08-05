@@ -260,6 +260,12 @@ class FileCacheManager {
     }
   }
 
+  // 清理资源，防止内存泄漏
+  cleanup(): void {
+    this.clearCache()
+    console.log('文件缓存管理器资源已清理')
+  }
+
   // 删除特定文件的缓存
   removeCachedFile(fileName: string, fileSize: number): boolean {
     const cacheKey = this.generateCacheKey(fileName, fileSize)

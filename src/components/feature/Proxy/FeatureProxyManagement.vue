@@ -231,18 +231,18 @@ const tableColumns = computed<TableColumn[]>(() => [
   { prop: 'port', label: '端口', width: 80 },
   { prop: 'username', label: '用户名', width: 120 },
   { prop: 'password', label: '密码', width: 120 },
-  { prop: 'status', label: '状态', width: 100, slot: 'status' },
-  { prop: 'response_time', label: '响应时间', width: 100, slot: 'response_time' },
+  { prop: 'status', label: '状态', width: 100, slot: true },
+  { prop: 'response_time', label: '响应时间', width: 100, slot: true },
   { prop: 'country', label: '地区', width: 100 },
   { prop: 'region', label: '区域', width: 100 },
   { prop: 'last_test', label: '最后测试', width: 150 },
   { prop: 'expire_date', label: '过期时间', width: 150 },
-  { prop: 'actions', label: '操作', width: 200, slot: 'actions', fixed: 'right' }
+  { prop: 'actions', label: '操作', width: 200, slot: true, fixed: 'right' }
 ])
 
 // 获取可用国家列表
 const countries = computed(() => {
-  return getProxyCountries()
+  return getProxyCountries(proxyList.value?.list || [])
 })
 
 // 自动刷新定时器

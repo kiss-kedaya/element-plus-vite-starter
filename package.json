@@ -19,8 +19,7 @@
     "vercel-build": "vite build",
     "deploy": "vercel",
     "deploy:prod": "vercel --prod",
-    "deploy:preview": "vercel",
-    "postbuild": "echo 'Build completed successfully'"
+    "deploy:preview": "vercel"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",

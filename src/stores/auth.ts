@@ -86,17 +86,8 @@ export const useAuthStore = defineStore('auth', () => {
         console.log(`账号切换：${previousAccount.wxid} -> ${wxid}`)
       }
 
-      // 无论是初始化还是切换，都需要加载对应账号的数据
-      if (!previousAccount || previousAccount.wxid !== wxid) {
-        try {
-          // 动态导入避免循环依赖
-          const { useChatStore } = await import('@/stores/chat')
-          const chatStore = useChatStore()
-          chatStore.switchAccount(wxid, previousAccount?.wxid)
-        } catch (error) {
-          console.error('切换聊天账号数据失败:', error)
-        }
-      }
+      // 账号切换现在由统一的AccountSwitchManager处理
+      // 这里只更新认证状态，不触发额外的切换逻辑
 
       // 在数据切换完成后，才更新currentAccount
       currentAccount.value = account

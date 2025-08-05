@@ -3,6 +3,7 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useFriendStore } from '@/stores/friend'
+import { useChatStore } from '@/stores/chat'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   User,
@@ -34,6 +35,7 @@ const FRIEND_SCENE = {
 const router = useRouter()
 const authStore = useAuthStore()
 const friendStore = useFriendStore()
+const chatStore = useChatStore()
 
 const activeTab = ref('list')
 const searchKeyword = ref('')
@@ -259,10 +261,6 @@ const sendMessage = async (friend: Friend) => {
   }
 
   try {
-    // 导入聊天store
-    const { useChatStore } = await import('@/stores/chat')
-    const chatStore = useChatStore()
-
     // 创建或获取聊天会话
     const session = chatStore.createOrGetSession(friend)
 

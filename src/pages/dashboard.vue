@@ -162,8 +162,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { User, Plus, MoreFilled, Connection, ChatDotRound } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useCrossAccountMessageStore } from '@/stores/crossAccountMessage'
+import { useChatStore } from '@/stores/chat'
 import { useRoute, useRouter } from 'vue-router'
 import { loginApi } from '@/api/auth'
+import { accountSwitchManager } from '@/utils/accountSwitchManager'
 
 // 组件导入
 import LoginForm from '@/components/LoginForm.vue'
@@ -177,6 +179,7 @@ import PresetFileCacheManager from '@/components/business/PresetFileCacheManager
 // Store
 const authStore = useAuthStore()
 const crossAccountMessageStore = useCrossAccountMessageStore()
+const chatStore = useChatStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -207,26 +210,19 @@ const selectAccount = async (account: any) => {
 
   try {
     const previousAccount = authStore.currentAccount
-    await authStore.setCurrentAccount(account.wxid)
+    const previousWxid = previousAccount?.wxid || null
 
-    // 清除当前账号的未读计数
-    authStore.clearAccountUnreadCount(account.wxid)
-    crossAccountMessageStore.clearAccountUnreadCount(account.wxid)
+    // 使用统一的账号切换管理器
+    const result = await accountSwitchManager.switchAccount(account.wxid, previousWxid)
 
-    // 如果是真正的账号切换，重新建立WebSocket连接以确保能立即看到新消息
-    if (previousAccount && previousAccount.wxid !== account.wxid) {
-      console.log(`🔄 账号切换：${previousAccount.wxid} -> ${account.wxid}`)
-      try {
-        const { useChatStore } = await import('@/stores/chat')
-        const chatStore = useChatStore()
-        await chatStore.connectWebSocket(account.wxid)
-        console.log(`✅ 账号切换后WebSocket重连成功`)
-      } catch (error) {
-        console.warn('账号切换后WebSocket重连失败:', error)
+    if (result.success) {
+      if (previousWxid && previousWxid !== account.wxid) {
+        ElMessage.success(`已切换到账号：${account.nickname}，相关数据已重置`)
+      } else {
+        ElMessage.success(`已切换到账号：${account.nickname}`)
       }
-      ElMessage.success(`已切换到账号：${account.nickname}，相关数据已重置`)
     } else {
-      ElMessage.success(`已切换到账号：${account.nickname}`)
+      throw new Error(result.error || '账号切换失败')
     }
   } catch (error) {
     console.error('切换账号时发生错误:', error)

@@ -931,32 +931,32 @@ const batchUpdateAllSessions = async () => {
   chatStore.forceRefreshUI()
 }
 
-// 监听账号变化
+// 监听账号变化 - 现在只处理UI相关的更新
 watch(() => props.account?.wxid, async (newWxid, oldWxid) => {
   if (newWxid && newWxid !== oldWxid) {
-    // 使用新的账号切换功能，自动保存旧账号数据并加载新账号缓存
-    chatStore.switchAccount(newWxid, oldWxid)
+    // 账号切换由统一的AccountSwitchManager处理
+    // 这里只处理UI相关的更新
 
-    // 加载新账号的好友作为会话（如果缓存中没有会话）
-    if (chatStore.sessions.length === 0) {
-      await loadFriendsAsSessions()
-    }
+    // 监听账号切换完成事件
+    const handleAccountSwitched = (event: CustomEvent) => {
+      if (event.detail.wxid === newWxid) {
+        // 加载新账号的好友作为会话（如果缓存中没有会话）
+        if (chatStore.sessions.length === 0) {
+          loadFriendsAsSessions()
+        }
 
-    // 尝试建立或切换 WebSocket 连接（确保事件监听器正确绑定）
-    try {
-      console.log(`🔄 账号切换，重新建立WebSocket连接: ${newWxid}`)
-      // 无论是否已连接，都重新连接以确保事件监听器正确绑定
-      const connected = await chatStore.connectWebSocket(newWxid)
-      if (connected) {
-        console.log(`✅ WebSocket已连接到账号: ${newWxid}`)
-      } else {
-        console.warn(`❌ WebSocket连接失败: ${newWxid}，将使用离线模式`)
+        // 移除事件监听器
+        window.removeEventListener('account-switched', handleAccountSwitched as EventListener)
       }
     }
-    catch (error) {
-      console.warn(`WebSocket连接失败: ${newWxid}，将使用离线模式`, error)
-      // 不显示错误消息，因为这在开发环境中是正常的
-    }
+
+    // 添加临时事件监听器
+    window.addEventListener('account-switched', handleAccountSwitched as EventListener)
+
+    // 设置超时清理，防止内存泄漏
+    setTimeout(() => {
+      window.removeEventListener('account-switched', handleAccountSwitched as EventListener)
+    }, 10000) // 10秒超时
   }
 })
 
